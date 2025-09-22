@@ -19,7 +19,7 @@ For detailed information about the server's functionality and usage, please refe
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/terraform-ibm-modules/tim-mcp
    cd tim-mcp
    ```
 
