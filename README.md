@@ -42,7 +42,7 @@ Add the following configuration to your editor settings to support MCP:
 
 ```json
 {
-  "terraform-ibm-modules mcp server": {
+  "terraform-ibm-modules": {
     "command": "uv",
     "args": [
       "run",
