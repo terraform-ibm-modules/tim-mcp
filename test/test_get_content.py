@@ -842,3 +842,151 @@ class TestGetContentTool:
 
         # Verify resolved version appears in output
         assert "**Version:** HEAD" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_invalid_regex_patterns(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+        """Test that invalid regex patterns are handled gracefully."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["*", "*.tf", ".*\\.tf$"],  # Mix of invalid and valid patterns
+            exclude_files=["+", "?", ".*test.*"],    # Mix of invalid and valid patterns
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+        mock_github_client.resolve_version.return_value = "latest"
+
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            },
+            {
+                "name": "test.tf",
+                "path": "examples/basic/test.tf",
+                "type": "file",
+                "size": 100,
+            }
+        ]
+
+        # Use the real match_file_patterns method to test error handling
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+        real_client = GitHubClient(Config())
+
+        def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
+            return real_client.match_file_patterns(file_path, include_patterns, exclude_patterns)
+
+        mock_github_client.match_file_patterns.side_effect = mock_match_patterns
+        mock_github_client.get_file_content.side_effect = [
+            sample_readme_content,
+            sample_main_tf_content,
+        ]
+
+        # This should not raise an exception despite invalid patterns
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify the request completed successfully
+        assert "**Version:** latest" in result
+        assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_all_invalid_patterns(self, config, mock_github_client, sample_readme_content):
+        """Test handling when all regex patterns are invalid."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["*", "+", "?"],  # All invalid patterns
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+        mock_github_client.resolve_version.return_value = "latest"
+
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            }
+        ]
+
+        # Use the real match_file_patterns method to test error handling
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+        real_client = GitHubClient(Config())
+
+        def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
+            return real_client.match_file_patterns(file_path, include_patterns, exclude_patterns)
+
+        mock_github_client.match_file_patterns.side_effect = mock_match_patterns
+        mock_github_client.get_file_content.side_effect = [sample_readme_content]
+
+        # Should still work - when all include patterns are invalid, defaults to including all files
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify the request completed successfully with README
+        assert "**Version:** latest" in result
+        assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
+        assert "## README" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_glob_patterns_error_scenario(self, config, mock_github_client, sample_readme_content):
+        """Test the specific error scenario reported by user: glob patterns causing regex errors."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["*.tf"],  # Common glob pattern that causes "nothing to repeat" error
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+        mock_github_client.resolve_version.return_value = "latest"
+
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            }
+        ]
+
+        # Use the real match_file_patterns method (this would previously fail)
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+        real_client = GitHubClient(Config())
+
+        def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
+            return real_client.match_file_patterns(file_path, include_patterns, exclude_patterns)
+
+        mock_github_client.match_file_patterns.side_effect = mock_match_patterns
+        mock_github_client.get_file_content.side_effect = [sample_readme_content]
+
+        # This should now work without throwing "nothing to repeat at position 0" error
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify the request completed successfully
+        assert "**Version:** latest" in result
+        assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
+        # Should still include README even though pattern was invalid
+        assert "## README" in result

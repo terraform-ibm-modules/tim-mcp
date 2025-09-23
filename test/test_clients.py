@@ -323,5 +323,55 @@ class TestGitHubClient:
         assert result == "HEAD"
         github_client.get_latest_release.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc")
 
+    def test_match_file_patterns_valid_patterns(self, github_client, mock_cache):
+        """Test match_file_patterns with valid regex patterns."""
+        # Test include patterns
+        assert github_client.match_file_patterns("main.tf", include_patterns=[".*\\.tf$"])
+        assert not github_client.match_file_patterns("main.py", include_patterns=[".*\\.tf$"])
+
+        # Test exclude patterns
+        assert not github_client.match_file_patterns("test_main.tf", exclude_patterns=[".*test.*"])
+        assert github_client.match_file_patterns("main.tf", exclude_patterns=[".*test.*"])
+
+        # Test combined patterns
+        assert github_client.match_file_patterns(
+            "main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
+        )
+        assert not github_client.match_file_patterns(
+            "test_main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
+        )
+
+    def test_match_file_patterns_invalid_regex(self, github_client, mock_cache):
+        """Test match_file_patterns with invalid regex patterns."""
+        # Test invalid include patterns
+        result = github_client.match_file_patterns("main.tf", include_patterns=["*", "*.tf", ".*\\.tf$"])
+        # Should still match because the valid pattern ".*\\.tf$" matches
+        assert result
+
+        # Test all invalid include patterns
+        result = github_client.match_file_patterns("main.tf", include_patterns=["*", "+", "?"])
+        # Should return True because all patterns are invalid (default behavior)
+        assert result
+
+        # Test invalid exclude patterns
+        result = github_client.match_file_patterns("main.tf", exclude_patterns=["*", "+"])
+        # Should return True because invalid patterns are skipped
+        assert result
+
+        # Test mixed valid and invalid exclude patterns
+        result = github_client.match_file_patterns("test_main.tf", exclude_patterns=["*", ".*test.*"])
+        # Should return False because the valid exclude pattern matches
+        assert not result
+
+    def test_match_file_patterns_no_patterns(self, github_client, mock_cache):
+        """Test match_file_patterns with no patterns (should include by default)."""
+        assert github_client.match_file_patterns("any_file.txt")
+        assert github_client.match_file_patterns("main.tf")
+
+    def test_match_file_patterns_empty_patterns(self, github_client, mock_cache):
+        """Test match_file_patterns with empty pattern lists."""
+        assert github_client.match_file_patterns("main.tf", include_patterns=[], exclude_patterns=[])
+        assert github_client.match_file_patterns("main.tf", include_patterns=None, exclude_patterns=None)
+
 
 # Made with Bob

@@ -512,17 +512,40 @@ class GitHubClient:
         # Check exclude patterns first
         if exclude_patterns:
             for pattern in exclude_patterns:
-                if re.search(pattern, file_path):
-                    return False
+                try:
+                    if re.search(pattern, file_path):
+                        return False
+                except re.error as e:
+                    self.logger.warning(
+                        "Invalid exclude pattern skipped",
+                        pattern=pattern,
+                        error=str(e),
+                        file_path=file_path,
+                    )
+                    # Continue with other patterns
 
         # Check include patterns
         if include_patterns:
+            valid_include_matched = False
             for pattern in include_patterns:
-                if re.search(pattern, file_path):
-                    return True
-            return False  # No include pattern matched
+                try:
+                    if re.search(pattern, file_path):
+                        return True
+                    valid_include_matched = True  # At least one valid pattern was processed
+                except re.error as e:
+                    self.logger.warning(
+                        "Invalid include pattern skipped",
+                        pattern=pattern,
+                        error=str(e),
+                        file_path=file_path,
+                    )
+                    # Continue with other patterns
 
-        return True  # No patterns specified, include by default
+            # If we had include patterns but none matched (and at least one was valid)
+            if valid_include_matched:
+                return False
+
+        return True  # No patterns specified or all patterns were invalid, include by default
 
     def clone_repository(self, repo_url: str, target_dir: str, branch: str | None = None) -> bool:
         """
