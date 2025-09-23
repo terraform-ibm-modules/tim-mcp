@@ -46,13 +46,9 @@ class Config(BaseModel):
 
     # Filtering Configuration
     allowed_namespaces: list[str] = Field(
-        default_factory=lambda: ["terraform-ibm-modules"],
-        description="List of allowed module namespaces to search within"
+        default_factory=lambda: ["terraform-ibm-modules"], description="List of allowed module namespaces to search within"
     )
-    excluded_modules: list[str] = Field(
-        default_factory=list,
-        description="List of module IDs to exclude from search results"
-    )
+    excluded_modules: list[str] = Field(default_factory=list, description="List of module IDs to exclude from search results")
 
     model_config = ConfigDict(env_prefix="TIM_")
 

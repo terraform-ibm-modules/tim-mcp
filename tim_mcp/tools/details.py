@@ -319,18 +319,14 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
             )
 
             # Get available versions for the module
-            versions = await terraform_client.get_module_versions(
-                namespace=namespace, name=name, provider=provider
-            )
+            versions = await terraform_client.get_module_versions(namespace=namespace, name=name, provider=provider)
 
             # Format as comprehensive markdown
             try:
                 return format_module_details(module_data, versions)
             except ValueError as e:
                 # Convert formatting errors to TerraformRegistryError
-                raise TerraformRegistryError(
-                    f"Invalid module data received from registry: {e}"
-                ) from e
+                raise TerraformRegistryError(f"Invalid module data received from registry: {e}") from e
 
         except TerraformRegistryError as e:
             # Transform 404 errors to more specific ModuleNotFoundError

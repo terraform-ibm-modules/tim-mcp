@@ -8,6 +8,7 @@ import pytest
 
 from tim_mcp.clients.github_client import GitHubClient
 from tim_mcp.clients.terraform_client import TerraformClient
+from tim_mcp.exceptions import ModuleNotFoundError
 
 
 @pytest.fixture
@@ -255,17 +256,19 @@ class TestGitHubClient:
         github_client.client.get = AsyncMock(return_value=mock_response)
 
         # Execute and verify exception
-        with pytest.raises(Exception):
+        with pytest.raises(ModuleNotFoundError):
             await github_client.get_latest_release("terraform-ibm-modules", "no-releases")
 
     @pytest.mark.asyncio
     async def test_resolve_version_latest_with_release(self, github_client, mock_cache):
         """Test resolving 'latest' version to release tag."""
         # Setup - Mock get_latest_release to return a release
-        github_client.get_latest_release = AsyncMock(return_value={
-            "tag_name": "v2.1.0",
-            "name": "Release v2.1.0",
-        })
+        github_client.get_latest_release = AsyncMock(
+            return_value={
+                "tag_name": "v2.1.0",
+                "name": "Release v2.1.0",
+            }
+        )
 
         # Execute
         result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
@@ -280,9 +283,9 @@ class TestGitHubClient:
         from tim_mcp.exceptions import ModuleNotFoundError
 
         # Setup - Mock get_latest_release to raise ModuleNotFoundError
-        github_client.get_latest_release = AsyncMock(side_effect=ModuleNotFoundError(
-            "test-repo", details={"reason": "No releases found"}
-        ))
+        github_client.get_latest_release = AsyncMock(
+            side_effect=ModuleNotFoundError("test-repo", details={"reason": "No releases found"})
+        )
 
         # Execute
         result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
@@ -334,12 +337,8 @@ class TestGitHubClient:
         assert github_client.match_file_patterns("main.tf", exclude_patterns=[".*test.*"])
 
         # Test combined patterns
-        assert github_client.match_file_patterns(
-            "main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
-        )
-        assert not github_client.match_file_patterns(
-            "test_main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
-        )
+        assert github_client.match_file_patterns("main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"])
+        assert not github_client.match_file_patterns("test_main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"])
 
     def test_match_file_patterns_invalid_regex(self, github_client, mock_cache):
         """Test match_file_patterns with invalid regex patterns."""

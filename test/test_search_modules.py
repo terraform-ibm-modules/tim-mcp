@@ -30,7 +30,7 @@ class TestSearchModulesImpl:
         """Create a test configuration with filtering enabled."""
         return Config(
             allowed_namespaces=["terraform-ibm-modules", "ibm-garage-cloud"],
-            excluded_modules=["terraform-ibm-modules/bad-module/ibm", "terraform-ibm-modules/deprecated-vpc/ibm"]
+            excluded_modules=["terraform-ibm-modules/bad-module/ibm", "terraform-ibm-modules/deprecated-vpc/ibm"],
         )
 
     @pytest.fixture

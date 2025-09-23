@@ -746,7 +746,9 @@ class TestGetContentTool:
         assert "**Outputs:**" in result
 
     @pytest.mark.asyncio
-    async def test_get_content_latest_version_resolution(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+    async def test_get_content_latest_version_resolution(
+        self, config, mock_github_client, sample_readme_content, sample_main_tf_content
+    ):
         """Test that 'latest' version is resolved to actual release tag."""
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
@@ -782,9 +784,7 @@ class TestGetContentTool:
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify version resolution was called
-        mock_github_client.resolve_version.assert_called_once_with(
-            "terraform-ibm-modules", "terraform-ibm-vpc", "latest"
-        )
+        mock_github_client.resolve_version.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
 
         # Verify resolved version is used in API calls
         mock_github_client.get_directory_contents.assert_called_once_with(
@@ -795,7 +795,9 @@ class TestGetContentTool:
         assert "**Version:** v3.2.1" in result
 
     @pytest.mark.asyncio
-    async def test_get_content_latest_fallback_to_head(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+    async def test_get_content_latest_fallback_to_head(
+        self, config, mock_github_client, sample_readme_content, sample_main_tf_content
+    ):
         """Test that 'latest' version falls back to HEAD when no releases exist."""
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
@@ -831,9 +833,7 @@ class TestGetContentTool:
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify version resolution was called
-        mock_github_client.resolve_version.assert_called_once_with(
-            "terraform-ibm-modules", "terraform-ibm-vpc", "latest"
-        )
+        mock_github_client.resolve_version.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
 
         # Verify resolved version is used in API calls
         mock_github_client.get_directory_contents.assert_called_once_with(
@@ -844,13 +844,15 @@ class TestGetContentTool:
         assert "**Version:** HEAD" in result
 
     @pytest.mark.asyncio
-    async def test_get_content_invalid_regex_patterns(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+    async def test_get_content_invalid_regex_patterns(
+        self, config, mock_github_client, sample_readme_content, sample_main_tf_content
+    ):
         """Test that invalid regex patterns are handled gracefully."""
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["*", "*.tf", ".*\\.tf$"],  # Mix of invalid and valid patterns
-            exclude_files=["+", "?", ".*test.*"],    # Mix of invalid and valid patterns
+            exclude_files=["+", "?", ".*test.*"],  # Mix of invalid and valid patterns
             include_readme=True,
             version="latest",
         )
@@ -874,12 +876,13 @@ class TestGetContentTool:
                 "path": "examples/basic/test.tf",
                 "type": "file",
                 "size": 100,
-            }
+            },
         ]
 
         # Use the real match_file_patterns method to test error handling
         from tim_mcp.clients.github_client import GitHubClient
         from tim_mcp.config import Config
+
         real_client = GitHubClient(Config())
 
         def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
@@ -928,6 +931,7 @@ class TestGetContentTool:
         # Use the real match_file_patterns method to test error handling
         from tim_mcp.clients.github_client import GitHubClient
         from tim_mcp.config import Config
+
         real_client = GitHubClient(Config())
 
         def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
@@ -974,6 +978,7 @@ class TestGetContentTool:
         # Use the real match_file_patterns method (this would previously fail)
         from tim_mcp.clients.github_client import GitHubClient
         from tim_mcp.config import Config
+
         real_client = GitHubClient(Config())
 
         def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):

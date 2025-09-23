@@ -43,7 +43,7 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
 
     try:
         # Get repository information
-        repo_info = await github_client.get_repository_info(owner, repo_name)
+        await github_client.get_repository_info(owner, repo_name)
 
         # Resolve version to actual git reference
         resolved_version = await github_client.resolve_version(owner, repo_name, request.version)
