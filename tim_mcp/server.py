@@ -20,6 +20,7 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
+from typing import Optional
 
 # Global configuration and logger
 config: Config = load_config()
@@ -33,8 +34,8 @@ mcp = FastMCP("TIM-MCP")
 @mcp.tool()
 async def search_modules(
     query: str,
-    namespace: str = None,
-    provider: str = None,
+    namespace: Optional[str] = None,
+    provider: Optional[str] = None,
     limit: int = 10,
 ) -> str:
     """
@@ -278,8 +279,8 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 async def get_content(
     module_id: str,
     path: str = "",
-    include_files: list[str] = None,
-    exclude_files: list[str] = None,
+    include_files: Optional[list[str]] = None,
+    exclude_files: Optional[list[str]] = None,
     include_readme: bool = True,
     version: str = "latest",
 ) -> str:
