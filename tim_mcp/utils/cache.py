@@ -147,6 +147,3 @@ class Cache:
         except OSError as e:
             logger.warning(f"Error clearing cache: {e}")
             return False
-
-
-# Made with Bob

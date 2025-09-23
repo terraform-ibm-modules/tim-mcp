@@ -121,6 +121,7 @@ class TestListContentImpl:
         request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm", version="latest")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
+        mock_github_client.resolve_version.return_value = "main"
         mock_github_client.get_repository_tree.return_value = sample_tree_response
 
         # Mock get_file_content to return README content
@@ -186,6 +187,7 @@ class TestListContentImpl:
         request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm", version="v5.1.0")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
+        mock_github_client.resolve_version.return_value = "v5.1.0"
         mock_github_client.get_repository_tree.return_value = sample_tree_response
 
         async def mock_get_file_content(owner, repo, path, ref="HEAD"):
@@ -302,6 +304,7 @@ class TestListContentImpl:
         request = ListContentRequest(module_id="terraform-ibm-modules/empty/ibm", version="latest")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
+        mock_github_client.resolve_version.return_value = "main"
         mock_github_client.get_repository_tree.return_value = []
 
         # Execute

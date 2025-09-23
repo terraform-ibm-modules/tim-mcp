@@ -60,6 +60,9 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
     # Extract repository information
     owner, repo = github_client._extract_repo_from_module_id(request.module_id)
 
+    # Resolve version to actual git reference
+    resolved_version = await github_client.resolve_version(owner, repo, request.version)
+
     logger.info(
         "Fetching content for module",
         module_id=request.module_id,
@@ -67,10 +70,11 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
         repo=repo,
         path=request.path,
         version=request.version,
+        resolved_version=resolved_version,
     )
 
     # Get directory contents
-    directory_contents = await github_client.get_directory_contents(owner, repo, request.path, request.version)
+    directory_contents = await github_client.get_directory_contents(owner, repo, request.path, resolved_version)
 
     # Filter files based on patterns
     filtered_files = _filter_files(directory_contents, github_client, request.include_files, request.exclude_files)
@@ -88,12 +92,12 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
 
     # Add README fetch task if enabled
     if request.include_readme:
-        readme_task = _fetch_readme(github_client, owner, repo, request.version)
+        readme_task = _fetch_readme(github_client, owner, repo, resolved_version)
         fetch_tasks.append(readme_task)
 
     # Add file content fetch tasks
     for file_item in filtered_files:
-        task = github_client.get_file_content(owner, repo, file_item["path"], request.version)
+        task = github_client.get_file_content(owner, repo, file_item["path"], resolved_version)
         fetch_tasks.append(task)
 
     # Fetch all content concurrently
@@ -138,7 +142,7 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
     )
 
     # Format the output
-    return _format_content_output(request.module_id, request.path, request.version, readme_content, file_contents)
+    return _format_content_output(request.module_id, request.path, resolved_version, readme_content, file_contents)
 
 
 async def _fetch_readme(github_client: GitHubClient, owner: str, repo: str, version: str) -> dict[str, Any]:

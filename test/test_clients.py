@@ -216,5 +216,112 @@ class TestGitHubClient:
         assert result == expected_files
         github_client.client.get.assert_called_once_with("/repos/hashicorp/terraform/contents", params={})
 
+    @pytest.mark.asyncio
+    async def test_get_latest_release(self, github_client, mock_cache):
+        """Test getting latest release information."""
+        # Setup
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "tag_name": "v1.2.3",
+            "name": "Release v1.2.3",
+            "published_at": "2023-01-01T00:00:00Z",
+            "html_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc/releases/tag/v1.2.3",
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {}
+        github_client.client.get = AsyncMock(return_value=mock_response)
+
+        # Execute
+        result = await github_client.get_latest_release("terraform-ibm-modules", "terraform-ibm-vpc")
+
+        # Verify
+        expected_release = {
+            "tag_name": "v1.2.3",
+            "name": "Release v1.2.3",
+            "published_at": "2023-01-01T00:00:00Z",
+            "html_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc/releases/tag/v1.2.3",
+        }
+        assert result == expected_release
+        github_client.client.get.assert_called_once_with("/repos/terraform-ibm-modules/terraform-ibm-vpc/releases/latest")
+
+    @pytest.mark.asyncio
+    async def test_get_latest_release_not_found(self, github_client, mock_cache):
+        """Test getting latest release when no releases exist."""
+        # Setup
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status = MagicMock(side_effect=Exception("Not found"))
+        github_client.client.get = AsyncMock(return_value=mock_response)
+
+        # Execute and verify exception
+        with pytest.raises(Exception):
+            await github_client.get_latest_release("terraform-ibm-modules", "no-releases")
+
+    @pytest.mark.asyncio
+    async def test_resolve_version_latest_with_release(self, github_client, mock_cache):
+        """Test resolving 'latest' version to release tag."""
+        # Setup - Mock get_latest_release to return a release
+        github_client.get_latest_release = AsyncMock(return_value={
+            "tag_name": "v2.1.0",
+            "name": "Release v2.1.0",
+        })
+
+        # Execute
+        result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
+
+        # Verify
+        assert result == "v2.1.0"
+        github_client.get_latest_release.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc")
+
+    @pytest.mark.asyncio
+    async def test_resolve_version_latest_no_releases(self, github_client, mock_cache):
+        """Test resolving 'latest' version when no releases exist (fallback to HEAD)."""
+        from tim_mcp.exceptions import ModuleNotFoundError
+
+        # Setup - Mock get_latest_release to raise ModuleNotFoundError
+        github_client.get_latest_release = AsyncMock(side_effect=ModuleNotFoundError(
+            "test-repo", details={"reason": "No releases found"}
+        ))
+
+        # Execute
+        result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
+
+        # Verify
+        assert result == "HEAD"
+        github_client.get_latest_release.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc")
+
+    @pytest.mark.asyncio
+    async def test_resolve_version_specific_tag(self, github_client, mock_cache):
+        """Test resolving specific version tag (should return as-is)."""
+        # Execute
+        result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "v1.5.2")
+
+        # Verify
+        assert result == "v1.5.2"
+        # Should not call get_latest_release for specific versions
+
+    @pytest.mark.asyncio
+    async def test_resolve_version_branch_name(self, github_client, mock_cache):
+        """Test resolving branch name (should return as-is)."""
+        # Execute
+        result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "main")
+
+        # Verify
+        assert result == "main"
+
+    @pytest.mark.asyncio
+    async def test_resolve_version_error_fallback(self, github_client, mock_cache):
+        """Test resolving version with API error (fallback to HEAD)."""
+        # Setup - Mock get_latest_release to raise generic error
+        github_client.get_latest_release = AsyncMock(side_effect=Exception("API Error"))
+
+        # Execute
+        result = await github_client.resolve_version("terraform-ibm-modules", "terraform-ibm-vpc", "latest")
+
+        # Verify
+        assert result == "HEAD"
+        github_client.get_latest_release.assert_called_once_with("terraform-ibm-modules", "terraform-ibm-vpc")
+
 
 # Made with Bob

@@ -138,6 +138,7 @@ class TestGetContentTool:
             "terraform-ibm-modules",
             "terraform-ibm-vpc",
         )
+        mock_github_client.resolve_version.return_value = "latest"
         mock_github_client.get_directory_contents.return_value = sample_directory_contents
         mock_github_client.get_file_content.side_effect = [
             sample_readme_content,
@@ -368,6 +369,7 @@ class TestGetContentTool:
             "terraform-ibm-modules",
             "terraform-ibm-vpc",
         )
+        mock_github_client.resolve_version.return_value = "latest"
         mock_github_client.get_directory_contents.return_value = []
         mock_github_client.get_file_content.side_effect = ModuleNotFoundError("terraform-ibm-modules/terraform-ibm-vpc/README.md")
 
@@ -642,6 +644,7 @@ class TestGetContentTool:
             "terraform-ibm-modules",
             "terraform-ibm-vpc",
         )
+        mock_github_client.resolve_version.return_value = "v5.1.0"
         mock_github_client.get_directory_contents.return_value = [
             {
                 "name": "main.tf",
@@ -741,3 +744,101 @@ class TestGetContentTool:
         assert "## Configuration Summary" in result
         assert "**Required Inputs:**" in result
         assert "**Outputs:**" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_latest_version_resolution(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+        """Test that 'latest' version is resolved to actual release tag."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["main.tf"],
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+
+        # Mock version resolution to return a specific tag
+        mock_github_client.resolve_version.return_value = "v3.2.1"
+
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            }
+        ]
+        mock_github_client.match_file_patterns.return_value = True
+        mock_github_client.get_file_content.side_effect = [
+            sample_readme_content,
+            sample_main_tf_content,
+        ]
+
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify version resolution was called
+        mock_github_client.resolve_version.assert_called_once_with(
+            "terraform-ibm-modules", "terraform-ibm-vpc", "latest"
+        )
+
+        # Verify resolved version is used in API calls
+        mock_github_client.get_directory_contents.assert_called_once_with(
+            "terraform-ibm-modules", "terraform-ibm-vpc", "examples/basic", "v3.2.1"
+        )
+
+        # Verify resolved version appears in output
+        assert "**Version:** v3.2.1" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_latest_fallback_to_head(self, config, mock_github_client, sample_readme_content, sample_main_tf_content):
+        """Test that 'latest' version falls back to HEAD when no releases exist."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["main.tf"],
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+
+        # Mock version resolution to return HEAD (no releases)
+        mock_github_client.resolve_version.return_value = "HEAD"
+
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            }
+        ]
+        mock_github_client.match_file_patterns.return_value = True
+        mock_github_client.get_file_content.side_effect = [
+            sample_readme_content,
+            sample_main_tf_content,
+        ]
+
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify version resolution was called
+        mock_github_client.resolve_version.assert_called_once_with(
+            "terraform-ibm-modules", "terraform-ibm-vpc", "latest"
+        )
+
+        # Verify resolved version is used in API calls
+        mock_github_client.get_directory_contents.assert_called_once_with(
+            "terraform-ibm-modules", "terraform-ibm-vpc", "examples/basic", "HEAD"
+        )
+
+        # Verify resolved version appears in output
+        assert "**Version:** HEAD" in result

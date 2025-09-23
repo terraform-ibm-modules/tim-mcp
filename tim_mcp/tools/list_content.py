@@ -11,8 +11,11 @@ import re
 from ..clients.github_client import GitHubClient
 from ..config import Config
 from ..exceptions import ModuleNotFoundError
+from ..logging import get_logger
 from ..types import ListContentRequest
 from ..utils.cache import Cache
+
+logger = get_logger(__name__)
 
 
 async def list_content_impl(request: ListContentRequest, config: Config) -> str:
@@ -42,22 +45,29 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         # Get repository information
         repo_info = await github_client.get_repository_info(owner, repo_name)
 
-        # Determine the version/ref to use
-        version = request.version
-        if version == "latest":
-            version = repo_info.get("default_branch", "main")
+        # Resolve version to actual git reference
+        resolved_version = await github_client.resolve_version(owner, repo_name, request.version)
+
+        logger.info(
+            "Listing content for module",
+            module_id=request.module_id,
+            owner=owner,
+            repo=repo_name,
+            version=request.version,
+            resolved_version=resolved_version,
+        )
 
         # Get repository tree structure
-        tree_items = await github_client.get_repository_tree(owner, repo_name, version, recursive=True)
+        tree_items = await github_client.get_repository_tree(owner, repo_name, resolved_version, recursive=True)
 
         # Categorize paths and collect README information
         categorized_paths = _categorize_tree_items(tree_items)
 
         # Extract README summaries for each significant path
-        path_descriptions = await _extract_path_descriptions(github_client, owner, repo_name, version, categorized_paths)
+        path_descriptions = await _extract_path_descriptions(github_client, owner, repo_name, resolved_version, categorized_paths)
 
         # Format output
-        return _format_content_listing(request.module_id, version, categorized_paths, path_descriptions)
+        return _format_content_listing(request.module_id, resolved_version, categorized_paths, path_descriptions)
     finally:
         await github_client.client.aclose()
 

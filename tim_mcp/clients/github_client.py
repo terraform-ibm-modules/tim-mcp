@@ -591,3 +591,140 @@ class GitHubClient:
         """
         ref = ref or "HEAD"
         return await self.get_file_content(owner, repo, path, ref)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any]:
+        """
+        Get the latest release for a repository.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Latest release information including tag_name
+
+        Raises:
+            GitHubError: If the API request fails
+            RateLimitError: If rate limited
+            ModuleNotFoundError: If no releases exist
+        """
+        cache_key = f"latest_release_{owner}_{repo}"
+
+        # Check cache first
+        cached = self.cache.get(cache_key)
+        if cached:
+            log_cache_operation(self.logger, "get", cache_key, hit=True)
+            return cached
+
+        log_cache_operation(self.logger, "get", cache_key, hit=False)
+
+        start_time = time.time()
+
+        try:
+            response = await self.client.get(f"/repos/{owner}/{repo}/releases/latest")
+            duration_ms = (time.time() - start_time) * 1000
+
+            self._update_rate_limit_info(response)
+
+            # Handle rate limiting
+            if response.status_code == 429:
+                raise RateLimitError(
+                    "GitHub rate limit exceeded",
+                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    api_name="GitHub",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Log successful request
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+                tag_name=data.get("tag_name"),
+            )
+
+            # Cache the result with shorter TTL for latest release
+            self.cache.set(cache_key, data, ttl=300)  # 5 minutes for latest release
+            log_cache_operation(self.logger, "set", cache_key)
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_api_request(
+                self.logger,
+                "GET",
+                str(e.request.url),
+                e.response.status_code,
+                duration_ms,
+                error=str(e),
+            )
+            if e.response.status_code == 404:
+                raise ModuleNotFoundError(
+                    f"{owner}/{repo}",
+                    details={"reason": "No releases found"},
+                ) from e
+            raise GitHubError(
+                f"HTTP error getting latest release: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
+
+        except httpx.RequestError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self.logger.error("Request error getting latest release", error=str(e))
+            raise GitHubError(f"Request error getting latest release: {e}") from e
+
+    async def resolve_version(self, owner: str, repo: str, version: str = "latest") -> str:
+        """
+        Resolve version to actual git reference.
+
+        For "latest", attempts to get the latest release tag. If no releases exist,
+        falls back to "HEAD".
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            version: Version to resolve (default: "latest")
+
+        Returns:
+            Resolved git reference (tag name, branch name, or "HEAD")
+        """
+        if version != "latest":
+            return version
+
+        try:
+            release_data = await self.get_latest_release(owner, repo)
+            resolved_version = release_data.get("tag_name", "HEAD")
+
+            self.logger.info(
+                "Resolved latest version to release tag",
+                repo=f"{owner}/{repo}",
+                resolved_version=resolved_version,
+            )
+
+            return resolved_version
+
+        except ModuleNotFoundError:
+            self.logger.warning(
+                "No releases found, falling back to HEAD",
+                repo=f"{owner}/{repo}",
+            )
+            return "HEAD"
+        except Exception as e:
+            self.logger.warning(
+                "Failed to resolve latest version, falling back to HEAD",
+                repo=f"{owner}/{repo}",
+                error=str(e),
+            )
+            return "HEAD"
