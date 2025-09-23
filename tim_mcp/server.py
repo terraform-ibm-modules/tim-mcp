@@ -203,6 +203,9 @@ async def list_content(module_id: str, version: str = "latest") -> str:
     """
     Discover available paths in a module repository with README summaries.
 
+    Searches and categorizes paths into: root module, examples/ directories,
+    modules/ (submodules), and patterns/solutions/ directories.
+
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
         version: Git tag/branch to scan
@@ -285,7 +288,7 @@ async def get_content(
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        path: Specific path: "examples/basic", "modules/dns", "" for root
+        path: Path to fetch: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
         include_files: Regex patterns: ["*.tf", "README.md"] or [".*"] for everything
         exclude_files: Regex patterns to exclude: ["*test*", "*.tftest"]
         include_readme: Include README.md for context (default: true)
