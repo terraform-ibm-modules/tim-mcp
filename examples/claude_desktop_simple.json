@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tim-mcp": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "src.tim_mcp.server"],
+      "cwd": "/Users/daniel/IdeaProjects/public/tim-mcp",
+      "env": {}
+    }
+  }
+}
