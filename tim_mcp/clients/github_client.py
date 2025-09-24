@@ -81,7 +81,9 @@ class GitHubClient:
         """
         parts = module_id.split("/")
         if len(parts) != 3:
-            raise ModuleNotFoundError(module_id, details={"reason": "Invalid module ID format"})
+            raise ModuleNotFoundError(
+                module_id, details={"reason": "Invalid module ID format"}
+            )
         return parts[0], parts[1], parts[2]
 
     def _extract_repo_from_module_id(self, module_id: str) -> tuple[str, str]:
@@ -147,7 +149,9 @@ class GitHubClient:
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
-                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    reset_time=int(self.rate_limit_reset)
+                    if self.rate_limit_reset
+                    else None,
                     api_name="GitHub",
                 )
 
@@ -201,7 +205,9 @@ class GitHubClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
-    async def get_directory_contents(self, owner: str, repo: str, path: str = "", ref: str = "HEAD") -> list[dict[str, Any]]:
+    async def get_directory_contents(
+        self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
+    ) -> list[dict[str, Any]]:
         """
         Get directory contents from repository.
 
@@ -245,7 +251,9 @@ class GitHubClient:
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
-                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    reset_time=int(self.rate_limit_reset)
+                    if self.rate_limit_reset
+                    else None,
                     api_name="GitHub",
                 )
 
@@ -302,7 +310,9 @@ class GitHubClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
-    async def get_file_content(self, owner: str, repo: str, path: str, ref: str = "HEAD") -> dict[str, Any]:
+    async def get_file_content(
+        self, owner: str, repo: str, path: str, ref: str = "HEAD"
+    ) -> dict[str, Any]:
         """
         Get file content from repository.
 
@@ -333,7 +343,9 @@ class GitHubClient:
 
         try:
             params = {"ref": ref} if ref != "HEAD" else {}
-            response = await self.client.get(f"/repos/{owner}/{repo}/contents/{path}", params=params)
+            response = await self.client.get(
+                f"/repos/{owner}/{repo}/contents/{path}", params=params
+            )
             duration_ms = (time.time() - start_time) * 1000
 
             self._update_rate_limit_info(response)
@@ -342,7 +354,9 @@ class GitHubClient:
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
-                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    reset_time=int(self.rate_limit_reset)
+                    if self.rate_limit_reset
+                    else None,
                     api_name="GitHub",
                 )
 
@@ -401,7 +415,9 @@ class GitHubClient:
             self.logger.error("Request error getting file content", error=str(e))
             raise GitHubError(f"Request error getting file content: {e}") from e
 
-    async def get_repository_tree(self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True) -> list[dict[str, Any]]:
+    async def get_repository_tree(
+        self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Get repository tree (all files and directories).
 
@@ -432,7 +448,9 @@ class GitHubClient:
 
         try:
             params = {"recursive": "1"} if recursive else {}
-            response = await self.client.get(f"/repos/{owner}/{repo}/git/trees/{ref}", params=params)
+            response = await self.client.get(
+                f"/repos/{owner}/{repo}/git/trees/{ref}", params=params
+            )
             duration_ms = (time.time() - start_time) * 1000
 
             self._update_rate_limit_info(response)
@@ -441,7 +459,9 @@ class GitHubClient:
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
-                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    reset_time=int(self.rate_limit_reset)
+                    if self.rate_limit_reset
+                    else None,
                     api_name="GitHub",
                 )
 
@@ -529,9 +549,12 @@ class GitHubClient:
             valid_include_matched = False
             for pattern in include_patterns:
                 try:
-                    if re.search(pattern, file_path):
+                    match_result = re.search(pattern, file_path)
+                    valid_include_matched = (
+                        True  # At least one valid pattern was processed
+                    )
+                    if match_result:
                         return True
-                    valid_include_matched = True  # At least one valid pattern was processed
                 except re.error as e:
                     self.logger.warning(
                         "Invalid include pattern skipped",
@@ -547,7 +570,9 @@ class GitHubClient:
 
         return True  # No patterns specified or all patterns were invalid, include by default
 
-    def clone_repository(self, repo_url: str, target_dir: str, branch: str | None = None) -> bool:
+    def clone_repository(
+        self, repo_url: str, target_dir: str, branch: str | None = None
+    ) -> bool:
         """
         Clone a GitHub repository.
 
@@ -595,7 +620,9 @@ class GitHubClient:
             )
             return False
 
-    async def get_content(self, owner: str, repo: str, path: str, ref: str | None = None) -> dict[str, Any]:
+    async def get_content(
+        self, owner: str, repo: str, path: str, ref: str | None = None
+    ) -> dict[str, Any]:
         """
         Get content from a repository (wrapper around get_file_content).
 
@@ -658,7 +685,9 @@ class GitHubClient:
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
-                    reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
+                    reset_time=int(self.rate_limit_reset)
+                    if self.rate_limit_reset
+                    else None,
                     api_name="GitHub",
                 )
 
@@ -708,7 +737,9 @@ class GitHubClient:
             self.logger.error("Request error getting latest release", error=str(e))
             raise GitHubError(f"Request error getting latest release: {e}") from e
 
-    async def resolve_version(self, owner: str, repo: str, version: str = "latest") -> str:
+    async def resolve_version(
+        self, owner: str, repo: str, version: str = "latest"
+    ) -> str:
         """
         Resolve version to actual git reference.
 

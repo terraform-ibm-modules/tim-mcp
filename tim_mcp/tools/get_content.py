@@ -46,7 +46,9 @@ async def get_content_impl(
         return await _get_content_with_client(request, github_client)
 
 
-async def _get_content_with_client(request: GetContentRequest, github_client: GitHubClient) -> str:
+async def _get_content_with_client(
+    request: GetContentRequest, github_client: GitHubClient
+) -> str:
     """
     Internal function to get content with a provided GitHub client.
 
@@ -74,10 +76,14 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
     )
 
     # Get directory contents
-    directory_contents = await github_client.get_directory_contents(owner, repo, request.path, resolved_version)
+    directory_contents = await github_client.get_directory_contents(
+        owner, repo, request.path, resolved_version
+    )
 
     # Filter files based on patterns
-    filtered_files = _filter_files(directory_contents, github_client, request.include_files, request.exclude_files)
+    filtered_files = _filter_files(
+        directory_contents, github_client, request.include_files, request.exclude_files
+    )
 
     logger.info(
         "Filtered files for content fetch",
@@ -97,7 +103,9 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
 
     # Add file content fetch tasks
     for file_item in filtered_files:
-        task = github_client.get_file_content(owner, repo, file_item["path"], resolved_version)
+        task = github_client.get_file_content(
+            owner, repo, file_item["path"], resolved_version
+        )
         fetch_tasks.append(task)
 
     # Fetch all content concurrently
@@ -142,10 +150,14 @@ async def _get_content_with_client(request: GetContentRequest, github_client: Gi
     )
 
     # Format the output
-    return _format_content_output(request.module_id, request.path, resolved_version, readme_content, file_contents)
+    return _format_content_output(
+        request.module_id, request.path, resolved_version, readme_content, file_contents
+    )
 
 
-async def _fetch_readme(github_client: GitHubClient, owner: str, repo: str, version: str) -> dict[str, Any]:
+async def _fetch_readme(
+    github_client: GitHubClient, owner: str, repo: str, version: str
+) -> dict[str, Any]:
     """
     Fetch README.md content, handling potential not found errors.
 
@@ -267,7 +279,9 @@ def _filter_files(
     for item in directory_contents:
         if item.get("type") == "file":
             file_path = item["path"]
-            if github_client.match_file_patterns(file_path, include_patterns, exclude_patterns):
+            if github_client.match_file_patterns(
+                file_path, include_patterns, exclude_patterns
+            ):
                 filtered_files.append(item)
     return filtered_files
 
@@ -314,7 +328,9 @@ def _generate_config_summary(file_contents: list[dict[str, Any]]) -> str:
         summary_lines.append(f"**Outputs:** {', '.join(sorted(set(outputs)))}")
 
     if dependencies:
-        summary_lines.append(f"**Dependencies:** {', '.join(sorted(set(dependencies)))}")
+        summary_lines.append(
+            f"**Dependencies:** {', '.join(sorted(set(dependencies)))}"
+        )
     else:
         summary_lines.append("**Dependencies:** None")
 

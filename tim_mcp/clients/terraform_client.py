@@ -62,10 +62,8 @@ class TerraformClient:
         self,
         query: str,
         namespace: str | None = None,
-        provider: str | None = None,
         limit: int = 10,
         offset: int = 0,
-        verified: bool | None = None,
     ) -> dict[str, Any]:
         """
         Search for modules in the Terraform Registry.
@@ -73,10 +71,8 @@ class TerraformClient:
         Args:
             query: Search query
             namespace: Optional namespace to filter by
-            provider: Optional provider to filter by
             limit: Maximum results to return
             offset: Offset for pagination
-            verified: Filter for verified modules only
 
         Returns:
             Search results with modules and metadata
@@ -86,7 +82,7 @@ class TerraformClient:
             RateLimitError: If rate limited
         """
         # Build cache key
-        cache_key = f"module_search_{query}_{namespace}_{provider}_{limit}_{offset}_{verified}"
+        cache_key = f"module_search_{query}_{namespace}_{limit}_{offset}"
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -100,10 +96,6 @@ class TerraformClient:
         params = {"q": query, "limit": limit, "offset": offset}
         if namespace:
             params["namespace"] = namespace
-        if provider:
-            params["provider"] = provider
-        if verified is not None:
-            params["verified"] = str(verified).lower()
 
         start_time = time.time()
 
@@ -166,7 +158,9 @@ class TerraformClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
-    async def get_module_details(self, namespace: str, name: str, provider: str, version: str = "latest") -> dict[str, Any]:
+    async def get_module_details(
+        self, namespace: str, name: str, provider: str, version: str = "latest"
+    ) -> dict[str, Any]:
         """
         Get detailed information about a specific module.
 
@@ -252,14 +246,18 @@ class TerraformClient:
         except httpx.RequestError as e:
             duration_ms = (time.time() - start_time) * 1000
             self.logger.error("Request error getting module details", error=str(e))
-            raise TerraformRegistryError(f"Request error getting module details: {e}") from e
+            raise TerraformRegistryError(
+                f"Request error getting module details: {e}"
+            ) from e
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
-    async def get_module_versions(self, namespace: str, name: str, provider: str) -> list[str]:
+    async def get_module_versions(
+        self, namespace: str, name: str, provider: str
+    ) -> list[str]:
         """
         Get available versions for a module.
 
@@ -289,7 +287,9 @@ class TerraformClient:
         start_time = time.time()
 
         try:
-            response = await self.client.get(f"/modules/{namespace}/{name}/{provider}/versions")
+            response = await self.client.get(
+                f"/modules/{namespace}/{name}/{provider}/versions"
+            )
             duration_ms = (time.time() - start_time) * 1000
 
             # Handle rate limiting
@@ -305,7 +305,9 @@ class TerraformClient:
             data = response.json()
 
             # Extract versions
-            versions = [v.get("version") for v in data.get("modules", []) if v.get("version")]
+            versions = [
+                v.get("version") for v in data.get("modules", []) if v.get("version")
+            ]
 
             # Log successful request
             log_api_request(
@@ -343,7 +345,9 @@ class TerraformClient:
         except httpx.RequestError as e:
             duration_ms = (time.time() - start_time) * 1000
             self.logger.error("Request error getting module versions", error=str(e))
-            raise TerraformRegistryError(f"Request error getting module versions: {e}") from e
+            raise TerraformRegistryError(
+                f"Request error getting module versions: {e}"
+            ) from e
 
     @retry(
         stop=stop_after_attempt(3),
@@ -429,4 +433,6 @@ class TerraformClient:
         except httpx.RequestError as e:
             duration_ms = (time.time() - start_time) * 1000
             self.logger.error("Request error getting provider info", error=str(e))
-            raise TerraformRegistryError(f"Request error getting provider info: {e}") from e
+            raise TerraformRegistryError(
+                f"Request error getting provider info: {e}"
+            ) from e

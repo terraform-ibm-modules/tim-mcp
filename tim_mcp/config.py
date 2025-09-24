@@ -16,7 +16,9 @@ class Config(BaseModel):
     """Configuration model for TIM-MCP."""
 
     # GitHub Configuration
-    github_token: str | None = Field(None, description="GitHub API token for authenticated requests")
+    github_token: str | None = Field(
+        None, description="GitHub API token for authenticated requests"
+    )
     github_base_url: HttpUrl = Field(
         default_factory=lambda: HttpUrl("https://api.github.com"),
         description="GitHub API base URL",
@@ -38,7 +40,9 @@ class Config(BaseModel):
     retry_backoff: float = Field(1.0, ge=0.1, description="Retry backoff factor")
 
     # Rate Limiting
-    respect_rate_limits: bool = Field(True, description="Whether to respect API rate limits")
+    respect_rate_limits: bool = Field(
+        True, description="Whether to respect API rate limits"
+    )
 
     # Logging
     log_level: str = Field("INFO", description="Logging level")
@@ -46,9 +50,13 @@ class Config(BaseModel):
 
     # Filtering Configuration
     allowed_namespaces: list[str] = Field(
-        default_factory=lambda: ["terraform-ibm-modules"], description="List of allowed module namespaces to search within"
+        default_factory=lambda: ["terraform-ibm-modules"],
+        description="List of allowed module namespaces to search within",
     )
-    excluded_modules: list[str] = Field(default_factory=list, description="List of module IDs to exclude from search results")
+    excluded_modules: list[str] = Field(
+        default_factory=list,
+        description="List of module IDs to exclude from search results",
+    )
 
     model_config = ConfigDict(env_prefix="TIM_")
 
@@ -108,10 +116,14 @@ def load_config() -> Config:
 
         # Filtering configuration
         if allowed_namespaces := os.getenv("TIM_ALLOWED_NAMESPACES"):
-            config_data["allowed_namespaces"] = [ns.strip() for ns in allowed_namespaces.split(",")]
+            config_data["allowed_namespaces"] = [
+                ns.strip() for ns in allowed_namespaces.split(",")
+            ]
 
         if excluded_modules := os.getenv("TIM_EXCLUDED_MODULES"):
-            config_data["excluded_modules"] = [mod.strip() for mod in excluded_modules.split(",")]
+            config_data["excluded_modules"] = [
+                mod.strip() for mod in excluded_modules.split(",")
+            ]
 
         return Config(**config_data)
 

@@ -30,7 +30,10 @@ class TestSearchModulesImpl:
         """Create a test configuration with filtering enabled."""
         return Config(
             allowed_namespaces=["terraform-ibm-modules", "ibm-garage-cloud"],
-            excluded_modules=["terraform-ibm-modules/bad-module/ibm", "terraform-ibm-modules/deprecated-vpc/ibm"],
+            excluded_modules=[
+                "terraform-ibm-modules/bad-module/ibm",
+                "terraform-ibm-modules/deprecated-vpc/ibm",
+            ],
         )
 
     @pytest.fixture
@@ -116,25 +119,34 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
             # Verify
             assert result == expected_response
             mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc", namespace="terraform-ibm-modules", provider=None, limit=10, offset=0
+                query="vpc",
+                namespace="terraform-ibm-modules",
+                limit=100,  # Always fetch 100 results internally
+                offset=0,
             )
 
     @pytest.mark.asyncio
-    async def test_successful_search_with_filters(self, config, mock_terraform_client, sample_registry_response):
-        """Test successful module search with namespace and provider filters."""
+    async def test_successful_search_with_limit(
+        self, config, mock_terraform_client, sample_registry_response
+    ):
+        """Test successful module search with custom limit."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        request = ModuleSearchRequest(query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5)
+        request = ModuleSearchRequest(query="vpc", limit=5)
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -145,8 +157,7 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                provider="ibm",
-                limit=5,
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
 
@@ -162,7 +173,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="nonexistent")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -175,11 +188,15 @@ class TestSearchModulesImpl:
     async def test_terraform_registry_error(self, config, mock_terraform_client):
         """Test handling of Terraform Registry API errors."""
         # Setup
-        mock_terraform_client.search_modules.side_effect = TerraformRegistryError("API temporarily unavailable", status_code=503)
+        mock_terraform_client.search_modules.side_effect = TerraformRegistryError(
+            "API temporarily unavailable", status_code=503
+        )
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TerraformRegistryError) as exc_info:
                 await search_modules_impl(request, config)
@@ -197,7 +214,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(RateLimitError) as exc_info:
                 await search_modules_impl(request, config)
@@ -223,7 +242,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -255,7 +276,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -274,7 +297,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -282,7 +307,9 @@ class TestSearchModulesImpl:
             assert "Invalid API response format" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_client_context_manager_usage(self, config, mock_terraform_client, sample_registry_response):
+    async def test_client_context_manager_usage(
+        self, config, mock_terraform_client, sample_registry_response
+    ):
         """Test that the TerraformClient is used as an async context manager."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
@@ -326,7 +353,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="test")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -345,85 +374,40 @@ class TestSearchModulesImpl:
             assert str(module.source_url) == "https://github.com/test/repo"
             assert module.downloads == 999
             assert module.verified is True
-            assert module.published_at == datetime.fromisoformat("2025-01-01T12:00:00+00:00")
-
-    @pytest.mark.asyncio
-    async def test_namespace_filtering_override_disallowed(
-        self, config_with_filtering, mock_terraform_client, sample_registry_response
-    ):
-        """Test that disallowed namespaces are overridden with the first allowed namespace."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with disallowed namespace
-        request = ModuleSearchRequest(query="vpc", namespace="some-disallowed-namespace")
-
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
-            # Execute
-            result = await search_modules_impl(request, config_with_filtering)
-
-            # Verify that the search was called with the first allowed namespace instead
-            mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc",
-                namespace="terraform-ibm-modules",  # First allowed namespace
-                provider=None,
-                limit=10,
-                offset=0,
+            assert module.published_at == datetime.fromisoformat(
+                "2025-01-01T12:00:00+00:00"
             )
-            assert result.query == "vpc"
 
     @pytest.mark.asyncio
-    async def test_namespace_filtering_allowed_namespace(
+    async def test_namespace_filtering_uses_configured(
         self, config_with_filtering, mock_terraform_client, sample_registry_response
     ):
-        """Test that allowed namespaces are passed through unchanged."""
+        """Test that the configured namespace is used from config."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with allowed namespace
-        request = ModuleSearchRequest(query="vpc", namespace="ibm-garage-cloud")
-
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
-            # Execute
-            result = await search_modules_impl(request, config_with_filtering)
-
-            # Verify that the search was called with the requested namespace
-            mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc",
-                namespace="ibm-garage-cloud",  # Requested namespace was allowed
-                provider=None,
-                limit=10,
-                offset=0,
-            )
-            assert result.query == "vpc"
-
-    @pytest.mark.asyncio
-    async def test_namespace_filtering_default_when_none(
-        self, config_with_filtering, mock_terraform_client, sample_registry_response
-    ):
-        """Test that the first allowed namespace is used when none is specified."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with no namespace
+        # Request without namespace parameter
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
             # Verify that the search was called with the first allowed namespace
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
-                namespace="terraform-ibm-modules",  # First allowed namespace
-                provider=None,
-                limit=10,
+                namespace="terraform-ibm-modules",  # First allowed namespace from config
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
             assert result.query == "vpc"
 
     @pytest.mark.asyncio
-    async def test_module_exclusion_filtering(self, config_with_filtering, mock_terraform_client):
+    async def test_module_exclusion_filtering(
+        self, config_with_filtering, mock_terraform_client
+    ):
         """Test that excluded modules are filtered out from results."""
         # Setup - response with both allowed and excluded modules
         response_with_excluded = {
@@ -472,7 +456,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="modules")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
@@ -488,27 +474,218 @@ class TestSearchModulesImpl:
             assert "terraform-ibm-modules/bad-module/ibm" not in module_ids  # Excluded
 
     @pytest.mark.asyncio
-    async def test_empty_allowed_namespaces_no_filtering(self, mock_terraform_client, sample_registry_response):
-        """Test behavior when allowed_namespaces is empty - no filtering should occur."""
+    async def test_empty_allowed_namespaces_no_filtering(
+        self, mock_terraform_client, sample_registry_response
+    ):
+        """Test behavior when allowed_namespaces is empty - no namespace filtering should occur."""
         # Setup config with empty allowed namespaces
         config_no_filtering = Config(allowed_namespaces=[], excluded_modules=[])
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        request = ModuleSearchRequest(query="vpc", namespace="any-namespace")
+        request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_no_filtering)
 
-            # Verify that the original namespace was passed through
+            # Verify that None namespace was passed (no filtering)
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
-                namespace="any-namespace",  # Original namespace preserved
-                provider=None,
-                limit=10,
+                namespace=None,  # No namespace filtering when config is empty
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
             assert result.query == "vpc"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting(self, config, mock_terraform_client):
+        """Test that results are sorted by downloads in descending order."""
+        # Setup - response with modules in wrong download order
+        unsorted_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/low-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "low-downloads",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module with few downloads",
+                    "source": "https://github.com/terraform-ibm-modules/low-downloads",
+                    "downloads": 100,  # Low downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/high-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "high-downloads",
+                    "provider": "ibm",
+                    "version": "2.0.0",
+                    "description": "Module with many downloads",
+                    "source": "https://github.com/terraform-ibm-modules/high-downloads",
+                    "downloads": 50000,  # High downloads
+                    "verified": True,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/medium-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "medium-downloads",
+                    "provider": "ibm",
+                    "version": "1.5.0",
+                    "description": "Module with medium downloads",
+                    "source": "https://github.com/terraform-ibm-modules/medium-downloads",
+                    "downloads": 5000,  # Medium downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T12:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 3},
+        }
+
+        mock_terraform_client.search_modules.return_value = unsorted_response
+        request = ModuleSearchRequest(query="modules")
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that results are sorted by downloads descending
+            assert result.query == "modules"
+            assert result.total_found == 3
+            assert len(result.modules) == 3
+
+            # Check order: high (50000) -> medium (5000) -> low (100)
+            assert result.modules[0].downloads == 50000
+            assert result.modules[0].id == "terraform-ibm-modules/high-downloads/ibm"
+            assert result.modules[1].downloads == 5000
+            assert result.modules[1].id == "terraform-ibm-modules/medium-downloads/ibm"
+            assert result.modules[2].downloads == 100
+            assert result.modules[2].id == "terraform-ibm-modules/low-downloads/ibm"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting_with_limit(self, config, mock_terraform_client):
+        """Test that sorting works correctly when applying user's limit."""
+        # Setup - same unsorted response as above
+        unsorted_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/low-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "low-downloads",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module with few downloads",
+                    "source": "https://github.com/terraform-ibm-modules/low-downloads",
+                    "downloads": 100,
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/high-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "high-downloads",
+                    "provider": "ibm",
+                    "version": "2.0.0",
+                    "description": "Module with many downloads",
+                    "source": "https://github.com/terraform-ibm-modules/high-downloads",
+                    "downloads": 50000,
+                    "verified": True,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/medium-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "medium-downloads",
+                    "provider": "ibm",
+                    "version": "1.5.0",
+                    "description": "Module with medium downloads",
+                    "source": "https://github.com/terraform-ibm-modules/medium-downloads",
+                    "downloads": 5000,
+                    "verified": False,
+                    "published_at": "2025-09-01T12:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 3},
+        }
+
+        mock_terraform_client.search_modules.return_value = unsorted_response
+        # Request only top 2 results
+        request = ModuleSearchRequest(query="modules", limit=2)
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that we get top 2 by downloads
+            assert result.query == "modules"
+            assert result.total_found == 3
+            assert len(result.modules) == 2  # Limited to 2
+
+            # Check that we got the top 2: high (50000) and medium (5000)
+            assert result.modules[0].downloads == 50000
+            assert result.modules[0].id == "terraform-ibm-modules/high-downloads/ibm"
+            assert result.modules[1].downloads == 5000
+            assert result.modules[1].id == "terraform-ibm-modules/medium-downloads/ibm"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting_same_counts(self, config, mock_terraform_client):
+        """Test sorting behavior when modules have the same download counts."""
+        # Setup - modules with same download counts
+        same_downloads_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/module-a/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "module-a",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module A",
+                    "source": "https://github.com/terraform-ibm-modules/module-a",
+                    "downloads": 1000,  # Same downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/module-b/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "module-b",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module B",
+                    "source": "https://github.com/terraform-ibm-modules/module-b",
+                    "downloads": 1000,  # Same downloads
+                    "verified": False,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 2},
+        }
+
+        mock_terraform_client.search_modules.return_value = same_downloads_response
+        request = ModuleSearchRequest(query="modules")
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that results are returned (order may be stable but not guaranteed)
+            assert result.query == "modules"
+            assert result.total_found == 2
+            assert len(result.modules) == 2
+            # Both modules should have same download count
+            assert all(module.downloads == 1000 for module in result.modules)
 
 
 class TestModuleSearchRequestValidation:
@@ -516,10 +693,8 @@ class TestModuleSearchRequestValidation:
 
     def test_valid_request(self):
         """Test valid request creation."""
-        request = ModuleSearchRequest(query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5)
+        request = ModuleSearchRequest(query="vpc", limit=5)
         assert request.query == "vpc"
-        assert request.namespace == "terraform-ibm-modules"
-        assert request.provider == "ibm"
         assert request.limit == 5
 
     def test_default_limit(self):
@@ -541,12 +716,6 @@ class TestModuleSearchRequestValidation:
         """Test empty query validation."""
         with pytest.raises(ValidationError):
             ModuleSearchRequest(query="")
-
-    def test_optional_fields_none(self):
-        """Test optional fields can be None."""
-        request = ModuleSearchRequest(query="vpc", namespace=None, provider=None)
-        assert request.namespace is None
-        assert request.provider is None
 
 
 class TestModuleInfoValidation:

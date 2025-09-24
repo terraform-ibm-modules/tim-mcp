@@ -25,7 +25,9 @@ class RegistryTools:
         """
         self.client = client or TerraformClient()
 
-    def search_modules(self, query: str, namespace: str | None = None) -> list[dict[str, Any]]:
+    def search_modules(
+        self, query: str, namespace: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Search for modules in the Terraform Registry.
 

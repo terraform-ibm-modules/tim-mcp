@@ -21,6 +21,18 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
      "mcpServers": {
        "tim-terraform": {
          "command": "uv",
+         "args": ["run", "--from", "git+https://github.com/terraform-ibm-modules/tim-mcp.git", "tim-mcp"]
+       }
+     }
+   }
+   ```
+
+   **Optional: Add GitHub Token** (recommended to avoid rate limits):
+   ```json
+   {
+     "mcpServers": {
+       "tim-terraform": {
+         "command": "uv",
          "args": ["run", "--from", "git+https://github.com/terraform-ibm-modules/tim-mcp.git", "tim-mcp"],
          "env": { "GITHUB_TOKEN": "your_github_token_here" }
        }
@@ -71,7 +83,11 @@ uv run tim-mcp
 
 ### Environment Variables
 
-- `GITHUB_TOKEN`: GitHub API token for accessing private repositories and avoiding rate limits
+- `GITHUB_TOKEN` (optional): GitHub personal access token
+  - **When to use:** Recommended for frequent usage to avoid GitHub API rate limits
+  - **Not required for:** Basic functionality - the server works fine without it for light usage
+  - **Permissions needed:** None (read-only access to public repositories)
+  - **Create token at:** https://github.com/settings/tokens
 - `TIM_ALLOWED_NAMESPACES`: Comma-separated list of allowed module namespaces (default: `terraform-ibm-modules`)
 - `TIM_EXCLUDED_MODULES`: Comma-separated list of module IDs to exclude from search results
 
@@ -83,8 +99,24 @@ TIM-MCP can be configured as an MCP server for use with Claude Desktop or other 
 
 This method downloads and runs TIM-MCP directly from the GitHub repository without requiring local installation.
 
-Add this configuration to your Claude Desktop MCP settings (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+**Basic Configuration** (works without GitHub token):
+```json
+{
+  "mcpServers": {
+    "tim-terraform": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--from",
+        "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
+        "tim-mcp"
+      ]
+    }
+  }
+}
+```
 
+**Enhanced Configuration** (with GitHub token to avoid rate limits):
 ```json
 {
   "mcpServers": {
@@ -112,6 +144,23 @@ Add this configuration to your Claude Desktop MCP settings (`~/Library/Applicati
 
 This method is ideal for development and testing, using your local clone of the repository.
 
+**Basic Configuration:**
+```json
+{
+  "mcpServers": {
+    "tim-terraform": {
+      "command": "uv",
+      "args": [
+        "run",
+        "tim-mcp"
+      ],
+      "cwd": "/path/to/your/tim-mcp"
+    }
+  }
+}
+```
+
+**With GitHub Token** (recommended for heavy usage):
 ```json
 {
   "mcpServers": {
@@ -146,12 +195,96 @@ Test the connection by asking Claude: "What IBM Cloud Terraform modules are avai
 
 ## Available MCP Tools
 
-Once configured, TIM-MCP provides these tools to Claude:
+Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraform module discovery and implementation:
 
-1. **`search_modules`** - Search Terraform Registry for IBM Cloud modules
-2. **`get_module_details`** - Retrieve detailed module metadata and documentation
-3. **`list_content`** - Discover available files and structure in module repositories
-4. **`get_content`** - Fetch source code, examples, and documentation from GitHub
+### 1. `search_modules`
+**Search Terraform Registry for IBM Cloud modules with intelligent result optimization.**
+
+**Purpose:** Find relevant modules based on search terms, with results optimized by download count for better quality.
+
+**Inputs:**
+- `query` (string, required): Specific search term (e.g., "vpc", "kubernetes", "security")
+- `limit` (integer, optional): Maximum results to return (default: 10, range: 1-100)
+
+**Output:** JSON formatted search results including:
+- Module identifiers and basic metadata
+- Download counts and verification status
+- Descriptions and source repository URLs
+- Publication dates and version information
+
+**Usage Examples:**
+- Quick reference: `limit=3` for "I need a VPC module"
+- Exploring options: `limit=10-15` (default) for comparing alternatives
+- Comprehensive research: `limit=20+` for thorough analysis
+
+### 2. `get_module_details`
+**Retrieve structured module metadata from Terraform Registry - lightweight module interface overview.**
+
+**Purpose:** Get comprehensive module interface information including inputs, outputs, and dependencies without fetching source code.
+
+**Inputs:**
+- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
+- `version` (string, optional): Specific version or "latest" (default: "latest")
+
+**Output:** Markdown formatted module details including:
+- Module description and documentation
+- Required and optional input variables with types, descriptions, and defaults
+- Available outputs with types and descriptions
+- Provider requirements and version constraints
+- Module dependencies and available versions
+
+**When to Use:** First step after finding a module to understand its interface - often sufficient to answer user questions without fetching implementation files.
+
+### 3. `list_content`
+**Discover available paths in a module repository with README summaries.**
+
+**Purpose:** Explore repository structure to understand available examples, submodules, and solutions before fetching specific content.
+
+**Inputs:**
+- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
+- `version` (string, optional): Git tag/branch to scan (default: "latest")
+
+**Output:** Markdown formatted content listing organized by category:
+- **Root Module:** Main terraform files, inputs/outputs definitions
+- **Examples:** Deployable examples showing module usage (ideal starting point)
+- **Submodules:** Reusable components within the module
+- **Solutions:** Complete architecture patterns for complex scenarios
+
+**Usage Tips:** Use before `get_content` to select the most relevant path for your needs.
+
+### 4. `get_content`
+**Retrieve source code, examples, and documentation from GitHub repositories with targeted content filtering.**
+
+**Purpose:** Fetch actual implementation files, examples, and documentation with precise filtering to avoid large responses.
+
+**Inputs:**
+- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
+- `path` (string, optional): Specific path - "" (root), "examples/basic", "modules/vpc", etc.
+- `include_files` (list[string], optional): Regex patterns for files to include
+- `exclude_files` (list[string], optional): Regex patterns for files to exclude
+- `include_readme` (boolean, optional): Include README.md for context (default: true)
+- `version` (string, optional): Git tag/branch to fetch from (default: "latest")
+
+**Output:** Markdown formatted content with file contents, organized by:
+- File paths and content
+- File sizes for reference
+- Context from README files when requested
+
+**Common Patterns:**
+- Input variables only: `include_files=["variables\\.tf$"]`
+- Basic example: `path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]`
+- Complete module: `include_files=[".*\\.tf$"]`
+
+## Tool Workflow
+
+The tools are designed to work together in an efficient workflow:
+
+1. **`search_modules`** → Find relevant modules
+2. **`get_module_details`** → Understand module interface (often sufficient)
+3. **`list_content`** → Explore repository structure if needed
+4. **`get_content`** → Fetch specific implementation details
+
+This progressive approach minimizes API calls and provides context-aware information at each step.
 
 ## Troubleshooting
 

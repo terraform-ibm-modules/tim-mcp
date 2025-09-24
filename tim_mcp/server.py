@@ -5,7 +5,9 @@ This module implements the main MCP server using FastMCP with tools
 for Terraform IBM Modules discovery and implementation support.
 """
 
+import json
 import time
+from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import ValidationError
@@ -20,7 +22,6 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
-from typing import Optional
 
 # Global configuration and logger
 config: Config = load_config()
@@ -28,33 +29,124 @@ configure_logging(config)
 logger = get_logger(__name__)
 
 # Initialize FastMCP server
-mcp = FastMCP("TIM-MCP")
+mcp = FastMCP(
+    "TIM-MCP",
+    instructions="""IBM Cloud Terraform module discovery and implementation server.
+
+ARCHITECTURAL BEST PRACTICES:
+- ALWAYS prefer terraform-ibm-modules over direct provider resources
+- Common module alternatives:
+  * Use 'resource-group' module instead of ibm_resource_group
+  * Use 'cbr' modules instead of direct ibm_cbr_* resources
+  * Use 'vpc' module instead of direct ibm_is_* resources
+  * Use 'iks' or 'ocp' modules instead of direct cluster resources
+- Modules provide security hardening, standardized configurations, and tested patterns
+- Use direct provider resources only when no suitable module exists
+
+STANDARD WORKFLOW:
+1. search_modules → find relevant modules
+2. get_module_details → understand module interface (often sufficient)
+3. list_content → explore repository structure if needed
+4. get_content → fetch specific implementation details
+- Avoid multiple searches unless comparing approaches
+- Stop at get_module_details if it provides sufficient information
+
+OPTIMIZATION PRINCIPLES:
+- Be specific in requests to minimize context usage and API calls
+- Start with narrow scope (specific files/paths), broaden only if needed
+- Exclude test files by default: [".*test.*", ".*\\.tftest$", ".*_test\\..*"]
+- For examples, prefer single targeted example over fetching all examples
+
+IBM CLOUD FOCUS:
+- This server specializes in IBM Cloud modules and patterns
+- Higher download counts indicate better maintained modules""",
+)
+
+
+def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
+    """
+    Sanitize list parameters that might be passed as JSON strings by LLMs.
+
+    Args:
+        param: The parameter value to sanitize
+        param_name: Name of the parameter for logging
+
+    Returns:
+        Sanitized list or None
+
+    Raises:
+        ValueError: If the parameter cannot be converted to a proper format
+    """
+    if param is None:
+        return None
+
+    if isinstance(param, list):
+        # Validate all items are strings
+        if not all(isinstance(item, str) for item in param):
+            raise ValueError(
+                f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
+            )
+        return param
+
+    if isinstance(param, str):
+        # Check if it looks like a JSON array
+        param_stripped = param.strip()
+        if param_stripped.startswith("[") and param_stripped.endswith("]"):
+            try:
+                parsed = json.loads(param_stripped)
+                if isinstance(parsed, list) and all(
+                    isinstance(item, str) for item in parsed
+                ):
+                    logger.warning(
+                        f"Parameter {param_name} was passed as JSON string, auto-converted to list",
+                        original_value=param,
+                        converted_value=parsed,
+                    )
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+
+        # If it's a single string that's not JSON, convert to single-item list
+        logger.warning(
+            f"Parameter {param_name} was passed as string, converting to single-item list",
+            original_value=param,
+        )
+        return [param]
+
+    raise ValueError(
+        f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
+    )
 
 
 @mcp.tool()
 async def search_modules(
     query: str,
-    namespace: Optional[str] = None,
-    provider: Optional[str] = None,
     limit: int = 10,
 ) -> str:
     """
-    Search Terraform Registry for modules with IBM Cloud optimizations.
+    Search Terraform Registry for modules with intelligent result optimization.
+
+    RESULT OPTIMIZATION BY USE CASE:
+    - SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
+    - EXPLORING OPTIONS: limit=10-15 (default, good balance)
+    - COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
+    - QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
+
+    SEARCH TIPS:
+    - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
 
     Args:
-        query: Search term (e.g., "vpc", "kubernetes", "security")
-        namespace: Module publisher (e.g., "terraform-ibm-modules")
-        provider: Primary provider filter (e.g., "ibm", "aws")
-        limit: Maximum results to return (default: 10)
+        query: Specific search term (e.g., "vpc", "kubernetes", "security")
+        limit: Maximum results based on use case (see optimization guidance above)
 
     Returns:
-        JSON formatted module search results
+        JSON formatted module search results with download counts, descriptions, and verification status
     """
     start_time = time.time()
 
     try:
         # Validate request
-        request = ModuleSearchRequest(query=query, namespace=namespace, provider=provider, limit=limit)
+        request = ModuleSearchRequest(query=query, limit=limit)
 
         # Import here to avoid circular imports
         from .tools.search import search_modules_impl
@@ -81,8 +173,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
@@ -98,8 +188,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
@@ -114,8 +202,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
@@ -129,14 +215,27 @@ async def search_modules(
 @mcp.tool()
 async def get_module_details(module_id: str, version: str = "latest") -> str:
     """
-    Get structured module metadata from Terraform Registry.
+    Get structured module metadata from Terraform Registry - lightweight module interface overview.
+
+    WHEN TO USE:
+    - First step after finding a module to understand its interface
+    - When you need input/output information without seeing code
+    - To check compatibility and requirements
+    - Often sufficient to answer user questions without fetching files
+
+    WHAT THIS PROVIDES:
+    - Module description and documentation
+    - Required inputs (variables) with types and descriptions
+    - Available outputs with descriptions
+    - Provider requirements and version constraints
+    - Module dependencies
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Specific version or latest
+        version: Specific version or "latest" (default: "latest")
 
     Returns:
-        Plain text with markdown formatted module details
+        Plain text with markdown formatted module details including inputs, outputs, and description
     """
     start_time = time.time()
 
@@ -204,15 +303,29 @@ async def list_content(module_id: str, version: str = "latest") -> str:
     """
     Discover available paths in a module repository with README summaries.
 
-    Searches and categorizes paths into: root module, examples/ directories,
-    modules/ (submodules), and patterns/solutions/ directories.
+    WHEN TO USE:
+    - Before calling get_content to understand repository structure
+    - When user asks "what examples are available"
+    - To find the right path for specific use cases
+
+    CONTENT CATEGORIES:
+    - Root Module: Main terraform files, inputs/outputs definitions
+    - Examples: Deployable examples showing module usage (START HERE for demos)
+    - Submodules: Reusable components within the module (for advanced use)
+    - Solutions: Complete architecture patterns (for complex scenarios)
+
+    USAGE TIPS:
+    - For basic demonstrations: choose examples/basic or examples/simple
+    - For comprehensive usage: choose examples/complete
+    - For architecture patterns: choose solutions/
+    - Use descriptions to select the single most relevant example
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Git tag/branch to scan
+        version: Git tag/branch to scan (default: "latest")
 
     Returns:
-        Plain text with markdown formatted content listing
+        Plain text with markdown formatted content listing organized by category
     """
     start_time = time.time()
 
@@ -279,21 +392,34 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 async def get_content(
     module_id: str,
     path: str = "",
-    include_files: Optional[list[str]] = None,
-    exclude_files: Optional[list[str]] = None,
+    include_files: list[str] | None = None,
+    exclude_files: list[str] | None = None,
     include_readme: bool = True,
     version: str = "latest",
 ) -> str:
     """
-    Retrieve source code, examples, solutions from GitHub repositories.
+    Retrieve source code, examples, solutions from GitHub repositories with targeted content filtering.
+
+    CONTEXT-AWARE USAGE PATTERNS:
+    - INPUT VARIABLES only: include_files=["variables\\.tf$"], include_readme=false
+    - OUTPUT VALUES only: include_files=["outputs\\.tf$"], include_readme=false
+    - BASIC EXAMPLES: path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]
+    - MODULE STRUCTURE: include_files=["main\\.tf$"], include_readme=true
+    - COMPLETE EXAMPLE: path="examples/{name}", include_files=[".*\\.tf$"]
+    - ROOT MODULE: path="", include_files=["main\\.tf$", "variables\\.tf$", "outputs\\.tf$"]
+
+    FILTERING PATTERNS:
+    - Common patterns: [".*\\.tf$"] (Terraform files), [".*\\.md$"] (docs), ["main\\.tf$"] (entry only)
+    - Be specific to avoid large responses - avoid [".*"] for large repositories
+    - Tool returns available files if specific patterns don't match
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        path: Path to fetch: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: Regex patterns: ["*.tf", "README.md"] or [".*"] for everything
-        exclude_files: Regex patterns to exclude: ["*test*", "*.tftest"]
+        path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
+        include_files: Regex patterns for files to include
+        exclude_files: Regex patterns for files to exclude
         include_readme: Include README.md for context (default: true)
-        version: Git tag/branch to fetch from
+        version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
         Plain text with markdown formatted content
@@ -301,12 +427,20 @@ async def get_content(
     start_time = time.time()
 
     try:
+        # Sanitize list parameters in case they're passed as JSON strings
+        sanitized_include_files = _sanitize_list_parameter(
+            include_files, "include_files"
+        )
+        sanitized_exclude_files = _sanitize_list_parameter(
+            exclude_files, "exclude_files"
+        )
+
         # Validate request
         request = GetContentRequest(
             module_id=module_id,
             path=path,
-            include_files=include_files,
-            exclude_files=exclude_files,
+            include_files=sanitized_include_files,
+            exclude_files=sanitized_exclude_files,
             include_readme=include_readme,
             version=version,
         )

@@ -61,7 +61,9 @@ class TestRegistryTools:
 
         # Verify
         assert result == mock_versions
-        mock_terraform_client.get_module_versions.assert_called_once_with("hashicorp", "consul")
+        mock_terraform_client.get_module_versions.assert_called_once_with(
+            "hashicorp", "consul"
+        )
 
     def test_get_provider_info(self, registry_tools, mock_terraform_client):
         """Test getting provider information."""
@@ -74,7 +76,9 @@ class TestRegistryTools:
 
         # Verify
         assert result == mock_info
-        mock_terraform_client.get_provider_info.assert_called_once_with("hashicorp", "aws")
+        mock_terraform_client.get_provider_info.assert_called_once_with(
+            "hashicorp", "aws"
+        )
 
 
 class TestGitHubTools:
@@ -97,7 +101,9 @@ class TestGitHubTools:
         mock_github_client.clone_repository.return_value = True
 
         # Execute
-        result = github_tools.clone_repository("https://github.com/hashicorp/terraform", "/tmp/terraform")
+        result = github_tools.clone_repository(
+            "https://github.com/hashicorp/terraform", "/tmp/terraform"
+        )
 
         # Verify
         assert result is True
@@ -112,11 +118,15 @@ class TestGitHubTools:
         mock_github_client.get_content.return_value = mock_source
 
         # Execute
-        result = github_tools.fetch_module_source("hashicorp", "terraform", "modules/consul")
+        result = github_tools.fetch_module_source(
+            "hashicorp", "terraform", "modules/consul"
+        )
 
         # Verify
         assert result == mock_source
-        mock_github_client.get_content.assert_called_once_with("hashicorp", "terraform", "modules/consul", None)
+        mock_github_client.get_content.assert_called_once_with(
+            "hashicorp", "terraform", "modules/consul", None
+        )
 
     def test_list_terraform_files(self, github_tools, mock_github_client):
         """Test listing Terraform files."""
@@ -130,7 +140,9 @@ class TestGitHubTools:
         ]
 
         # Execute
-        with patch.object(github_tools, "list_terraform_files", return_value=mock_files):
+        with patch.object(
+            github_tools, "list_terraform_files", return_value=mock_files
+        ):
             result = github_tools.list_terraform_files("hashicorp", "terraform")
 
         # Verify

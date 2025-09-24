@@ -15,8 +15,6 @@ class ModuleSearchRequest(BaseModel):
     """Request model for module search."""
 
     query: str = Field(..., min_length=1, description="Search term")
-    namespace: str | None = Field(None, description="Module publisher")
-    provider: str | None = Field(None, description="Primary provider filter")
     limit: int = Field(10, ge=1, le=100, description="Maximum results to return")
 
 
@@ -87,7 +85,9 @@ class ContentPath(BaseModel):
 
     path: str = Field(..., description="Path string")
     description: str = Field(..., description="Path description from README")
-    type: str = Field(..., description="Path type (root, examples, submodules, solutions)")
+    type: str = Field(
+        ..., description="Path type (root, examples, submodules, solutions)"
+    )
 
 
 class ListContentResponse(BaseModel):
