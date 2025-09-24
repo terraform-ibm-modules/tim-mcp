@@ -4,6 +4,7 @@ Tests for the clients module.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from tim_mcp.clients.github_client import GitHubClient
@@ -250,9 +251,15 @@ class TestGitHubClient:
     async def test_get_latest_release_not_found(self, github_client, mock_cache):
         """Test getting latest release when no releases exist."""
         # Setup
+        mock_request = MagicMock()
+        mock_request.url = "https://api.github.com/repos/terraform-ibm-modules/no-releases/releases/latest"
+
         mock_response = MagicMock()
         mock_response.status_code = 404
-        mock_response.raise_for_status = MagicMock(side_effect=Exception("Not found"))
+        mock_response.text = "Not Found"
+
+        http_error = httpx.HTTPStatusError("404 Client Error", request=mock_request, response=mock_response)
+        mock_response.raise_for_status = MagicMock(side_effect=http_error)
         github_client.client.get = AsyncMock(return_value=mock_response)
 
         # Execute and verify exception
