@@ -1,10 +1,12 @@
 {
   "mcpServers": {
     "tim-mcp": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "src.tim_mcp.server"],
-      "cwd": "/Users/daniel/IdeaProjects/public/tim-mcp",
-      "env": {}
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
+        "tim-mcp"
+      ]
     }
   }
 }
