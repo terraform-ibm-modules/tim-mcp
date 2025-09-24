@@ -19,9 +19,13 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
    ```json
    {
      "mcpServers": {
-       "tim-terraform": {
-         "command": "uv",
-         "args": ["run", "--from", "git+https://github.com/terraform-ibm-modules/tim-mcp.git", "tim-mcp"]
+       "tim-mcp": {
+         "command": "uvx",
+         "args": [
+           "--from",
+           "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
+           "tim-mcp"
+         ]
        }
      }
    }
@@ -31,9 +35,13 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
    ```json
    {
      "mcpServers": {
-       "tim-terraform": {
-         "command": "uv",
-         "args": ["run", "--from", "git+https://github.com/terraform-ibm-modules/tim-mcp.git", "tim-mcp"],
+       "tim-mcp": {
+         "command": "uvx",
+         "args": [
+           "--from",
+           "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
+           "tim-mcp"
+         ],
          "env": { "GITHUB_TOKEN": "your_github_token_here" }
        }
      }
@@ -99,14 +107,13 @@ TIM-MCP can be configured as an MCP server for use with Claude Desktop or other 
 
 This method downloads and runs TIM-MCP directly from the GitHub repository without requiring local installation.
 
-**Basic Configuration** (works without GitHub token):
+**Basic Configuration** (recommended):
 ```json
 {
   "mcpServers": {
-    "tim-terraform": {
-      "command": "uv",
+    "tim-mcp": {
+      "command": "uvx",
       "args": [
-        "run",
         "--from",
         "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
         "tim-mcp"
@@ -116,14 +123,13 @@ This method downloads and runs TIM-MCP directly from the GitHub repository witho
 }
 ```
 
-**Enhanced Configuration** (with GitHub token to avoid rate limits):
+**With GitHub Token** (recommended for frequent usage to avoid rate limits):
 ```json
 {
   "mcpServers": {
-    "tim-terraform": {
-      "command": "uv",
+    "tim-mcp": {
+      "command": "uvx",
       "args": [
-        "run",
         "--from",
         "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
         "tim-mcp"
@@ -135,6 +141,27 @@ This method downloads and runs TIM-MCP directly from the GitHub repository witho
   }
 }
 ```
+
+**Pinned Version** (recommended for production - replace `vX.X.X` with desired version):
+```json
+{
+  "mcpServers": {
+    "tim-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/terraform-ibm-modules/tim-mcp.git@vX.X.X",
+        "tim-mcp"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "your_github_token_here"
+      }
+    }
+  }
+}
+```
+
+> **Note:** Check the [releases page](https://github.com/terraform-ibm-modules/tim-mcp/releases) for the latest version tag. Pinning to a specific version ensures consistent behavior and prevents unexpected changes from updates.
 
 **Requirements:**
 - [uv](https://docs.astral.sh/uv/) package manager installed on your system
