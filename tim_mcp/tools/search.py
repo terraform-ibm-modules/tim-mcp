@@ -88,10 +88,12 @@ async def search_modules_impl(
     async with TerraformClient(config) as client:
         try:
             # Call the Terraform Registry API with search parameters
+            # Always fetch up to 100 results to get better sorting accuracy
+            internal_limit = 100
             api_response = await client.search_modules(
                 query=request.query,
                 namespace=namespace,
-                limit=request.limit,
+                limit=internal_limit,
                 offset=0,  # Start from beginning - pagination can be added later
             )
 
@@ -118,9 +120,15 @@ async def search_modules_impl(
                         f"Invalid module data at index {i}: {e}"
                     ) from e
 
+            # Sort modules by downloads in descending order (highest first)
+            modules.sort(key=lambda m: m.downloads, reverse=True)
+
+            # Apply the user's requested limit to the sorted results
+            limited_modules = modules[: request.limit]
+
             # Create and return the formatted response
             return ModuleSearchResponse(
-                query=request.query, total_found=total_count, modules=modules
+                query=request.query, total_found=total_count, modules=limited_modules
             )
 
         except TIMError:

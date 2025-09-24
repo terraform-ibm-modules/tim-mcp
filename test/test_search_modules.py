@@ -130,7 +130,7 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                limit=10,
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
 
@@ -157,7 +157,7 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                limit=5,
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
 
@@ -399,7 +399,7 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",  # First allowed namespace from config
-                limit=10,
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
             assert result.query == "vpc"
@@ -494,10 +494,198 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace=None,  # No namespace filtering when config is empty
-                limit=10,
+                limit=100,  # Always fetch 100 results internally
                 offset=0,
             )
             assert result.query == "vpc"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting(self, config, mock_terraform_client):
+        """Test that results are sorted by downloads in descending order."""
+        # Setup - response with modules in wrong download order
+        unsorted_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/low-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "low-downloads",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module with few downloads",
+                    "source": "https://github.com/terraform-ibm-modules/low-downloads",
+                    "downloads": 100,  # Low downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/high-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "high-downloads",
+                    "provider": "ibm",
+                    "version": "2.0.0",
+                    "description": "Module with many downloads",
+                    "source": "https://github.com/terraform-ibm-modules/high-downloads",
+                    "downloads": 50000,  # High downloads
+                    "verified": True,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/medium-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "medium-downloads",
+                    "provider": "ibm",
+                    "version": "1.5.0",
+                    "description": "Module with medium downloads",
+                    "source": "https://github.com/terraform-ibm-modules/medium-downloads",
+                    "downloads": 5000,  # Medium downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T12:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 3},
+        }
+
+        mock_terraform_client.search_modules.return_value = unsorted_response
+        request = ModuleSearchRequest(query="modules")
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that results are sorted by downloads descending
+            assert result.query == "modules"
+            assert result.total_found == 3
+            assert len(result.modules) == 3
+
+            # Check order: high (50000) -> medium (5000) -> low (100)
+            assert result.modules[0].downloads == 50000
+            assert result.modules[0].id == "terraform-ibm-modules/high-downloads/ibm"
+            assert result.modules[1].downloads == 5000
+            assert result.modules[1].id == "terraform-ibm-modules/medium-downloads/ibm"
+            assert result.modules[2].downloads == 100
+            assert result.modules[2].id == "terraform-ibm-modules/low-downloads/ibm"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting_with_limit(self, config, mock_terraform_client):
+        """Test that sorting works correctly when applying user's limit."""
+        # Setup - same unsorted response as above
+        unsorted_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/low-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "low-downloads",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module with few downloads",
+                    "source": "https://github.com/terraform-ibm-modules/low-downloads",
+                    "downloads": 100,
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/high-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "high-downloads",
+                    "provider": "ibm",
+                    "version": "2.0.0",
+                    "description": "Module with many downloads",
+                    "source": "https://github.com/terraform-ibm-modules/high-downloads",
+                    "downloads": 50000,
+                    "verified": True,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/medium-downloads/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "medium-downloads",
+                    "provider": "ibm",
+                    "version": "1.5.0",
+                    "description": "Module with medium downloads",
+                    "source": "https://github.com/terraform-ibm-modules/medium-downloads",
+                    "downloads": 5000,
+                    "verified": False,
+                    "published_at": "2025-09-01T12:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 3},
+        }
+
+        mock_terraform_client.search_modules.return_value = unsorted_response
+        # Request only top 2 results
+        request = ModuleSearchRequest(query="modules", limit=2)
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that we get top 2 by downloads
+            assert result.query == "modules"
+            assert result.total_found == 3
+            assert len(result.modules) == 2  # Limited to 2
+
+            # Check that we got the top 2: high (50000) and medium (5000)
+            assert result.modules[0].downloads == 50000
+            assert result.modules[0].id == "terraform-ibm-modules/high-downloads/ibm"
+            assert result.modules[1].downloads == 5000
+            assert result.modules[1].id == "terraform-ibm-modules/medium-downloads/ibm"
+
+    @pytest.mark.asyncio
+    async def test_download_sorting_same_counts(self, config, mock_terraform_client):
+        """Test sorting behavior when modules have the same download counts."""
+        # Setup - modules with same download counts
+        same_downloads_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/module-a/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "module-a",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module A",
+                    "source": "https://github.com/terraform-ibm-modules/module-a",
+                    "downloads": 1000,  # Same downloads
+                    "verified": False,
+                    "published_at": "2025-09-01T08:00:00.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/module-b/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "module-b",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Module B",
+                    "source": "https://github.com/terraform-ibm-modules/module-b",
+                    "downloads": 1000,  # Same downloads
+                    "verified": False,
+                    "published_at": "2025-09-02T08:00:00.000Z",
+                },
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 2},
+        }
+
+        mock_terraform_client.search_modules.return_value = same_downloads_response
+        request = ModuleSearchRequest(query="modules")
+
+        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify that results are returned (order may be stable but not guaranteed)
+            assert result.query == "modules"
+            assert result.total_found == 2
+            assert len(result.modules) == 2
+            # Both modules should have same download count
+            assert all(module.downloads == 1000 for module in result.modules)
 
 
 class TestModuleSearchRequestValidation:
