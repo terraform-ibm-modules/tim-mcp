@@ -166,7 +166,9 @@ class TestGetModuleDetailsSuccess:
     """Test successful module details retrieval."""
 
     @pytest.mark.asyncio
-    async def test_get_module_details_latest_version(self, config, sample_module_details_response, expected_markdown_output):
+    async def test_get_module_details_latest_version(
+        self, config, sample_module_details_response, expected_markdown_output
+    ):
         """Test getting module details for latest version."""
         from tim_mcp.tools.details import get_module_details_impl
 
@@ -182,7 +184,9 @@ class TestGetModuleDetailsSuccess:
                 "7.3.1",
             ]
 
-            request = ModuleDetailsRequest(module_id="terraform-ibm-modules/vpc/ibm", version="latest")
+            request = ModuleDetailsRequest(
+                module_id="terraform-ibm-modules/vpc/ibm", version="latest"
+            )
 
             result = await get_module_details_impl(request, config)
 
@@ -195,7 +199,9 @@ class TestGetModuleDetailsSuccess:
             )
 
     @pytest.mark.asyncio
-    async def test_get_module_details_specific_version(self, config, sample_module_details_response):
+    async def test_get_module_details_specific_version(
+        self, config, sample_module_details_response
+    ):
         """Test getting module details for specific version."""
         from tim_mcp.tools.details import get_module_details_impl
 
@@ -214,7 +220,9 @@ class TestGetModuleDetailsSuccess:
                 "7.3.1",
             ]
 
-            request = ModuleDetailsRequest(module_id="terraform-ibm-modules/vpc/ibm", version="7.4.1")
+            request = ModuleDetailsRequest(
+                module_id="terraform-ibm-modules/vpc/ibm", version="7.4.1"
+            )
 
             result = await get_module_details_impl(request, config)
 
@@ -313,7 +321,9 @@ class TestGetModuleDetailsErrors:
         with patch("tim_mcp.tools.details.TerraformClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.side_effect = TerraformRegistryError("Module not found", status_code=404)
+            mock_client.get_module_details.side_effect = TerraformRegistryError(
+                "Module not found", status_code=404
+            )
 
             request = ModuleDetailsRequest(module_id="nonexistent/module/aws")
 
@@ -330,7 +340,9 @@ class TestGetModuleDetailsErrors:
         with patch("tim_mcp.tools.details.TerraformClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.side_effect = RateLimitError("Rate limit exceeded", reset_time=1640995200)
+            mock_client.get_module_details.side_effect = RateLimitError(
+                "Rate limit exceeded", reset_time=1640995200
+            )
 
             request = ModuleDetailsRequest(module_id="test/module/aws")
 
@@ -345,7 +357,9 @@ class TestGetModuleDetailsErrors:
         with patch("tim_mcp.tools.details.TerraformClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.side_effect = TerraformRegistryError("Internal server error", status_code=500)
+            mock_client.get_module_details.side_effect = TerraformRegistryError(
+                "Internal server error", status_code=500
+            )
 
             request = ModuleDetailsRequest(module_id="test/module/aws")
 
@@ -423,7 +437,9 @@ class TestMarkdownFormatting:
         output_result = format_outputs(outputs)
 
         assert "- **vpc_name** (string): Name of the VPC" in required_result
-        assert "- **tags** (map(string)): Resource tags (default: {})" in optional_result
+        assert (
+            "- **tags** (map(string)): Resource tags (default: {})" in optional_result
+        )
         assert "- **vpc_id** (string): ID of the VPC" in output_result
 
     def test_format_dependencies(self):

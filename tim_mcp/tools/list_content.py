@@ -46,7 +46,9 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         await github_client.get_repository_info(owner, repo_name)
 
         # Resolve version to actual git reference
-        resolved_version = await github_client.resolve_version(owner, repo_name, request.version)
+        resolved_version = await github_client.resolve_version(
+            owner, repo_name, request.version
+        )
 
         logger.info(
             "Listing content for module",
@@ -58,16 +60,22 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         )
 
         # Get repository tree structure
-        tree_items = await github_client.get_repository_tree(owner, repo_name, resolved_version, recursive=True)
+        tree_items = await github_client.get_repository_tree(
+            owner, repo_name, resolved_version, recursive=True
+        )
 
         # Categorize paths and collect README information
         categorized_paths = _categorize_tree_items(tree_items)
 
         # Extract README summaries for each significant path
-        path_descriptions = await _extract_path_descriptions(github_client, owner, repo_name, resolved_version, categorized_paths)
+        path_descriptions = await _extract_path_descriptions(
+            github_client, owner, repo_name, resolved_version, categorized_paths
+        )
 
         # Format output
-        return _format_content_listing(request.module_id, resolved_version, categorized_paths, path_descriptions)
+        return _format_content_listing(
+            request.module_id, resolved_version, categorized_paths, path_descriptions
+        )
     finally:
         await github_client.client.aclose()
 
@@ -87,7 +95,9 @@ def _extract_repo_from_module_id(module_id: str) -> tuple[str, str]:
     """
     parts = module_id.split("/")
     if len(parts) != 3:
-        raise ModuleNotFoundError(module_id, details={"reason": "Invalid module ID format"})
+        raise ModuleNotFoundError(
+            module_id, details={"reason": "Invalid module ID format"}
+        )
 
     namespace, name, provider = parts
 
@@ -222,7 +232,9 @@ async def _extract_path_descriptions(
     # Extract descriptions for all paths
     for category, paths in categorized_paths.items():
         for path in paths:
-            description = await _get_path_description(github_client, owner, repo_name, version, path, category)
+            description = await _get_path_description(
+                github_client, owner, repo_name, version, path, category
+            )
             descriptions[path] = description
 
     return descriptions
@@ -258,7 +270,9 @@ async def _get_path_description(
             # Path-specific README
             readme_path = f"{path}/README.md"
 
-        file_content = await github_client.get_file_content(owner, repo_name, readme_path, version)
+        file_content = await github_client.get_file_content(
+            owner, repo_name, readme_path, version
+        )
 
         if "decoded_content" in file_content:
             readme_text = file_content["decoded_content"]
@@ -307,7 +321,12 @@ def _extract_readme_summary(readme_content: str) -> str:
             continue
 
         # Skip empty lines, titles, and markdown headers
-        if not line or line.startswith("#") or line.startswith("=") or line.startswith("-"):
+        if (
+            not line
+            or line.startswith("#")
+            or line.startswith("=")
+            or line.startswith("-")
+        ):
             continue
 
         # Stop at section headers

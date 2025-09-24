@@ -30,7 +30,10 @@ class TestSearchModulesImpl:
         """Create a test configuration with filtering enabled."""
         return Config(
             allowed_namespaces=["terraform-ibm-modules", "ibm-garage-cloud"],
-            excluded_modules=["terraform-ibm-modules/bad-module/ibm", "terraform-ibm-modules/deprecated-vpc/ibm"],
+            excluded_modules=[
+                "terraform-ibm-modules/bad-module/ibm",
+                "terraform-ibm-modules/deprecated-vpc/ibm",
+            ],
         )
 
     @pytest.fixture
@@ -116,25 +119,37 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
             # Verify
             assert result == expected_response
             mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc", namespace="terraform-ibm-modules", provider=None, limit=10, offset=0
+                query="vpc",
+                namespace="terraform-ibm-modules",
+                provider=None,
+                limit=10,
+                offset=0,
             )
 
     @pytest.mark.asyncio
-    async def test_successful_search_with_filters(self, config, mock_terraform_client, sample_registry_response):
+    async def test_successful_search_with_filters(
+        self, config, mock_terraform_client, sample_registry_response
+    ):
         """Test successful module search with namespace and provider filters."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        request = ModuleSearchRequest(query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5)
+        request = ModuleSearchRequest(
+            query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5
+        )
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -162,7 +177,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="nonexistent")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -175,11 +192,15 @@ class TestSearchModulesImpl:
     async def test_terraform_registry_error(self, config, mock_terraform_client):
         """Test handling of Terraform Registry API errors."""
         # Setup
-        mock_terraform_client.search_modules.side_effect = TerraformRegistryError("API temporarily unavailable", status_code=503)
+        mock_terraform_client.search_modules.side_effect = TerraformRegistryError(
+            "API temporarily unavailable", status_code=503
+        )
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TerraformRegistryError) as exc_info:
                 await search_modules_impl(request, config)
@@ -197,7 +218,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(RateLimitError) as exc_info:
                 await search_modules_impl(request, config)
@@ -223,7 +246,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -255,7 +280,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -274,7 +301,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute & Verify
             with pytest.raises(TIMValidationError) as exc_info:
                 await search_modules_impl(request, config)
@@ -282,7 +311,9 @@ class TestSearchModulesImpl:
             assert "Invalid API response format" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_client_context_manager_usage(self, config, mock_terraform_client, sample_registry_response):
+    async def test_client_context_manager_usage(
+        self, config, mock_terraform_client, sample_registry_response
+    ):
         """Test that the TerraformClient is used as an async context manager."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
@@ -326,7 +357,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="test")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -345,7 +378,9 @@ class TestSearchModulesImpl:
             assert str(module.source_url) == "https://github.com/test/repo"
             assert module.downloads == 999
             assert module.verified is True
-            assert module.published_at == datetime.fromisoformat("2025-01-01T12:00:00+00:00")
+            assert module.published_at == datetime.fromisoformat(
+                "2025-01-01T12:00:00+00:00"
+            )
 
     @pytest.mark.asyncio
     async def test_namespace_filtering_override_disallowed(
@@ -355,10 +390,14 @@ class TestSearchModulesImpl:
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
         # Request with disallowed namespace
-        request = ModuleSearchRequest(query="vpc", namespace="some-disallowed-namespace")
+        request = ModuleSearchRequest(
+            query="vpc", namespace="some-disallowed-namespace"
+        )
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
@@ -383,7 +422,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc", namespace="ibm-garage-cloud")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
@@ -408,7 +449,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
@@ -423,7 +466,9 @@ class TestSearchModulesImpl:
             assert result.query == "vpc"
 
     @pytest.mark.asyncio
-    async def test_module_exclusion_filtering(self, config_with_filtering, mock_terraform_client):
+    async def test_module_exclusion_filtering(
+        self, config_with_filtering, mock_terraform_client
+    ):
         """Test that excluded modules are filtered out from results."""
         # Setup - response with both allowed and excluded modules
         response_with_excluded = {
@@ -472,7 +517,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="modules")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
@@ -488,7 +535,9 @@ class TestSearchModulesImpl:
             assert "terraform-ibm-modules/bad-module/ibm" not in module_ids  # Excluded
 
     @pytest.mark.asyncio
-    async def test_empty_allowed_namespaces_no_filtering(self, mock_terraform_client, sample_registry_response):
+    async def test_empty_allowed_namespaces_no_filtering(
+        self, mock_terraform_client, sample_registry_response
+    ):
         """Test behavior when allowed_namespaces is empty - no filtering should occur."""
         # Setup config with empty allowed namespaces
         config_no_filtering = Config(allowed_namespaces=[], excluded_modules=[])
@@ -496,7 +545,9 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc", namespace="any-namespace")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
             # Execute
             result = await search_modules_impl(request, config_no_filtering)
 
@@ -516,7 +567,9 @@ class TestModuleSearchRequestValidation:
 
     def test_valid_request(self):
         """Test valid request creation."""
-        request = ModuleSearchRequest(query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5)
+        request = ModuleSearchRequest(
+            query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5
+        )
         assert request.query == "vpc"
         assert request.namespace == "terraform-ibm-modules"
         assert request.provider == "ibm"

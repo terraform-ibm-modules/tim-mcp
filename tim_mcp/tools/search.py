@@ -42,15 +42,21 @@ def _validate_api_response_structure(api_response: Any) -> None:
 
     # Validate modules is a list
     if not isinstance(api_response["modules"], list):
-        raise TIMValidationError("Invalid API response format: 'modules' must be a list")
+        raise TIMValidationError(
+            "Invalid API response format: 'modules' must be a list"
+        )
 
     # Validate meta has required fields
     meta = api_response["meta"]
     if not isinstance(meta, dict):
-        raise TIMValidationError("Invalid API response format: 'meta' must be a dictionary")
+        raise TIMValidationError(
+            "Invalid API response format: 'meta' must be a dictionary"
+        )
 
 
-async def search_modules_impl(request: ModuleSearchRequest, config: Config) -> ModuleSearchResponse:
+async def search_modules_impl(
+    request: ModuleSearchRequest, config: Config
+) -> ModuleSearchResponse:
     """
     Implementation function for the search_modules MCP tool.
 
@@ -75,7 +81,9 @@ async def search_modules_impl(request: ModuleSearchRequest, config: Config) -> M
     logger = get_logger(__name__)
 
     # Enforce namespace filtering based on allowed_namespaces configuration
-    filtered_namespace = _filter_namespace(request.namespace, config.allowed_namespaces, logger)
+    filtered_namespace = _filter_namespace(
+        request.namespace, config.allowed_namespaces, logger
+    )
 
     # Create and use the Terraform client as async context manager
     # This ensures proper cleanup of HTTP connections
@@ -109,17 +117,23 @@ async def search_modules_impl(request: ModuleSearchRequest, config: Config) -> M
                         logger.info("Module excluded from results", module_id=module.id)
                 except Exception as e:
                     # Include context about which module failed
-                    raise TIMValidationError(f"Invalid module data at index {i}: {e}") from e
+                    raise TIMValidationError(
+                        f"Invalid module data at index {i}: {e}"
+                    ) from e
 
             # Create and return the formatted response
-            return ModuleSearchResponse(query=request.query, total_found=total_count, modules=modules)
+            return ModuleSearchResponse(
+                query=request.query, total_found=total_count, modules=modules
+            )
 
         except TIMError:
             # Re-raise TIM errors as-is to preserve error context
             raise
         except Exception as e:
             # Wrap unexpected errors with context
-            raise TIMValidationError(f"Unexpected error processing search results: {e}") from e
+            raise TIMValidationError(
+                f"Unexpected error processing search results: {e}"
+            ) from e
 
 
 def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
@@ -164,7 +178,9 @@ def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
             published_at_str = published_at_str[:-1] + "+00:00"
         published_at = datetime.fromisoformat(published_at_str)
     except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid published_at format '{published_at_str}': {e}") from e
+        raise ValueError(
+            f"Invalid published_at format '{published_at_str}': {e}"
+        ) from e
 
     # Validate and get optional fields with defaults
     downloads = module_data.get("downloads", 0)
@@ -194,7 +210,9 @@ def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
         raise ValueError(f"Failed to create ModuleInfo object: {e}") from e
 
 
-def _filter_namespace(requested_namespace: str | None, allowed_namespaces: list[str], logger) -> str | None:
+def _filter_namespace(
+    requested_namespace: str | None, allowed_namespaces: list[str], logger
+) -> str | None:
     """
     Filter the requested namespace based on the allowed namespaces configuration.
 
@@ -208,13 +226,19 @@ def _filter_namespace(requested_namespace: str | None, allowed_namespaces: list[
     """
     # If no filtering is configured (empty allowed list), pass through as-is
     if not allowed_namespaces:
-        logger.debug("No namespace filtering configured, passing through original request", namespace=requested_namespace)
+        logger.debug(
+            "No namespace filtering configured, passing through original request",
+            namespace=requested_namespace,
+        )
         return requested_namespace
 
     # If no namespace was requested, default to the first allowed namespace
     if requested_namespace is None:
         filtered_namespace = allowed_namespaces[0]
-        logger.info("No namespace specified, defaulting to first allowed namespace", namespace=filtered_namespace)
+        logger.info(
+            "No namespace specified, defaulting to first allowed namespace",
+            namespace=filtered_namespace,
+        )
         return filtered_namespace
 
     # If a namespace was requested, check if it's in the allowed list

@@ -25,7 +25,9 @@ class GitHubTools:
         """
         self.client = client or GitHubClient()
 
-    def clone_repository(self, repo_url: str, target_dir: str, branch: str | None = None) -> bool:
+    def clone_repository(
+        self, repo_url: str, target_dir: str, branch: str | None = None
+    ) -> bool:
         """
         Clone a GitHub repository.
 
@@ -40,7 +42,9 @@ class GitHubTools:
         logger.info(f"Cloning repository {repo_url} to {target_dir}")
         return self.client.clone_repository(repo_url, target_dir, branch)
 
-    def fetch_module_source(self, owner: str, repo: str, path: str, ref: str | None = None) -> dict[str, Any]:
+    def fetch_module_source(
+        self, owner: str, repo: str, path: str, ref: str | None = None
+    ) -> dict[str, Any]:
         """
         Fetch Terraform module source from GitHub.
 
@@ -56,7 +60,9 @@ class GitHubTools:
         logger.info(f"Fetching module source from {owner}/{repo}/{path}")
         return self.client.get_content(owner, repo, path, ref)
 
-    def list_terraform_files(self, owner: str, repo: str, path: str = "", ref: str | None = None) -> list[str]:
+    def list_terraform_files(
+        self, owner: str, repo: str, path: str = "", ref: str | None = None
+    ) -> list[str]:
         """
         List Terraform files in a repository.
 

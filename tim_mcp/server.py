@@ -20,7 +20,6 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
-from typing import Optional
 
 # Global configuration and logger
 config: Config = load_config()
@@ -34,8 +33,8 @@ mcp = FastMCP("TIM-MCP")
 @mcp.tool()
 async def search_modules(
     query: str,
-    namespace: Optional[str] = None,
-    provider: Optional[str] = None,
+    namespace: str | None = None,
+    provider: str | None = None,
     limit: int = 10,
 ) -> str:
     """
@@ -54,7 +53,9 @@ async def search_modules(
 
     try:
         # Validate request
-        request = ModuleSearchRequest(query=query, namespace=namespace, provider=provider, limit=limit)
+        request = ModuleSearchRequest(
+            query=query, namespace=namespace, provider=provider, limit=limit
+        )
 
         # Import here to avoid circular imports
         from .tools.search import search_modules_impl
@@ -279,8 +280,8 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 async def get_content(
     module_id: str,
     path: str = "",
-    include_files: Optional[list[str]] = None,
-    exclude_files: Optional[list[str]] = None,
+    include_files: list[str] | None = None,
+    exclude_files: list[str] | None = None,
     include_readme: bool = True,
     version: str = "latest",
 ) -> str:
@@ -290,8 +291,8 @@ async def get_content(
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
         path: Path to fetch: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: Regex patterns: ["*.tf", "README.md"] or [".*"] for everything
-        exclude_files: Regex patterns to exclude: ["*test*", "*.tftest"]
+        include_files: List of regex patterns to include files, e.g., [".*\\.tf$", "README\\.md$"] for Terraform files and README, or [".*"] for everything
+        exclude_files: List of regex patterns to exclude files, e.g., [".*test.*", ".*\\.tftest$"] to exclude test files
         include_readme: Include README.md for context (default: true)
         version: Git tag/branch to fetch from
 

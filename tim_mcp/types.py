@@ -87,7 +87,9 @@ class ContentPath(BaseModel):
 
     path: str = Field(..., description="Path string")
     description: str = Field(..., description="Path description from README")
-    type: str = Field(..., description="Path type (root, examples, submodules, solutions)")
+    type: str = Field(
+        ..., description="Path type (root, examples, submodules, solutions)"
+    )
 
 
 class ListContentResponse(BaseModel):

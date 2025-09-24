@@ -134,7 +134,9 @@ class RateLimitError(APIError):
             **kwargs: Additional details
         """
         details = {"reset_time": reset_time, **kwargs}
-        super().__init__(message, status_code=429, api_name=api_name, code="RATE_LIMIT", **details)
+        super().__init__(
+            message, status_code=429, api_name=api_name, code="RATE_LIMIT", **details
+        )
         self.reset_time = reset_time
 
 
