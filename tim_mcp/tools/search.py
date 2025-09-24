@@ -80,10 +80,8 @@ async def search_modules_impl(
 
     logger = get_logger(__name__)
 
-    # Enforce namespace filtering based on allowed_namespaces configuration
-    filtered_namespace = _filter_namespace(
-        request.namespace, config.allowed_namespaces, logger
-    )
+    # Use the configured namespace (always the first allowed namespace)
+    namespace = config.allowed_namespaces[0] if config.allowed_namespaces else None
 
     # Create and use the Terraform client as async context manager
     # This ensures proper cleanup of HTTP connections
@@ -92,8 +90,7 @@ async def search_modules_impl(
             # Call the Terraform Registry API with search parameters
             api_response = await client.search_modules(
                 query=request.query,
-                namespace=filtered_namespace,
-                provider=request.provider,
+                namespace=namespace,
                 limit=request.limit,
                 offset=0,  # Start from beginning - pagination can be added later
             )
@@ -208,53 +205,6 @@ def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
         )
     except Exception as e:
         raise ValueError(f"Failed to create ModuleInfo object: {e}") from e
-
-
-def _filter_namespace(
-    requested_namespace: str | None, allowed_namespaces: list[str], logger
-) -> str | None:
-    """
-    Filter the requested namespace based on the allowed namespaces configuration.
-
-    Args:
-        requested_namespace: The namespace requested by the user (can be None)
-        allowed_namespaces: List of allowed namespaces from configuration
-        logger: Logger instance for logging filtering actions
-
-    Returns:
-        The filtered namespace to use for the search
-    """
-    # If no filtering is configured (empty allowed list), pass through as-is
-    if not allowed_namespaces:
-        logger.debug(
-            "No namespace filtering configured, passing through original request",
-            namespace=requested_namespace,
-        )
-        return requested_namespace
-
-    # If no namespace was requested, default to the first allowed namespace
-    if requested_namespace is None:
-        filtered_namespace = allowed_namespaces[0]
-        logger.info(
-            "No namespace specified, defaulting to first allowed namespace",
-            namespace=filtered_namespace,
-        )
-        return filtered_namespace
-
-    # If a namespace was requested, check if it's in the allowed list
-    if requested_namespace in allowed_namespaces:
-        logger.debug("Requested namespace is allowed", namespace=requested_namespace)
-        return requested_namespace
-    else:
-        # Override with first allowed namespace if requested namespace is not allowed
-        filtered_namespace = allowed_namespaces[0]
-        logger.warning(
-            "Requested namespace not allowed, overriding with default",
-            requested_namespace=requested_namespace,
-            filtered_namespace=filtered_namespace,
-            allowed_namespaces=allowed_namespaces,
-        )
-        return filtered_namespace
 
 
 def _is_module_excluded(module_id: str, excluded_modules: list[str]) -> bool:

@@ -130,21 +130,18 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                provider=None,
                 limit=10,
                 offset=0,
             )
 
     @pytest.mark.asyncio
-    async def test_successful_search_with_filters(
+    async def test_successful_search_with_limit(
         self, config, mock_terraform_client, sample_registry_response
     ):
-        """Test successful module search with namespace and provider filters."""
+        """Test successful module search with custom limit."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        request = ModuleSearchRequest(
-            query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5
-        )
+        request = ModuleSearchRequest(query="vpc", limit=5)
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
@@ -160,7 +157,6 @@ class TestSearchModulesImpl:
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                provider="ibm",
                 limit=5,
                 offset=0,
             )
@@ -383,69 +379,13 @@ class TestSearchModulesImpl:
             )
 
     @pytest.mark.asyncio
-    async def test_namespace_filtering_override_disallowed(
+    async def test_namespace_filtering_uses_configured(
         self, config_with_filtering, mock_terraform_client, sample_registry_response
     ):
-        """Test that disallowed namespaces are overridden with the first allowed namespace."""
+        """Test that the configured namespace is used from config."""
         # Setup
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with disallowed namespace
-        request = ModuleSearchRequest(
-            query="vpc", namespace="some-disallowed-namespace"
-        )
-
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
-            # Execute
-            result = await search_modules_impl(request, config_with_filtering)
-
-            # Verify that the search was called with the first allowed namespace instead
-            mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc",
-                namespace="terraform-ibm-modules",  # First allowed namespace
-                provider=None,
-                limit=10,
-                offset=0,
-            )
-            assert result.query == "vpc"
-
-    @pytest.mark.asyncio
-    async def test_namespace_filtering_allowed_namespace(
-        self, config_with_filtering, mock_terraform_client, sample_registry_response
-    ):
-        """Test that allowed namespaces are passed through unchanged."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with allowed namespace
-        request = ModuleSearchRequest(query="vpc", namespace="ibm-garage-cloud")
-
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
-            # Execute
-            result = await search_modules_impl(request, config_with_filtering)
-
-            # Verify that the search was called with the requested namespace
-            mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc",
-                namespace="ibm-garage-cloud",  # Requested namespace was allowed
-                provider=None,
-                limit=10,
-                offset=0,
-            )
-            assert result.query == "vpc"
-
-    @pytest.mark.asyncio
-    async def test_namespace_filtering_default_when_none(
-        self, config_with_filtering, mock_terraform_client, sample_registry_response
-    ):
-        """Test that the first allowed namespace is used when none is specified."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
-        # Request with no namespace
+        # Request without namespace parameter
         request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
@@ -458,8 +398,7 @@ class TestSearchModulesImpl:
             # Verify that the search was called with the first allowed namespace
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
-                namespace="terraform-ibm-modules",  # First allowed namespace
-                provider=None,
+                namespace="terraform-ibm-modules",  # First allowed namespace from config
                 limit=10,
                 offset=0,
             )
@@ -538,11 +477,11 @@ class TestSearchModulesImpl:
     async def test_empty_allowed_namespaces_no_filtering(
         self, mock_terraform_client, sample_registry_response
     ):
-        """Test behavior when allowed_namespaces is empty - no filtering should occur."""
+        """Test behavior when allowed_namespaces is empty - no namespace filtering should occur."""
         # Setup config with empty allowed namespaces
         config_no_filtering = Config(allowed_namespaces=[], excluded_modules=[])
         mock_terraform_client.search_modules.return_value = sample_registry_response
-        request = ModuleSearchRequest(query="vpc", namespace="any-namespace")
+        request = ModuleSearchRequest(query="vpc")
 
         with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
@@ -551,11 +490,10 @@ class TestSearchModulesImpl:
             # Execute
             result = await search_modules_impl(request, config_no_filtering)
 
-            # Verify that the original namespace was passed through
+            # Verify that None namespace was passed (no filtering)
             mock_terraform_client.search_modules.assert_called_once_with(
                 query="vpc",
-                namespace="any-namespace",  # Original namespace preserved
-                provider=None,
+                namespace=None,  # No namespace filtering when config is empty
                 limit=10,
                 offset=0,
             )
@@ -567,12 +505,8 @@ class TestModuleSearchRequestValidation:
 
     def test_valid_request(self):
         """Test valid request creation."""
-        request = ModuleSearchRequest(
-            query="vpc", namespace="terraform-ibm-modules", provider="ibm", limit=5
-        )
+        request = ModuleSearchRequest(query="vpc", limit=5)
         assert request.query == "vpc"
-        assert request.namespace == "terraform-ibm-modules"
-        assert request.provider == "ibm"
         assert request.limit == 5
 
     def test_default_limit(self):
@@ -594,12 +528,6 @@ class TestModuleSearchRequestValidation:
         """Test empty query validation."""
         with pytest.raises(ValidationError):
             ModuleSearchRequest(query="")
-
-    def test_optional_fields_none(self):
-        """Test optional fields can be None."""
-        request = ModuleSearchRequest(query="vpc", namespace=None, provider=None)
-        assert request.namespace is None
-        assert request.provider is None
 
 
 class TestModuleInfoValidation:

@@ -59,8 +59,6 @@ OPTIMIZATION PRINCIPLES:
 
 IBM CLOUD FOCUS:
 - This server specializes in IBM Cloud modules and patterns
-- Use namespace="terraform-ibm-modules" for official, reliable modules
-- Use provider="ibm" to focus on IBM Cloud specific implementations
 - Higher download counts indicate better maintained modules""",
 )
 
@@ -123,8 +121,6 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
 @mcp.tool()
 async def search_modules(
     query: str,
-    namespace: str | None = None,
-    provider: str | None = None,
     limit: int = 10,
 ) -> str:
     """
@@ -138,13 +134,9 @@ async def search_modules(
 
     SEARCH TIPS:
     - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
-    - Combine query + namespace for precise results: query="vpc", namespace="terraform-ibm-modules"
-    - Popular IBM Cloud terms: "vpc", "iks", "cos", "security", "cbr", "resource-group"
 
     Args:
         query: Specific search term (e.g., "vpc", "kubernetes", "security")
-        namespace: Module publisher (e.g., "terraform-ibm-modules" for official IBM modules)
-        provider: Primary provider filter (e.g., "ibm" for IBM Cloud)
         limit: Maximum results based on use case (see optimization guidance above)
 
     Returns:
@@ -154,9 +146,7 @@ async def search_modules(
 
     try:
         # Validate request
-        request = ModuleSearchRequest(
-            query=query, namespace=namespace, provider=provider, limit=limit
-        )
+        request = ModuleSearchRequest(query=query, limit=limit)
 
         # Import here to avoid circular imports
         from .tools.search import search_modules_impl
@@ -183,8 +173,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
@@ -200,8 +188,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
@@ -216,8 +202,6 @@ async def search_modules(
             "search_modules",
             {
                 "query": query,
-                "namespace": namespace,
-                "provider": provider,
                 "limit": limit,
             },
             duration_ms,
