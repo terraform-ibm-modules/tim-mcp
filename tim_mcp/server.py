@@ -29,7 +29,40 @@ configure_logging(config)
 logger = get_logger(__name__)
 
 # Initialize FastMCP server
-mcp = FastMCP("TIM-MCP")
+mcp = FastMCP(
+    "TIM-MCP",
+    instructions="""IBM Cloud Terraform module discovery and implementation server.
+
+ARCHITECTURAL BEST PRACTICES:
+- ALWAYS prefer terraform-ibm-modules over direct provider resources
+- Common module alternatives:
+  * Use 'resource-group' module instead of ibm_resource_group
+  * Use 'cbr' modules instead of direct ibm_cbr_* resources
+  * Use 'vpc' module instead of direct ibm_is_* resources
+  * Use 'iks' or 'ocp' modules instead of direct cluster resources
+- Modules provide security hardening, standardized configurations, and tested patterns
+- Use direct provider resources only when no suitable module exists
+
+STANDARD WORKFLOW:
+1. search_modules → find relevant modules
+2. get_module_details → understand module interface (often sufficient)
+3. list_content → explore repository structure if needed
+4. get_content → fetch specific implementation details
+- Avoid multiple searches unless comparing approaches
+- Stop at get_module_details if it provides sufficient information
+
+OPTIMIZATION PRINCIPLES:
+- Be specific in requests to minimize context usage and API calls
+- Start with narrow scope (specific files/paths), broaden only if needed
+- Exclude test files by default: [".*test.*", ".*\\.tftest$", ".*_test\\..*"]
+- For examples, prefer single targeted example over fetching all examples
+
+IBM CLOUD FOCUS:
+- This server specializes in IBM Cloud modules and patterns
+- Use namespace="terraform-ibm-modules" for official, reliable modules
+- Use provider="ibm" to focus on IBM Cloud specific implementations
+- Higher download counts indicate better maintained modules""",
+)
 
 
 def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
@@ -95,35 +128,24 @@ async def search_modules(
     limit: int = 10,
 ) -> str:
     """
-    Search Terraform Registry for modules with intelligent result optimization for different scenarios.
+    Search Terraform Registry for modules with intelligent result optimization.
 
     RESULT OPTIMIZATION BY USE CASE:
-    - For SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
-    - For EXPLORING OPTIONS: limit=10-15 (default, good balance)
-    - For COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
-    - For QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
+    - SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
+    - EXPLORING OPTIONS: limit=10-15 (default, good balance)
+    - COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
+    - QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
 
-    SEARCH EFFICIENCY TIPS:
-    - Use SPECIFIC terms: "vpc" better than "network", "kubernetes" better than "container"
+    SEARCH TIPS:
+    - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
     - Combine query + namespace for precise results: query="vpc", namespace="terraform-ibm-modules"
-    - Use provider="ibm" to focus on IBM Cloud modules (this server specializes in IBM Cloud)
-    - For broad exploration, start with popular terms: "vpc", "iks", "cos", "security"
-
-    INTELLIGENT FILTERING:
-    - namespace="terraform-ibm-modules" for official IBM modules (most reliable)
-    - provider="ibm" narrows to IBM Cloud specific modules
-    - Higher download counts typically indicate better maintained modules
-    - "verified" status indicates official publisher verification
-
-    WORKFLOW OPTIMIZATION:
-    - Search -> pick ONE relevant module -> use get_module_details for overview -> use list_content for structure -> use get_content for specific needs
-    - Don't search multiple times unless user explicitly wants to compare different approaches
+    - Popular IBM Cloud terms: "vpc", "iks", "cos", "security", "cbr", "resource-group"
 
     Args:
-        query: Specific search term (e.g., "vpc", "kubernetes", "security") - be specific for better results
+        query: Specific search term (e.g., "vpc", "kubernetes", "security")
         namespace: Module publisher (e.g., "terraform-ibm-modules" for official IBM modules)
         provider: Primary provider filter (e.g., "ibm" for IBM Cloud)
-        limit: Maximum results (3-5 for specific lookup, 10+ for exploration, 20+ for research)
+        limit: Maximum results based on use case (see optimization guidance above)
 
     Returns:
         JSON formatted module search results with download counts, descriptions, and verification status
@@ -209,38 +231,24 @@ async def search_modules(
 @mcp.tool()
 async def get_module_details(module_id: str, version: str = "latest") -> str:
     """
-    Get structured module metadata from Terraform Registry - use this for high-level overview before diving into code.
+    Get structured module metadata from Terraform Registry - lightweight module interface overview.
 
-    WHEN TO USE THIS TOOL:
-    - FIRST step after finding a module to understand its purpose and interface
-    - When user needs INPUT/OUTPUT information without seeing actual code
-    - To get module description, version info, and basic usage without fetching files
-    - When you need to understand module capabilities before recommending examples
-    - To check compatibility and requirements before showing implementation
+    WHEN TO USE:
+    - First step after finding a module to understand its interface
+    - When you need input/output information without seeing code
+    - To check compatibility and requirements
+    - Often sufficient to answer user questions without fetching files
 
     WHAT THIS PROVIDES:
     - Module description and documentation
     - Required inputs (variables) with types and descriptions
     - Available outputs with descriptions
-    - Provider requirements and versions
-    - Module dependencies and usage patterns
-    - Latest version information
-
-    WHEN TO PROCEED TO OTHER TOOLS:
-    - If this provides sufficient info for user's question → STOP HERE (avoid unnecessary content fetching)
-    - If user needs to see actual code → use get_content with specific filters
-    - If user wants to explore examples → use list_content then get_content
-    - If user needs implementation details → use get_content with targeted patterns
-
-    EFFICIENCY TIPS:
-    - This tool provides structured metadata without heavy file downloads
-    - Use this to answer questions about "what inputs does this module need" or "what outputs are available"
-    - Sufficient for understanding module interface before implementation
-    - Much lighter than fetching actual source files
+    - Provider requirements and version constraints
+    - Module dependencies
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Specific version or "latest" for most recent (default: "latest")
+        version: Specific version or "latest" (default: "latest")
 
     Returns:
         Plain text with markdown formatted module details including inputs, outputs, and description
@@ -309,32 +317,24 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 @mcp.tool()
 async def list_content(module_id: str, version: str = "latest") -> str:
     """
-    Discover available paths in a module repository with README summaries - use this to optimize subsequent get_content calls.
+    Discover available paths in a module repository with README summaries.
 
-    WHEN TO USE THIS TOOL:
-    - BEFORE calling get_content to understand repository structure
-    - When user asks "what examples are available" or "show me all options"
-    - To find the RIGHT path for specific use cases (basic vs advanced examples)
-    - When you need to recommend the most appropriate example to the user
+    WHEN TO USE:
+    - Before calling get_content to understand repository structure
+    - When user asks "what examples are available"
+    - To find the right path for specific use cases
 
-    INTELLIGENT WORKFLOW:
-    1. Call list_content first to see all available paths and their descriptions
-    2. Based on user intent, select the MOST RELEVANT single path
-    3. Use get_content with specific path and minimal file filters
-    4. For "basic example" requests: choose examples/basic or examples/simple
-    5. For "advanced usage" requests: choose examples/complete or solutions/
-
-    CONTENT CATEGORIES EXPLAINED:
+    CONTENT CATEGORIES:
     - Root Module: Main terraform files, inputs/outputs definitions
-    - Examples: Deployable examples showing how to use the module (START HERE for demos)
+    - Examples: Deployable examples showing module usage (START HERE for demos)
     - Submodules: Reusable components within the module (for advanced use)
-    - Solutions: Complete architecture patterns using the module (for complex scenarios)
+    - Solutions: Complete architecture patterns (for complex scenarios)
 
-    OPTIMIZATION TIPS:
-    - Use descriptions to pick the SINGLE best example instead of fetching all
-    - Prioritize examples/basic for simple demonstrations
-    - Use examples/complete for comprehensive usage
-    - Choose solutions/ only when user needs full architecture patterns
+    USAGE TIPS:
+    - For basic demonstrations: choose examples/basic or examples/simple
+    - For comprehensive usage: choose examples/complete
+    - For architecture patterns: choose solutions/
+    - Use descriptions to select the single most relevant example
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
@@ -414,33 +414,27 @@ async def get_content(
     version: str = "latest",
 ) -> str:
     """
-    Retrieve source code, examples, solutions from GitHub repositories with intelligent content filtering.
+    Retrieve source code, examples, solutions from GitHub repositories with targeted content filtering.
 
-    CONTEXT-AWARE USAGE GUIDANCE:
-    - For INPUT VARIABLES only: include_files=["variables\\.tf$"], include_readme=false
-    - For OUTPUT VALUES only: include_files=["outputs\\.tf$"], include_readme=false
-    - For BASIC EXAMPLES only: path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"], exclude_files=[".*test.*"]
-    - For MODULE STRUCTURE only: include_files=["main\\.tf$"], include_readme=true
-    - For COMPLETE EXAMPLE: path="examples/{name}", include_files=[".*\\.tf$"], exclude_files=[".*test.*", ".*\\.tftest$"]
-    - For ROOT MODULE: path="", include_files=["main\\.tf$", "variables\\.tf$", "outputs\\.tf$"]
+    CONTEXT-AWARE USAGE PATTERNS:
+    - INPUT VARIABLES only: include_files=["variables\\.tf$"], include_readme=false
+    - OUTPUT VALUES only: include_files=["outputs\\.tf$"], include_readme=false
+    - BASIC EXAMPLES: path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]
+    - MODULE STRUCTURE: include_files=["main\\.tf$"], include_readme=true
+    - COMPLETE EXAMPLE: path="examples/{name}", include_files=[".*\\.tf$"]
+    - ROOT MODULE: path="", include_files=["main\\.tf$", "variables\\.tf$", "outputs\\.tf$"]
 
-    INTELLIGENT FILTERING:
-    - Use specific patterns to avoid large responses. Avoid [".*"] unless you need everything
-    - Common patterns: [".*\\.tf$"] (Terraform files), [".*\\.md$"] (docs), ["main\\.tf$"] (entry point only)
-    - Exclude tests by default: exclude_files=[".*test.*", ".*\\.tftest$", ".*_test\\..*"]
-    - For minimal examples, request 1 example path rather than all examples
-
-    FALLBACK STRATEGY:
-    - If specific files not found (e.g., no variables.tf), tool will return available files
-    - Use list_content first to discover what's available in the repository
-    - Start specific, then broaden scope if needed
+    FILTERING PATTERNS:
+    - Common patterns: [".*\\.tf$"] (Terraform files), [".*\\.md$"] (docs), ["main\\.tf$"] (entry only)
+    - Be specific to avoid large responses - avoid [".*"] for large repositories
+    - Tool returns available files if specific patterns don't match
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        path: Specific path to fetch: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: Regex patterns for files to include. BE SPECIFIC - avoid [".*"] for large repos
-        exclude_files: Regex patterns for files to exclude (tests, irrelevant files)
-        include_readme: Include README.md for context. Set false when you only need code
+        path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
+        include_files: Regex patterns for files to include
+        exclude_files: Regex patterns for files to exclude
+        include_readme: Include README.md for context (default: true)
         version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
