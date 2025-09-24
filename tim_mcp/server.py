@@ -5,6 +5,7 @@ This module implements the main MCP server using FastMCP with tools
 for Terraform IBM Modules discovery and implementation support.
 """
 
+import fnmatch
 import json
 import time
 from typing import Any
@@ -43,13 +44,24 @@ ARCHITECTURAL BEST PRACTICES:
 - Modules provide security hardening, standardized configurations, and tested patterns
 - Use direct provider resources only when no suitable module exists
 
-STANDARD WORKFLOW:
+WORKFLOW BY INTENT:
+
+FOR EXAMPLES/SAMPLES (user wants existing deployments):
 1. search_modules → find relevant modules
-2. get_module_details → understand module interface (often sufficient)
-3. list_content → explore repository structure if needed
-4. get_content → fetch specific implementation details
+2. list_content → check what examples are available
+3. get_content → fetch existing examples/samples
+- Skip get_module_details when examples exist - use actual working code
+
+FOR NEW DEVELOPMENT (user needs to write custom terraform):
+1. search_modules → find relevant modules
+2. get_module_details → understand inputs/outputs/interface
+3. list_content → explore structure if needed
+4. get_content → fetch specific files if needed
+
+INTENT DETECTION:
+- Keywords: "example", "sample", "deploy", "show me", "simple" → use examples workflow
+- Keywords: "create", "build", "inputs", "outputs", "develop" → use development workflow
 - Avoid multiple searches unless comparing approaches
-- Stop at get_module_details if it provides sufficient information
 
 OPTIMIZATION PRINCIPLES:
 - Be specific in requests to minimize context usage and API calls
@@ -63,16 +75,80 @@ IBM CLOUD FOCUS:
 )
 
 
+def _is_glob_pattern(pattern: str) -> bool:
+    """
+    Check if a pattern looks like a glob pattern rather than a regex.
+
+    Simple heuristics to detect glob patterns:
+    - Contains * or ? without regex escaping
+    - Looks like file extensions (*.ext)
+    - Doesn't contain regex-specific characters like ^, $, [], etc.
+    """
+    # If it contains regex anchors or character classes, it's probably regex
+    if any(char in pattern for char in ["^", "$", "[", "]", "\\."]):
+        return False
+
+    # If it contains glob wildcards, it's probably glob
+    if any(char in pattern for char in ["*", "?"]):
+        return True
+
+    # If it looks like a simple filename, treat as glob
+    if "." in pattern and not pattern.startswith("."):
+        return True
+
+    return False
+
+
+def _convert_glob_to_regex(pattern: str) -> str:
+    """
+    Convert glob pattern to regex pattern.
+
+    Uses fnmatch.translate which handles standard shell wildcards:
+    - * matches everything
+    - ? matches any single character
+    - [seq] matches any character in seq
+    - [!seq] matches any character not in seq
+    """
+    regex_pattern = fnmatch.translate(pattern)
+
+    # fnmatch.translate output format: '(?s:PATTERN)\Z'
+    # Clean these up for compatibility with our existing regex matching
+
+    # Convert \Z (end of string) to $ for consistency first
+    if regex_pattern.endswith("\\Z"):
+        regex_pattern = regex_pattern[:-2] + "$"
+
+    # Remove (?s:...) wrapper if present
+    if regex_pattern.startswith("(?s:") and ")$" in regex_pattern:
+        # Find the last )$ to properly handle nested groups
+        close_pos = regex_pattern.rfind(")$")
+        if close_pos > 4:
+            inner_pattern = regex_pattern[4:close_pos]
+            regex_pattern = inner_pattern + "$"
+    elif regex_pattern.startswith("(?ms:") and ")$" in regex_pattern:
+        close_pos = regex_pattern.rfind(")$")
+        if close_pos > 5:
+            inner_pattern = regex_pattern[5:close_pos]
+            regex_pattern = inner_pattern + "$"
+
+    return regex_pattern
+
+
 def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
     """
     Sanitize list parameters that might be passed as JSON strings by LLMs.
+
+    This function handles common patterns and automatically converts glob patterns
+    to regex patterns for easier use by LLMs. Examples:
+    - "*.tf" becomes ".*\\.tf$"
+    - ["*.tf", "*.md"] becomes [".*\\.tf$", ".*\\.md$"]
 
     Args:
         param: The parameter value to sanitize
         param_name: Name of the parameter for logging
 
     Returns:
-        Sanitized list or None
+        Sanitized list with glob patterns converted to regex or None
 
     Raises:
         ValueError: If the parameter cannot be converted to a proper format
@@ -80,13 +156,40 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
     if param is None:
         return None
 
+    def _process_pattern_list(patterns: list[str]) -> list[str]:
+        """Process a list of patterns, converting globs to regex as needed."""
+        processed = []
+        converted_any = False
+
+        for pattern in patterns:
+            if _is_glob_pattern(pattern):
+                converted_pattern = _convert_glob_to_regex(pattern)
+                processed.append(converted_pattern)
+                converted_any = True
+                logger.info(
+                    f"Converted glob pattern to regex in {param_name}",
+                    original=pattern,
+                    converted=converted_pattern,
+                )
+            else:
+                processed.append(pattern)
+
+        if converted_any:
+            logger.info(
+                f"Auto-converted glob patterns to regex in {param_name}",
+                original_patterns=patterns,
+                converted_patterns=processed,
+            )
+
+        return processed
+
     if isinstance(param, list):
         # Validate all items are strings
         if not all(isinstance(item, str) for item in param):
             raise ValueError(
                 f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
             )
-        return param
+        return _process_pattern_list(param)
 
     if isinstance(param, str):
         # Check if it looks like a JSON array
@@ -102,7 +205,7 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
                         original_value=param,
                         converted_value=parsed,
                     )
-                    return parsed
+                    return _process_pattern_list(parsed)
             except json.JSONDecodeError:
                 pass
 
@@ -111,7 +214,7 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
             f"Parameter {param_name} was passed as string, converting to single-item list",
             original_value=param,
         )
-        return [param]
+        return _process_pattern_list([param])
 
     raise ValueError(
         f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
@@ -215,13 +318,17 @@ async def search_modules(
 @mcp.tool()
 async def get_module_details(module_id: str, version: str = "latest") -> str:
     """
-    Get structured module metadata from Terraform Registry - lightweight module interface overview.
+    Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
 
-    WHEN TO USE:
-    - First step after finding a module to understand its interface
-    - When you need input/output information without seeing code
-    - To check compatibility and requirements
-    - Often sufficient to answer user questions without fetching files
+    WHEN TO USE (Development workflow only):
+    - When user needs to CREATE/BUILD new terraform configurations
+    - To understand required inputs/outputs for custom implementations
+    - To check compatibility and requirements before development
+    - When user asks about "inputs", "outputs", "parameters", "interface"
+
+    WHEN NOT TO USE:
+    - Skip this when user wants examples/samples (use list_content → get_content instead)
+    - Skip when existing examples are available - prefer actual working code
 
     WHAT THIS PROVIDES:
     - Module description and documentation
@@ -301,23 +408,27 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 @mcp.tool()
 async def list_content(module_id: str, version: str = "latest") -> str:
     """
-    Discover available paths in a module repository with README summaries.
+    Discover available examples and repository structure - FIRST step in examples workflow.
 
-    WHEN TO USE:
-    - Before calling get_content to understand repository structure
-    - When user asks "what examples are available"
-    - To find the right path for specific use cases
+    PRIMARY USE CASE (Examples workflow):
+    - Check what examples/samples are available before fetching content
+    - When user wants "examples", "samples", "deployment patterns"
+    - Essential step before get_content to find the right example path
+
+    SECONDARY USE CASE (Development workflow):
+    - Explore repository structure during development
+    - Find specific submodules or solutions
 
     CONTENT CATEGORIES:
-    - Root Module: Main terraform files, inputs/outputs definitions
-    - Examples: Deployable examples showing module usage (START HERE for demos)
-    - Submodules: Reusable components within the module (for advanced use)
-    - Solutions: Complete architecture patterns (for complex scenarios)
+    - Examples: Deployable examples showing module usage (PRIMARY TARGET for samples)
+    - Solutions: Complete architecture patterns
+    - Root Module: Main terraform files (for development)
+    - Submodules: Reusable components (for advanced development)
 
-    USAGE TIPS:
-    - For basic demonstrations: choose examples/basic or examples/simple
-    - For comprehensive usage: choose examples/complete
-    - For architecture patterns: choose solutions/
+    EXAMPLE SELECTION STRATEGY:
+    - examples/basic or examples/simple → for straightforward demos
+    - examples/complete → for comprehensive usage
+    - solutions/ → for complex architecture patterns
     - Use descriptions to select the single most relevant example
 
     Args:
@@ -392,32 +503,45 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 async def get_content(
     module_id: str,
     path: str = "",
-    include_files: list[str] | None = None,
-    exclude_files: list[str] | None = None,
+    include_files: str | list[str] | None = None,
+    exclude_files: str | list[str] | None = None,
     include_readme: bool = True,
     version: str = "latest",
 ) -> str:
     """
     Retrieve source code, examples, solutions from GitHub repositories with targeted content filtering.
 
-    CONTEXT-AWARE USAGE PATTERNS:
-    - INPUT VARIABLES only: include_files=["variables\\.tf$"], include_readme=false
-    - OUTPUT VALUES only: include_files=["outputs\\.tf$"], include_readme=false
-    - BASIC EXAMPLES: path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]
-    - MODULE STRUCTURE: include_files=["main\\.tf$"], include_readme=true
-    - COMPLETE EXAMPLE: path="examples/{name}", include_files=[".*\\.tf$"]
-    - ROOT MODULE: path="", include_files=["main\\.tf$", "variables\\.tf$", "outputs\\.tf$"]
+    SIMPLE FILE PATTERNS (Recommended - Easy to Use):
+    - INPUT VARIABLES: include_files=["variables.tf"], include_readme=false
+    - OUTPUT VALUES: include_files=["outputs.tf"], include_readme=false
+    - BASIC EXAMPLES: path="examples/basic", include_files=["*.tf"]
+    - MODULE STRUCTURE: include_files=["main.tf"], include_readme=true
+    - ALL TERRAFORM FILES: include_files=["*.tf"]
+    - DOCUMENTATION: include_files=["*.md"]
+    - SPECIFIC FILE: include_files=["main.tf", "variables.tf"]
 
-    FILTERING PATTERNS:
-    - Common patterns: [".*\\.tf$"] (Terraform files), [".*\\.md$"] (docs), ["main\\.tf$"] (entry only)
-    - Be specific to avoid large responses - avoid [".*"] for large repositories
-    - Tool returns available files if specific patterns don't match
+    USAGE PATTERNS BY GOAL:
+    - Understand module inputs: include_files=["variables.tf"]
+    - See module outputs: include_files=["outputs.tf"]
+    - Get working example: path="examples/basic", include_files=["*.tf"]
+    - Browse all terraform: include_files=["*.tf"]
+    - Get documentation: include_files=["README.md", "*.md"]
+
+    FILE PATTERN FORMATS (Both supported):
+    - Simple patterns: ["*.tf", "*.md", "main.tf"] (Recommended)
+    - Regex patterns: [".*\\.tf$", ".*\\.md$", "^main\\.tf$"] (Advanced)
+    - Tool auto-converts simple patterns to regex internally
+
+    PARAMETER FORMATS (Multiple formats supported):
+    - List format (recommended): include_files=["*.tf", "*.md"]
+    - JSON string format: include_files='["*.tf", "*.md"]'
+    - Single string: include_files="*.tf"
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
         path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: Regex patterns for files to include
-        exclude_files: Regex patterns for files to exclude
+        include_files: File patterns (list, JSON string, or single string)
+        exclude_files: File patterns (list, JSON string, or single string)
         include_readme: Include README.md for context (default: true)
         version: Git tag/branch to fetch from (default: "latest")
 
