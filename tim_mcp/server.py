@@ -44,13 +44,24 @@ ARCHITECTURAL BEST PRACTICES:
 - Modules provide security hardening, standardized configurations, and tested patterns
 - Use direct provider resources only when no suitable module exists
 
-STANDARD WORKFLOW:
+WORKFLOW BY INTENT:
+
+FOR EXAMPLES/SAMPLES (user wants existing deployments):
 1. search_modules → find relevant modules
-2. get_module_details → understand module interface (often sufficient)
-3. list_content → explore repository structure if needed
-4. get_content → fetch specific implementation details
+2. list_content → check what examples are available
+3. get_content → fetch existing examples/samples
+- Skip get_module_details when examples exist - use actual working code
+
+FOR NEW DEVELOPMENT (user needs to write custom terraform):
+1. search_modules → find relevant modules
+2. get_module_details → understand inputs/outputs/interface
+3. list_content → explore structure if needed
+4. get_content → fetch specific files if needed
+
+INTENT DETECTION:
+- Keywords: "example", "sample", "deploy", "show me", "simple" → use examples workflow
+- Keywords: "create", "build", "inputs", "outputs", "develop" → use development workflow
 - Avoid multiple searches unless comparing approaches
-- Stop at get_module_details if it provides sufficient information
 
 OPTIMIZATION PRINCIPLES:
 - Be specific in requests to minimize context usage and API calls
@@ -307,13 +318,17 @@ async def search_modules(
 @mcp.tool()
 async def get_module_details(module_id: str, version: str = "latest") -> str:
     """
-    Get structured module metadata from Terraform Registry - lightweight module interface overview.
+    Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
 
-    WHEN TO USE:
-    - First step after finding a module to understand its interface
-    - When you need input/output information without seeing code
-    - To check compatibility and requirements
-    - Often sufficient to answer user questions without fetching files
+    WHEN TO USE (Development workflow only):
+    - When user needs to CREATE/BUILD new terraform configurations
+    - To understand required inputs/outputs for custom implementations
+    - To check compatibility and requirements before development
+    - When user asks about "inputs", "outputs", "parameters", "interface"
+
+    WHEN NOT TO USE:
+    - Skip this when user wants examples/samples (use list_content → get_content instead)
+    - Skip when existing examples are available - prefer actual working code
 
     WHAT THIS PROVIDES:
     - Module description and documentation
@@ -393,23 +408,27 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 @mcp.tool()
 async def list_content(module_id: str, version: str = "latest") -> str:
     """
-    Discover available paths in a module repository with README summaries.
+    Discover available examples and repository structure - FIRST step in examples workflow.
 
-    WHEN TO USE:
-    - Before calling get_content to understand repository structure
-    - When user asks "what examples are available"
-    - To find the right path for specific use cases
+    PRIMARY USE CASE (Examples workflow):
+    - Check what examples/samples are available before fetching content
+    - When user wants "examples", "samples", "deployment patterns"
+    - Essential step before get_content to find the right example path
+
+    SECONDARY USE CASE (Development workflow):
+    - Explore repository structure during development
+    - Find specific submodules or solutions
 
     CONTENT CATEGORIES:
-    - Root Module: Main terraform files, inputs/outputs definitions
-    - Examples: Deployable examples showing module usage (START HERE for demos)
-    - Submodules: Reusable components within the module (for advanced use)
-    - Solutions: Complete architecture patterns (for complex scenarios)
+    - Examples: Deployable examples showing module usage (PRIMARY TARGET for samples)
+    - Solutions: Complete architecture patterns
+    - Root Module: Main terraform files (for development)
+    - Submodules: Reusable components (for advanced development)
 
-    USAGE TIPS:
-    - For basic demonstrations: choose examples/basic or examples/simple
-    - For comprehensive usage: choose examples/complete
-    - For architecture patterns: choose solutions/
+    EXAMPLE SELECTION STRATEGY:
+    - examples/basic or examples/simple → for straightforward demos
+    - examples/complete → for comprehensive usage
+    - solutions/ → for complex architecture patterns
     - Use descriptions to select the single most relevant example
 
     Args:
