@@ -484,8 +484,8 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 async def get_content(
     module_id: str,
     path: str = "",
-    include_files: list[str] | None = None,
-    exclude_files: list[str] | None = None,
+    include_files: str | list[str] | None = None,
+    exclude_files: str | list[str] | None = None,
     include_readme: bool = True,
     version: str = "latest",
 ) -> str:
@@ -513,11 +513,16 @@ async def get_content(
     - Regex patterns: [".*\\.tf$", ".*\\.md$", "^main\\.tf$"] (Advanced)
     - Tool auto-converts simple patterns to regex internally
 
+    PARAMETER FORMATS (Multiple formats supported):
+    - List format (recommended): include_files=["*.tf", "*.md"]
+    - JSON string format: include_files='["*.tf", "*.md"]'
+    - Single string: include_files="*.tf"
+
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
         path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: Simple file patterns or regex patterns for files to include
-        exclude_files: Simple file patterns or regex patterns for files to exclude
+        include_files: File patterns (list, JSON string, or single string)
+        exclude_files: File patterns (list, JSON string, or single string)
         include_readme: Include README.md for context (default: true)
         version: Git tag/branch to fetch from (default: "latest")
 
