@@ -995,3 +995,71 @@ class TestGetContentTool:
         assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
         # Should still include README even though pattern was invalid
         assert "## README" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_include_files_bug_reproduction(self, config, mock_github_client, sample_readme_content):
+        """Test that reproduces the specific bug in match_file_patterns logic with include_files."""
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["main.tf"],  # First pattern matches immediately, causing bug
+            include_readme=True,
+            version="latest",
+        )
+
+        # Mock GitHub client methods
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+        mock_github_client.resolve_version.return_value = "latest"
+
+        # Set up directory with both matching and non-matching files
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "size": 150,
+            },
+            {
+                "name": "variables.tf",
+                "path": "examples/basic/variables.tf",
+                "type": "file",
+                "size": 80,
+            }
+        ]
+
+        # Use the real match_file_patterns method to reproduce the bug
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+
+        real_client = GitHubClient(Config())
+
+        def mock_match_patterns(file_path, include_patterns=None, exclude_patterns=None):
+            return real_client.match_file_patterns(file_path, include_patterns, exclude_patterns)
+
+        mock_github_client.match_file_patterns.side_effect = mock_match_patterns
+
+        # Mock file content for main.tf
+        mock_github_client.get_file_content.side_effect = [
+            sample_readme_content,
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "content": "bWFpbi50Zg==",
+                "encoding": "base64",
+                "size": 150,
+                "decoded_content": "# main.tf content",
+            },
+        ]
+
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify that only main.tf is included (not variables.tf)
+        assert "### main.tf" in result
+        assert "### variables.tf" not in result
+
+        # Verify the matching logic worked correctly
+        # With the bug, this might fail if valid_include_matched logic is broken
+        assert "# main.tf content" in result

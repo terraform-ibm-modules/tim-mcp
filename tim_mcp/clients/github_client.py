@@ -529,9 +529,10 @@ class GitHubClient:
             valid_include_matched = False
             for pattern in include_patterns:
                 try:
-                    if re.search(pattern, file_path):
-                        return True
+                    match_result = re.search(pattern, file_path)
                     valid_include_matched = True  # At least one valid pattern was processed
+                    if match_result:
+                        return True
                 except re.error as e:
                     self.logger.warning(
                         "Invalid include pattern skipped",
