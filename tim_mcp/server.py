@@ -5,7 +5,9 @@ This module implements the main MCP server using FastMCP with tools
 for Terraform IBM Modules discovery and implementation support.
 """
 
+import json
 import time
+from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import ValidationError
@@ -28,6 +30,61 @@ logger = get_logger(__name__)
 
 # Initialize FastMCP server
 mcp = FastMCP("TIM-MCP")
+
+
+def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
+    """
+    Sanitize list parameters that might be passed as JSON strings by LLMs.
+
+    Args:
+        param: The parameter value to sanitize
+        param_name: Name of the parameter for logging
+
+    Returns:
+        Sanitized list or None
+
+    Raises:
+        ValueError: If the parameter cannot be converted to a proper format
+    """
+    if param is None:
+        return None
+
+    if isinstance(param, list):
+        # Validate all items are strings
+        if not all(isinstance(item, str) for item in param):
+            raise ValueError(
+                f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
+            )
+        return param
+
+    if isinstance(param, str):
+        # Check if it looks like a JSON array
+        param_stripped = param.strip()
+        if param_stripped.startswith("[") and param_stripped.endswith("]"):
+            try:
+                parsed = json.loads(param_stripped)
+                if isinstance(parsed, list) and all(
+                    isinstance(item, str) for item in parsed
+                ):
+                    logger.warning(
+                        f"Parameter {param_name} was passed as JSON string, auto-converted to list",
+                        original_value=param,
+                        converted_value=parsed,
+                    )
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+
+        # If it's a single string that's not JSON, convert to single-item list
+        logger.warning(
+            f"Parameter {param_name} was passed as string, converting to single-item list",
+            original_value=param,
+        )
+        return [param]
+
+    raise ValueError(
+        f"Parameter {param_name} must be a list of strings, None, or a JSON array string"
+    )
 
 
 @mcp.tool()
@@ -302,12 +359,20 @@ async def get_content(
     start_time = time.time()
 
     try:
+        # Sanitize list parameters in case they're passed as JSON strings
+        sanitized_include_files = _sanitize_list_parameter(
+            include_files, "include_files"
+        )
+        sanitized_exclude_files = _sanitize_list_parameter(
+            exclude_files, "exclude_files"
+        )
+
         # Validate request
         request = GetContentRequest(
             module_id=module_id,
             path=path,
-            include_files=include_files,
-            exclude_files=exclude_files,
+            include_files=sanitized_include_files,
+            exclude_files=sanitized_exclude_files,
             include_readme=include_readme,
             version=version,
         )
