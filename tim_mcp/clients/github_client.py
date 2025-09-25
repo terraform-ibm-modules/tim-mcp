@@ -106,6 +106,61 @@ class GitHubClient:
 
         return namespace, repo_name
 
+    def parse_github_url(self, source_url: str) -> tuple[str, str] | None:
+        """
+        Parse GitHub URL to extract owner and repository name.
+
+        Args:
+            source_url: GitHub source URL in various formats
+
+        Returns:
+            Tuple of (owner, repo_name) or None if not a valid GitHub URL
+
+        Examples:
+            https://github.com/terraform-ibm-modules/terraform-ibm-vpc -> ("terraform-ibm-modules", "terraform-ibm-vpc")
+            git::https://github.com/owner/repo.git -> ("owner", "repo")
+        """
+        from urllib.parse import urlparse
+
+        if not source_url:
+            return None
+
+        # Remove git:: prefix if present
+        clean_url = source_url
+        if clean_url.startswith("git::"):
+            clean_url = clean_url[5:]
+
+        # Parse the URL
+        try:
+            parsed = urlparse(clean_url)
+
+            # Check if it's a GitHub URL
+            if parsed.netloc not in ["github.com", "www.github.com"]:
+                return None
+
+            # Extract path and clean it
+            path = parsed.path.strip("/")
+
+            # Remove .git suffix if present
+            if path.endswith(".git"):
+                path = path[:-4]
+
+            # Split path into parts
+            path_parts = path.split("/")
+            if len(path_parts) < 2:
+                return None
+
+            owner = path_parts[0]
+            repo_name = path_parts[1]
+
+            return owner, repo_name
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to parse GitHub URL", url=source_url, error=str(e)
+            )
+            return None
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),

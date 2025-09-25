@@ -229,18 +229,12 @@ async def search_modules(
     """
     Search Terraform Registry for modules with intelligent result optimization.
 
-    RESULT OPTIMIZATION BY USE CASE:
-    - SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
-    - EXPLORING OPTIONS: limit=5-15 (default=5, good balance)
-    - COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
-    - QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
-
     SEARCH TIPS:
     - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
 
     Args:
         query: Specific search term (e.g., "vpc", "kubernetes", "security")
-        limit: Maximum results based on use case (see optimization guidance above)
+        limit: Maximum results based on use case (optional only use if asked)
 
     Returns:
         JSON formatted module search results with download counts, descriptions, and verification status

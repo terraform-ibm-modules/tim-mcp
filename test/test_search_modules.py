@@ -688,6 +688,258 @@ class TestSearchModulesImpl:
             assert all(module.downloads == 1000 for module in result.modules)
 
 
+class TestRepositoryFiltering:
+    """Test repository filtering functionality."""
+
+    @pytest.fixture
+    def config(self):
+        """Create a test configuration."""
+        return Config()
+
+    @pytest.fixture
+    def mock_terraform_client(self):
+        """Create a mock Terraform client."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_github_client(self):
+        """Create a mock GitHub client."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def sample_registry_response(self):
+        """Sample response from Terraform Registry API."""
+        return {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/vpc/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "vpc",
+                    "provider": "ibm",
+                    "version": "5.1.0",
+                    "description": "Provisions and configures IBM Cloud VPC resources",
+                    "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
+                    "downloads": 53004,
+                    "verified": False,
+                    "published_at": "2025-09-02T08:33:15.000Z",
+                },
+                {
+                    "id": "terraform-ibm-modules/security-group/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "security-group",
+                    "provider": "ibm",
+                    "version": "2.3.1",
+                    "description": "Creates and configures IBM Cloud security groups",
+                    "source": "https://github.com/terraform-ibm-modules/terraform-ibm-security-group",
+                    "downloads": 15234,
+                    "verified": True,
+                    "published_at": "2025-08-15T12:22:33.000Z",
+                },
+            ],
+            "meta": {"limit": 50, "offset": 0, "total_count": 23},
+        }
+
+    @pytest.mark.asyncio
+    async def test_repository_filtering_valid_repos(
+        self,
+        config,
+        mock_terraform_client,
+        mock_github_client,
+        sample_registry_response,
+    ):
+        """Test that valid repositories pass filtering."""
+        # Setup
+        mock_terraform_client.search_modules.return_value = sample_registry_response
+
+        # Mock GitHub client to return valid repository info
+        def mock_parse_url(url):
+            if "vpc" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-vpc")
+            elif "security-group" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-security-group")
+            return None
+
+        mock_github_client.parse_github_url.side_effect = mock_parse_url
+
+        # Mock repository info - both repos are valid
+        def mock_get_repo_info(owner, repo):
+            return {
+                "archived": False,
+                "topics": ["core-team", "terraform", "ibm-cloud"],
+            }
+
+        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+
+        request = ModuleSearchRequest(query="vpc", limit=5)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify
+            assert len(result.modules) == 2  # Both modules should pass filtering
+            assert result.modules[0].id == "terraform-ibm-modules/vpc/ibm"
+            assert result.modules[1].id == "terraform-ibm-modules/security-group/ibm"
+
+    @pytest.mark.asyncio
+    async def test_repository_filtering_archived_repos(
+        self,
+        config,
+        mock_terraform_client,
+        mock_github_client,
+        sample_registry_response,
+    ):
+        """Test that archived repositories are filtered out."""
+        # Setup
+        mock_terraform_client.search_modules.return_value = sample_registry_response
+
+        def mock_parse_url(url):
+            if "vpc" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-vpc")
+            elif "security-group" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-security-group")
+            return None
+
+        mock_github_client.parse_github_url.side_effect = mock_parse_url
+
+        # Mock repository info - first repo is archived
+        def mock_get_repo_info(owner, repo):
+            if "vpc" in repo:
+                return {
+                    "archived": True,  # This repo is archived
+                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                }
+            else:
+                return {
+                    "archived": False,
+                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                }
+
+        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+
+        request = ModuleSearchRequest(query="vpc", limit=5)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify - only non-archived repo should be in results
+            assert len(result.modules) == 1
+            assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
+
+    @pytest.mark.asyncio
+    async def test_repository_filtering_missing_topics(
+        self,
+        config,
+        mock_terraform_client,
+        mock_github_client,
+        sample_registry_response,
+    ):
+        """Test that repositories without required topics are filtered out."""
+        # Setup
+        mock_terraform_client.search_modules.return_value = sample_registry_response
+
+        def mock_parse_url(url):
+            if "vpc" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-vpc")
+            elif "security-group" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-security-group")
+            return None
+
+        mock_github_client.parse_github_url.side_effect = mock_parse_url
+
+        # Mock repository info - first repo missing core-team topic
+        def mock_get_repo_info(owner, repo):
+            if "vpc" in repo:
+                return {
+                    "archived": False,
+                    "topics": ["terraform", "ibm-cloud"],  # Missing core-team
+                }
+            else:
+                return {
+                    "archived": False,
+                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                }
+
+        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+
+        request = ModuleSearchRequest(query="vpc", limit=5)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify - only repo with required topics should be in results
+            assert len(result.modules) == 1
+            assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
+
+
+class TestGitHubClientURLParsing:
+    """Test GitHub URL parsing functionality."""
+
+    @pytest.fixture
+    def mock_github_client(self):
+        """Create a mock GitHub client with real URL parsing."""
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+
+        return GitHubClient(Config())
+
+    def test_parse_standard_github_url(self, mock_github_client):
+        """Test parsing standard GitHub URLs."""
+        url = "https://github.com/terraform-ibm-modules/terraform-ibm-vpc"
+        result = mock_github_client.parse_github_url(url)
+        assert result == ("terraform-ibm-modules", "terraform-ibm-vpc")
+
+    def test_parse_github_url_with_git_suffix(self, mock_github_client):
+        """Test parsing GitHub URLs with .git suffix."""
+        url = "https://github.com/terraform-ibm-modules/terraform-ibm-vpc.git"
+        result = mock_github_client.parse_github_url(url)
+        assert result == ("terraform-ibm-modules", "terraform-ibm-vpc")
+
+    def test_parse_github_url_with_git_prefix(self, mock_github_client):
+        """Test parsing GitHub URLs with git:: prefix."""
+        url = "git::https://github.com/terraform-ibm-modules/terraform-ibm-vpc.git"
+        result = mock_github_client.parse_github_url(url)
+        assert result == ("terraform-ibm-modules", "terraform-ibm-vpc")
+
+    def test_parse_non_github_url(self, mock_github_client):
+        """Test parsing non-GitHub URLs returns None."""
+        url = "https://gitlab.com/owner/repo"
+        result = mock_github_client.parse_github_url(url)
+        assert result is None
+
+    def test_parse_invalid_url(self, mock_github_client):
+        """Test parsing invalid URLs returns None."""
+        url = "not-a-valid-url"
+        result = mock_github_client.parse_github_url(url)
+        assert result is None
+
+    def test_parse_empty_url(self, mock_github_client):
+        """Test parsing empty URL returns None."""
+        url = ""
+        result = mock_github_client.parse_github_url(url)
+        assert result is None
+
+
 class TestModuleSearchRequestValidation:
     """Test validation of ModuleSearchRequest."""
 
