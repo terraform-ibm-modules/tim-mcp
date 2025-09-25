@@ -347,20 +347,22 @@ Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraf
 **Inputs:**
 - `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
 - `path` (string, optional): Specific path - "" (root), "examples/basic", "modules/vpc", etc.
-- `include_files` (list[string], optional): Regex patterns for files to include
-- `exclude_files` (list[string], optional): Regex patterns for files to exclude
-- `include_readme` (boolean, optional): Include README.md for context (default: true)
+- `include_files` (list[string], optional): Glob patterns for files to include
+- `exclude_files` (list[string], optional): Glob patterns for files to exclude
 - `version` (string, optional): Git tag/branch to fetch from (default: "latest")
 
 **Output:** Markdown formatted content with file contents, organized by:
-- File paths and content
+- File paths and content with appropriate syntax highlighting
 - File sizes for reference
-- Context from README files when requested
+- README files are included if they match the patterns (like any other file)
 
-**Common Patterns:**
-- Input variables only: `include_files=["variables\\.tf$"]`
-- Basic example: `path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]`
-- Complete module: `include_files=[".*\\.tf$"]`
+**Common Glob Patterns:**
+- Input variables only: `include_files=["variables.tf"]`
+- Basic example: `path="examples/basic", include_files=["*.tf"]`
+- Complete module: `include_files=["*.tf"]`
+- Documentation: `include_files=["*.md"]`
+- README only: `include_files=["README.md"]`
+- Everything: `include_files=["*"]` (or omit entirely)
 
 ## Tool Workflow
 

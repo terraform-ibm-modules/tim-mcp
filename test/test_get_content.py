@@ -6,7 +6,6 @@ following TDD methodology.
 """
 
 import asyncio
-import re
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -128,8 +127,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=[".*"],
-            include_readme=True,
+            include_files=["*"],
             version="latest",
         )
 
@@ -139,13 +137,18 @@ class TestGetContentTool:
             "terraform-ibm-vpc",
         )
         mock_github_client.resolve_version.return_value = "latest"
-        mock_github_client.get_directory_contents.return_value = (
-            sample_directory_contents
-        )
+        # Add README.md to directory contents for this test
+        directory_with_readme = sample_directory_contents + [
+            {
+                "name": "README.md",
+                "path": "examples/basic/README.md",
+                "type": "file",
+                "size": 200,
+            }
+        ]
+        mock_github_client.get_directory_contents.return_value = directory_with_readme
         mock_github_client.get_file_content.side_effect = [
-            sample_readme_content,
             sample_main_tf_content,
-            sample_variables_tf_content,
             {
                 "name": "outputs.tf",
                 "path": "examples/basic/outputs.tf",
@@ -154,6 +157,7 @@ class TestGetContentTool:
                 "size": 60,
                 "decoded_content": 'output "vpc_id" {\n  value = module.vpc.vpc_id\n}',
             },
+            sample_readme_content,
             {
                 "name": "test.tf",
                 "path": "examples/basic/test.tf",
@@ -162,6 +166,7 @@ class TestGetContentTool:
                 "size": 40,
                 "decoded_content": "# Test file",
             },
+            sample_variables_tf_content,
         ]
         mock_github_client.match_file_patterns.return_value = True
 
@@ -170,13 +175,12 @@ class TestGetContentTool:
         # Verify the result format
         assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
         assert "**Version:** latest" in result
-        assert "## README" in result
+        assert "## README.md" in result
         assert "A sample Terraform module for IBM Cloud" in result
-        assert "## Terraform Files" in result
-        assert "### main.tf" in result
-        assert "### variables.tf" in result
-        assert "### outputs.tf" in result
-        assert "### test.tf" in result
+        assert "## main.tf" in result
+        assert "## variables.tf" in result
+        assert "## outputs.tf" in result
+        assert "## test.tf" in result
         assert 'module "vpc"' in result
         assert 'variable "vpc_name"' in result
         assert 'output "vpc_id"' in result
@@ -188,7 +192,7 @@ class TestGetContentTool:
         mock_github_client.get_directory_contents.assert_called_once_with(
             "terraform-ibm-modules", "terraform-ibm-vpc", "examples/basic", "latest"
         )
-        assert mock_github_client.get_file_content.call_count == 5  # README + 4 files
+        assert mock_github_client.get_file_content.call_count == 5  # 5 files total
 
     @pytest.mark.asyncio
     async def test_get_content_with_terraform_files_only(
@@ -204,9 +208,8 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=[".*\\.tf$"],
-            exclude_files=[".*test.*"],
-            include_readme=True,
+            include_files=["*.tf"],
+            exclude_files=["*test*"],
             version="v5.1.0",
         )
 
@@ -219,18 +222,27 @@ class TestGetContentTool:
             sample_directory_contents
         )
 
-        # Mock pattern matching to exclude test files
+        # Mock pattern matching to exclude test files using glob patterns
         def mock_match_patterns(
             file_path, include_patterns=None, exclude_patterns=None
         ):
-            if exclude_patterns and any(
-                re.search(pattern, file_path) for pattern in exclude_patterns
-            ):
-                return False
+            from pathlib import Path
+
+            path = Path(file_path)
+
+            # Check exclude patterns first
+            if exclude_patterns:
+                for pattern in exclude_patterns:
+                    if path.match(pattern):
+                        return False
+
+            # Check include patterns
             if include_patterns:
-                return any(
-                    re.search(pattern, file_path) for pattern in include_patterns
-                )
+                for pattern in include_patterns:
+                    if path.match(pattern):
+                        return True
+                return False
+
             return True
 
         mock_github_client.match_file_patterns.side_effect = mock_match_patterns
@@ -251,13 +263,13 @@ class TestGetContentTool:
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify test.tf is excluded
-        assert "### test.tf" not in result
+        assert "## test.tf" not in result
         assert "# Test file" not in result
 
         # Verify other tf files are included
-        assert "### main.tf" in result
-        assert "### variables.tf" in result
-        assert "### outputs.tf" in result
+        assert "## main.tf" in result
+        assert "## variables.tf" in result
+        assert "## outputs.tf" in result
 
     @pytest.mark.asyncio
     async def test_get_content_root_path(
@@ -268,7 +280,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="",
             include_files=["main.tf", "variables.tf", "outputs.tf"],
-            include_readme=True,
             version="latest",
         )
 
@@ -323,7 +334,12 @@ class TestGetContentTool:
         # Verify root path in title
         assert "# terraform-ibm-modules/vpc/ibm" in result
         assert "- examples/basic" not in result  # Should not have path suffix for root
-        assert "## Terraform Files" in result
+        # Files are now shown directly with ## headings
+        assert (
+            "## main.tf" in result
+            or "## variables.tf" in result
+            or "## outputs.tf" in result
+        )
         assert 'resource "ibm_vpc"' in result
 
     @pytest.mark.asyncio
@@ -339,7 +355,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["main.tf"],
-            include_readme=False,
             version="latest",
         )
 
@@ -361,7 +376,7 @@ class TestGetContentTool:
         assert "A sample Terraform module" not in result
 
         # Verify only main.tf is included
-        assert "### main.tf" in result
+        assert "## main.tf" in result
         assert 'module "vpc"' in result
 
         # Verify README.md was not fetched
@@ -375,8 +390,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/empty",
-            include_files=[".*"],
-            include_readme=True,
+            include_files=["*"],
             version="latest",
         )
 
@@ -396,8 +410,11 @@ class TestGetContentTool:
         # Verify basic structure exists even with no files
         assert "# terraform-ibm-modules/vpc/ibm - examples/empty" in result
         assert "**Version:** latest" in result
-        assert "## Terraform Files" in result
+        # Empty directory should show message and have no file headings
         assert "No files found matching the specified criteria." in result
+        assert "## main.tf" not in result
+        assert "## variables.tf" not in result
+        assert "## outputs.tf" not in result
 
     @pytest.mark.asyncio
     async def test_get_content_module_not_found(self, config, mock_github_client):
@@ -405,8 +422,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="nonexistent/module/provider",
             path="",
-            include_files=[".*"],
-            include_readme=True,
+            include_files=["*"],
             version="latest",
         )
 
@@ -430,8 +446,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=[".*"],
-            include_readme=True,
+            include_files=["*"],
             version="latest",
         )
 
@@ -463,8 +478,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=[".*\\.tf$"],
-            include_readme=True,
+            include_files=["*.tf"],
             version="latest",
         )
 
@@ -528,8 +542,8 @@ class TestGetContentTool:
 
         # Verify all files were fetched
         assert (
-            mock_github_client.get_file_content.call_count == 4
-        )  # README + 3 tf files
+            mock_github_client.get_file_content.call_count == 3
+        )  # 3 tf files (README not included due to *.tf filter)
 
         # Verify concurrent execution - all calls should start close together
         # (within a small time window if they're truly concurrent)
@@ -545,9 +559,8 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/complex",
-            include_files=[".*\\.tf$", ".*\\.yaml$"],
-            exclude_files=[".*test.*", ".*\\.tftest$"],
-            include_readme=True,
+            include_files=["*.tf", "*.yaml"],
+            exclude_files=["*test*", "*.tftest"],
             version="latest",
         )
 
@@ -590,24 +603,18 @@ class TestGetContentTool:
             },
         ]
 
-        # Mock realistic pattern matching
+        # Use the real match_file_patterns method to test glob patterns
+        from tim_mcp.clients.github_client import GitHubClient
+        from tim_mcp.config import Config
+
+        real_client = GitHubClient(Config())
+
         def mock_pattern_matching(
             file_path, include_patterns=None, exclude_patterns=None
         ):
-            # Check exclude patterns first
-            if exclude_patterns:
-                for pattern in exclude_patterns:
-                    if re.search(pattern, file_path):
-                        return False
-
-            # Check include patterns
-            if include_patterns:
-                for pattern in include_patterns:
-                    if re.search(pattern, file_path):
-                        return True
-                return False
-
-            return True
+            return real_client.match_file_patterns(
+                file_path, include_patterns, exclude_patterns
+            )
 
         # Mock GitHub client methods
         mock_github_client._extract_repo_from_module_id.return_value = (
@@ -649,14 +656,14 @@ class TestGetContentTool:
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify included files
-        assert "### main.tf" in result
-        assert "### variables.tf" in result
-        assert "### config.yaml" in result
+        assert "## main.tf" in result
+        assert "## variables.tf" in result
+        assert "## config.yaml" in result
 
         # Verify excluded files
-        assert "### test_main.tf" not in result
-        assert "### example.tftest" not in result
-        assert "### README.txt" not in result
+        assert "## test_main.tf" not in result
+        assert "## example.tftest" not in result
+        assert "## README.txt" not in result
 
     @pytest.mark.asyncio
     async def test_get_content_specific_version(
@@ -667,7 +674,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["main.tf"],
-            include_readme=True,
             version="v5.1.0",
         )
 
@@ -709,8 +715,7 @@ class TestGetContentTool:
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=[".*\\.tf$"],
-            include_readme=True,
+            include_files=["*.tf"],
             version="latest",
         )
 
@@ -767,10 +772,7 @@ class TestGetContentTool:
             },
         ]
         mock_github_client.match_file_patterns.return_value = True
-        mock_github_client.get_file_content.side_effect = [
-            sample_readme_content,
-            *terraform_files,
-        ]
+        mock_github_client.get_file_content.side_effect = terraform_files
 
         result = await get_content_impl(request, config, mock_github_client)
 
@@ -788,7 +790,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["main.tf"],
-            include_readme=True,
             version="latest",
         )
 
@@ -839,7 +840,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["main.tf"],
-            include_readme=True,
             version="latest",
         )
 
@@ -895,7 +895,6 @@ class TestGetContentTool:
                 ".*\\.tf$",
             ],  # Mix of invalid and valid patterns
             exclude_files=["+", "?", ".*test.*"],  # Mix of invalid and valid patterns
-            include_readme=True,
             version="latest",
         )
 
@@ -948,15 +947,14 @@ class TestGetContentTool:
         assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
 
     @pytest.mark.asyncio
-    async def test_get_content_all_invalid_patterns(
+    async def test_get_content_unusual_glob_patterns(
         self, config, mock_github_client, sample_readme_content
     ):
-        """Test handling when all regex patterns are invalid."""
+        """Test handling with unusual but valid glob patterns."""
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=["*", "+", "?"],  # All invalid patterns
-            include_readme=True,
+            include_files=["*", "+", "?"],  # Unusual glob patterns
             version="latest",
         )
 
@@ -973,7 +971,13 @@ class TestGetContentTool:
                 "path": "examples/basic/main.tf",
                 "type": "file",
                 "size": 150,
-            }
+            },
+            {
+                "name": "README.md",
+                "path": "examples/basic/README.md",
+                "type": "file",
+                "size": 100,
+            },
         ]
 
         # Use the real match_file_patterns method to test error handling
@@ -990,9 +994,19 @@ class TestGetContentTool:
             )
 
         mock_github_client.match_file_patterns.side_effect = mock_match_patterns
-        mock_github_client.get_file_content.side_effect = [sample_readme_content]
+        mock_github_client.get_file_content.side_effect = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "content": "bWFpbi50Zg==",
+                "encoding": "base64",
+                "size": 150,
+                "decoded_content": "# main.tf content",
+            },
+            sample_readme_content,
+        ]
 
-        # Should still work - when all include patterns are invalid, defaults to including all files
+        # Should work - unusual glob patterns will match based on their literal meaning
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify the request completed successfully with README
@@ -1011,7 +1025,6 @@ class TestGetContentTool:
             include_files=[
                 "*.tf"
             ],  # Common glob pattern that causes "nothing to repeat" error
-            include_readme=True,
             version="latest",
         )
 
@@ -1045,7 +1058,16 @@ class TestGetContentTool:
             )
 
         mock_github_client.match_file_patterns.side_effect = mock_match_patterns
-        mock_github_client.get_file_content.side_effect = [sample_readme_content]
+        mock_github_client.get_file_content.side_effect = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "content": "bWFpbi50Zg==",
+                "encoding": "base64",
+                "size": 150,
+                "decoded_content": "# main.tf content",
+            }
+        ]
 
         # This should now work without throwing "nothing to repeat at position 0" error
         result = await get_content_impl(request, config, mock_github_client)
@@ -1053,8 +1075,8 @@ class TestGetContentTool:
         # Verify the request completed successfully
         assert "**Version:** latest" in result
         assert "# terraform-ibm-modules/vpc/ibm - examples/basic" in result
-        # Should still include README even though pattern was invalid
-        assert "## README" in result
+        # Should include main.tf which matches *.tf pattern
+        assert "## main.tf" in result
 
     @pytest.mark.asyncio
     async def test_get_content_include_files_bug_reproduction(
@@ -1065,7 +1087,6 @@ class TestGetContentTool:
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
             include_files=["main.tf"],  # First pattern matches immediately, causing bug
-            include_readme=True,
             version="latest",
         )
 
@@ -1109,7 +1130,6 @@ class TestGetContentTool:
 
         # Mock file content for main.tf
         mock_github_client.get_file_content.side_effect = [
-            sample_readme_content,
             {
                 "name": "main.tf",
                 "path": "examples/basic/main.tf",
@@ -1123,8 +1143,8 @@ class TestGetContentTool:
         result = await get_content_impl(request, config, mock_github_client)
 
         # Verify that only main.tf is included (not variables.tf)
-        assert "### main.tf" in result
-        assert "### variables.tf" not in result
+        assert "## main.tf" in result
+        assert "## variables.tf" not in result
 
         # Verify the matching logic worked correctly
         # With the bug, this might fail if valid_include_matched logic is broken

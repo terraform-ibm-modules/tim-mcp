@@ -370,59 +370,59 @@ class TestGitHubClient:
         )
 
     def test_match_file_patterns_valid_patterns(self, github_client, mock_cache):
-        """Test match_file_patterns with valid regex patterns."""
+        """Test match_file_patterns with valid glob patterns."""
         # Test include patterns
-        assert github_client.match_file_patterns(
-            "main.tf", include_patterns=[".*\\.tf$"]
-        )
+        assert github_client.match_file_patterns("main.tf", include_patterns=["*.tf"])
         assert not github_client.match_file_patterns(
-            "main.py", include_patterns=[".*\\.tf$"]
+            "main.py", include_patterns=["*.tf"]
         )
 
         # Test exclude patterns
         assert not github_client.match_file_patterns(
-            "test_main.tf", exclude_patterns=[".*test.*"]
+            "test_main.tf", exclude_patterns=["*test*"]
         )
-        assert github_client.match_file_patterns(
-            "main.tf", exclude_patterns=[".*test.*"]
-        )
+        assert github_client.match_file_patterns("main.tf", exclude_patterns=["*test*"])
 
         # Test combined patterns
         assert github_client.match_file_patterns(
-            "main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
+            "main.tf", include_patterns=["*.tf"], exclude_patterns=["*test*"]
         )
         assert not github_client.match_file_patterns(
-            "test_main.tf", include_patterns=[".*\\.tf$"], exclude_patterns=[".*test.*"]
+            "test_main.tf", include_patterns=["*.tf"], exclude_patterns=["*test*"]
         )
 
-    def test_match_file_patterns_invalid_regex(self, github_client, mock_cache):
-        """Test match_file_patterns with invalid regex patterns."""
-        # Test invalid include patterns
-        result = github_client.match_file_patterns(
-            "main.tf", include_patterns=["*", "*.tf", ".*\\.tf$"]
+    def test_match_file_patterns_complex_globs(self, github_client, mock_cache):
+        """Test match_file_patterns with complex glob patterns."""
+        # Test recursive patterns
+        assert github_client.match_file_patterns(
+            "examples/basic/main.tf", include_patterns=["**/*.tf"]
         )
-        # Should still match because the valid pattern ".*\\.tf$" matches
+        assert not github_client.match_file_patterns(
+            "main.py", include_patterns=["**/*.tf"]
+        )
+
+        # Test directory-specific patterns
+        assert github_client.match_file_patterns(
+            "examples/basic/main.tf", include_patterns=["examples/**/*.tf"]
+        )
+        assert not github_client.match_file_patterns(
+            "modules/vpc/main.tf", include_patterns=["examples/**/*.tf"]
+        )
+
+        # Test multiple include patterns
+        result = github_client.match_file_patterns(
+            "main.tf", include_patterns=["*.tf", "*.md"]
+        )
         assert result
 
-        # Test all invalid include patterns
         result = github_client.match_file_patterns(
-            "main.tf", include_patterns=["*", "+", "?"]
+            "README.md", include_patterns=["*.tf", "*.md"]
         )
-        # Should return True because all patterns are invalid (default behavior)
         assert result
 
-        # Test invalid exclude patterns
         result = github_client.match_file_patterns(
-            "main.tf", exclude_patterns=["*", "+"]
+            "script.py", include_patterns=["*.tf", "*.md"]
         )
-        # Should return True because invalid patterns are skipped
-        assert result
-
-        # Test mixed valid and invalid exclude patterns
-        result = github_client.match_file_patterns(
-            "test_main.tf", exclude_patterns=["*", ".*test.*"]
-        )
-        # Should return False because the valid exclude pattern matches
         assert not result
 
     def test_match_file_patterns_no_patterns(self, github_client, mock_cache):

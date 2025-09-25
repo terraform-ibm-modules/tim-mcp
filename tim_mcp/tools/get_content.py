@@ -12,7 +12,6 @@ from typing import Any
 
 from ..clients.github_client import GitHubClient
 from ..config import Config
-from ..exceptions import ModuleNotFoundError
 from ..logging import get_logger
 from ..types import GetContentRequest
 
@@ -95,13 +94,6 @@ async def _get_content_with_client(
 
     # Prepare file fetch tasks
     fetch_tasks = []
-
-    # Add README fetch task if enabled
-    if request.include_readme:
-        readme_task = _fetch_readme(github_client, owner, repo, resolved_version)
-        fetch_tasks.append(readme_task)
-
-    # Add file content fetch tasks
     for file_item in filtered_files:
         task = github_client.get_file_content(
             owner, repo, file_item["path"], resolved_version
@@ -111,20 +103,10 @@ async def _get_content_with_client(
     # Fetch all content concurrently
     results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
-    # Separate README and file contents
-    readme_content = None
-    file_contents = []
-
-    result_index = 0
-    if request.include_readme:
-        readme_result = results[result_index]
-        if not isinstance(readme_result, Exception):
-            readme_content = readme_result.get("decoded_content", "")
-        result_index += 1
-
     # Process file results
+    file_contents = []
     for i, file_item in enumerate(filtered_files):
-        result = results[result_index + i]
+        result = results[i]
         if not isinstance(result, Exception):
             file_contents.append(
                 {
@@ -144,48 +126,20 @@ async def _get_content_with_client(
 
     logger.info(
         "Content fetch completed",
-        readme_fetched=readme_content is not None,
         files_fetched=len(file_contents),
         files_failed=len(filtered_files) - len(file_contents),
     )
 
     # Format the output
     return _format_content_output(
-        request.module_id, request.path, resolved_version, readme_content, file_contents
+        request.module_id, request.path, resolved_version, file_contents
     )
-
-
-async def _fetch_readme(
-    github_client: GitHubClient, owner: str, repo: str, version: str
-) -> dict[str, Any]:
-    """
-    Fetch README.md content, handling potential not found errors.
-
-    Args:
-        github_client: GitHub client instance
-        owner: Repository owner
-        repo: Repository name
-        version: Git reference
-
-    Returns:
-        README file content data
-
-    Raises:
-        Exception: If README not found (caught by caller)
-    """
-    try:
-        return await github_client.get_file_content(owner, repo, "README.md", version)
-    except ModuleNotFoundError:
-        # README not found, let caller handle the exception
-        logger.debug("README.md not found", owner=owner, repo=repo, version=version)
-        raise
 
 
 def _format_content_output(
     module_id: str,
     path: str,
     version: str,
-    readme_content: str | None,
     file_contents: list[dict[str, Any]],
 ) -> str:
     """
@@ -195,7 +149,6 @@ def _format_content_output(
         module_id: Module identifier
         path: Path that was fetched
         version: Version that was fetched
-        readme_content: README content (optional)
         file_contents: List of file content data
 
     Returns:
@@ -210,24 +163,37 @@ def _format_content_output(
     # Build header
     lines = [title, "", f"**Version:** {version}", ""]
 
-    # Add README section if available
-    if readme_content:
-        lines.extend(["## README", readme_content.strip(), ""])
-
-    # Add Terraform Files section
-    lines.extend(["## Terraform Files", ""])
-
     if not file_contents:
         lines.append("No files found matching the specified criteria.")
     else:
-        # Sort files for consistent output
-        sorted_files = sorted(file_contents, key=lambda x: x["name"])
+        # Sort files for consistent output - put README first if present
+        def sort_key(file_data):
+            name = file_data["name"]
+            if name.upper() == "README.MD":
+                return "0_" + name  # Sort README first
+            return name
+
+        sorted_files = sorted(file_contents, key=sort_key)
 
         for file_data in sorted_files:
+            file_extension = file_data["name"].split(".")[-1].lower()
+
+            # Choose appropriate syntax highlighting
+            if file_extension in ["tf", "hcl"]:
+                syntax = "terraform"
+            elif file_extension in ["md", "markdown"]:
+                syntax = "markdown"
+            elif file_extension in ["yaml", "yml"]:
+                syntax = "yaml"
+            elif file_extension in ["json"]:
+                syntax = "json"
+            else:
+                syntax = "text"
+
             lines.extend(
                 [
-                    f"### {file_data['name']}",
-                    "```terraform",
+                    f"## {file_data['name']}",
+                    f"```{syntax}",
                     file_data["content"].strip(),
                     "```",
                     "",

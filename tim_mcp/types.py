@@ -103,9 +103,13 @@ class GetContentRequest(BaseModel):
 
     module_id: str = Field(..., description="Full module identifier")
     path: str = Field("", description="Specific path to fetch")
-    include_files: list[str] | None = Field(None, description="Include patterns")
-    exclude_files: list[str] | None = Field(None, description="Exclude patterns")
-    include_readme: bool = Field(True, description="Include README.md")
+    include_files: list[str] | None = Field(
+        None, description="Glob patterns for files to include (e.g., '*.tf', '**/*.md')"
+    )
+    exclude_files: list[str] | None = Field(
+        None,
+        description="Glob patterns for files to exclude (e.g., '*test*', 'examples/**')",
+    )
     version: str = Field("latest", description="Git tag/branch to fetch from")
 
 

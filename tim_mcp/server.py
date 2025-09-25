@@ -505,44 +505,22 @@ async def get_content(
     path: str = "",
     include_files: str | list[str] | None = None,
     exclude_files: str | list[str] | None = None,
-    include_readme: bool = True,
     version: str = "latest",
 ) -> str:
     """
-    Retrieve source code, examples, solutions from GitHub repositories with targeted content filtering.
+    Retrieve source code, examples, solutions from GitHub repositories with glob pattern filtering.
 
-    SIMPLE FILE PATTERNS (Recommended - Easy to Use):
-    - INPUT VARIABLES: include_files=["variables.tf"], include_readme=false
-    - OUTPUT VALUES: include_files=["outputs.tf"], include_readme=false
-    - BASIC EXAMPLES: path="examples/basic", include_files=["*.tf"]
-    - MODULE STRUCTURE: include_files=["main.tf"], include_readme=true
-    - ALL TERRAFORM FILES: include_files=["*.tf"]
-    - DOCUMENTATION: include_files=["*.md"]
-    - SPECIFIC FILE: include_files=["main.tf", "variables.tf"]
-
-    USAGE PATTERNS BY GOAL:
-    - Understand module inputs: include_files=["variables.tf"]
-    - See module outputs: include_files=["outputs.tf"]
-    - Get working example: path="examples/basic", include_files=["*.tf"]
-    - Browse all terraform: include_files=["*.tf"]
-    - Get documentation: include_files=["README.md", "*.md"]
-
-    FILE PATTERN FORMATS (Both supported):
-    - Simple patterns: ["*.tf", "*.md", "main.tf"] (Recommended)
-    - Regex patterns: [".*\\.tf$", ".*\\.md$", "^main\\.tf$"] (Advanced)
-    - Tool auto-converts simple patterns to regex internally
-
-    PARAMETER FORMATS (Multiple formats supported):
-    - List format (recommended): include_files=["*.tf", "*.md"]
-    - JSON string format: include_files='["*.tf", "*.md"]'
-    - Single string: include_files="*.tf"
+    Common patterns:
+    - All Terraform files: include_files=["*.tf"]
+    - Specific files: include_files=["main.tf", "variables.tf"]
+    - Documentation: include_files=["*.md"]
+    - Examples: path="examples/basic", include_files=["*.tf"]
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: File patterns (list, JSON string, or single string)
-        exclude_files: File patterns (list, JSON string, or single string)
-        include_readme: Include README.md for context (default: true)
+        path: Specific path: "" (root), "examples/basic", "modules/vpc"
+        include_files: Glob patterns for files to include (e.g., ["*.tf"], ["*.md"])
+        exclude_files: Glob patterns for files to exclude (e.g., ["*test*"])
         version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
@@ -565,7 +543,6 @@ async def get_content(
             path=path,
             include_files=sanitized_include_files,
             exclude_files=sanitized_exclude_files,
-            include_readme=include_readme,
             version=version,
         )
 
@@ -597,7 +574,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
@@ -616,7 +592,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
@@ -634,7 +609,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
