@@ -14,11 +14,15 @@ The implementation follows these principles:
 from datetime import datetime
 from typing import Any
 
+from ..clients.github_client import GitHubClient
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..exceptions import TIMError
 from ..exceptions import ValidationError as TIMValidationError
 from ..types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
+
+# Required topics that must be present in the GitHub repository
+REQUIRED_TOPICS = ["core-team"]
 
 
 def _validate_api_response_structure(api_response: Any) -> None:
@@ -83,52 +87,105 @@ async def search_modules_impl(
     # Use the configured namespace (always the first allowed namespace)
     namespace = config.allowed_namespaces[0] if config.allowed_namespaces else None
 
-    # Create and use the Terraform client as async context manager
-    # This ensures proper cleanup of HTTP connections
-    async with TerraformClient(config) as client:
+    # Create and use both Terraform and GitHub clients as async context managers
+    async with (
+        TerraformClient(config) as terraform_client,
+        GitHubClient(config) as github_client,
+    ):
         try:
-            # Call the Terraform Registry API with search parameters
-            # Always fetch up to 100 results to get better sorting accuracy
-            internal_limit = 100
-            api_response = await client.search_modules(
-                query=request.query,
-                namespace=namespace,
-                limit=internal_limit,
-                offset=0,  # Start from beginning - pagination can be added later
+            # We need to fetch and validate modules until we have enough valid ones
+            validated_modules = []
+            offset = 0
+            batch_size = 50  # Fetch modules in smaller batches
+            max_attempts = 10  # Prevent infinite loops
+
+            attempt = 0
+            while len(validated_modules) < request.limit and attempt < max_attempts:
+                attempt += 1
+
+                # Call the Terraform Registry API with search parameters
+                api_response = await terraform_client.search_modules(
+                    query=request.query,
+                    namespace=namespace,
+                    limit=batch_size,
+                    offset=offset,
+                )
+
+                # Validate API response structure before processing
+                _validate_api_response_structure(api_response)
+
+                # Extract metadata from response
+                meta = api_response["meta"]
+                total_count = meta.get("total_count", 0)
+
+                # If no more modules available, break
+                if not api_response["modules"]:
+                    logger.info(
+                        "No more modules available from Terraform Registry",
+                        offset=offset,
+                        total_validated=len(validated_modules),
+                    )
+                    break
+
+                # Transform and validate each module's data
+                batch_modules = []
+                for i, module_data in enumerate(api_response["modules"]):
+                    try:
+                        module = _transform_module_data(module_data)
+                        # Apply module exclusion filtering first
+                        if _is_module_excluded(module.id, config.excluded_modules):
+                            logger.info(
+                                "Module excluded from results", module_id=module.id
+                            )
+                            continue
+
+                        batch_modules.append(module)
+                    except Exception as e:
+                        # Include context about which module failed
+                        logger.warning(
+                            f"Invalid module data at offset {offset + i}: {e}",
+                            module_data=module_data,
+                        )
+                        continue
+
+                # Sort this batch by downloads in descending order
+                batch_modules.sort(key=lambda m: m.downloads, reverse=True)
+
+                # Validate repositories for modules in this batch
+                for module in batch_modules:
+                    if len(validated_modules) >= request.limit:
+                        break
+
+                    # Check if repository meets our criteria
+                    if await _is_repository_valid(module, github_client, logger):
+                        validated_modules.append(module)
+
+                # Move to next batch
+                offset += batch_size
+
+                logger.info(
+                    "Processed batch of modules",
+                    batch_size=len(batch_modules),
+                    validated_count=len(validated_modules),
+                    target_limit=request.limit,
+                    offset=offset,
+                )
+
+            # Ensure we don't exceed the requested limit
+            final_modules = validated_modules[: request.limit]
+
+            logger.info(
+                "Search completed",
+                total_found=total_count,
+                modules_validated=len(final_modules),
+                attempts=attempt,
             )
-
-            # Validate API response structure before processing
-            _validate_api_response_structure(api_response)
-
-            # Extract metadata from response
-            meta = api_response["meta"]
-            total_count = meta.get("total_count", 0)
-
-            # Transform each module's data to our format
-            modules = []
-            for i, module_data in enumerate(api_response["modules"]):
-                try:
-                    module = _transform_module_data(module_data)
-                    # Apply module exclusion filtering
-                    if not _is_module_excluded(module.id, config.excluded_modules):
-                        modules.append(module)
-                    else:
-                        logger.info("Module excluded from results", module_id=module.id)
-                except Exception as e:
-                    # Include context about which module failed
-                    raise TIMValidationError(
-                        f"Invalid module data at index {i}: {e}"
-                    ) from e
-
-            # Sort modules by downloads in descending order (highest first)
-            modules.sort(key=lambda m: m.downloads, reverse=True)
-
-            # Apply the user's requested limit to the sorted results
-            limited_modules = modules[: request.limit]
 
             # Create and return the formatted response
             return ModuleSearchResponse(
-                query=request.query, total_found=total_count, modules=limited_modules
+                query=request.query,
+                total_found=total_count,
+                modules=final_modules,
             )
 
         except TIMError:
@@ -227,3 +284,77 @@ def _is_module_excluded(module_id: str, excluded_modules: list[str]) -> bool:
         True if the module should be excluded, False otherwise
     """
     return module_id in excluded_modules
+
+
+async def _is_repository_valid(
+    module: ModuleInfo, github_client: GitHubClient, logger
+) -> bool:
+    """
+    Validate if a repository meets our criteria (not archived, has required topics).
+
+    Args:
+        module: Module information containing source URL
+        github_client: GitHub client to fetch repository info
+        logger: Logger instance for logging
+
+    Returns:
+        True if the repository meets all criteria, False otherwise
+    """
+    try:
+        # Parse GitHub URL from source URL
+        repo_info = github_client.parse_github_url(str(module.source_url))
+        if not repo_info:
+            logger.warning(
+                "Could not parse GitHub URL from source",
+                module_id=module.id,
+                source_url=str(module.source_url),
+            )
+            return False
+
+        owner, repo_name = repo_info
+
+        # Get repository information
+        repo_data = await github_client.get_repository_info(owner, repo_name)
+
+        # Check if repository is archived
+        if repo_data.get("archived", False):
+            logger.info(
+                "Repository is archived, excluding module",
+                module_id=module.id,
+                repo=f"{owner}/{repo_name}",
+            )
+            return False
+
+        # Check if repository has all required topics
+        repo_topics = repo_data.get("topics", [])
+        missing_topics = [
+            topic for topic in REQUIRED_TOPICS if topic not in repo_topics
+        ]
+
+        if missing_topics:
+            logger.info(
+                "Repository missing required topics, excluding module",
+                module_id=module.id,
+                repo=f"{owner}/{repo_name}",
+                missing_topics=missing_topics,
+                required_topics=REQUIRED_TOPICS,
+                repo_topics=repo_topics,
+            )
+            return False
+
+        logger.info(
+            "Repository passed validation",
+            module_id=module.id,
+            repo=f"{owner}/{repo_name}",
+            repo_topics=repo_topics,
+        )
+        return True
+
+    except Exception as e:
+        logger.warning(
+            "Failed to validate repository, excluding module",
+            module_id=module.id,
+            source_url=str(module.source_url),
+            error=str(e),
+        )
+        return False

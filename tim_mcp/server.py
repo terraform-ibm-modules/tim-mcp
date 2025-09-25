@@ -138,17 +138,15 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
     """
     Sanitize list parameters that might be passed as JSON strings by LLMs.
 
-    This function handles common patterns and automatically converts glob patterns
-    to regex patterns for easier use by LLMs. Examples:
-    - "*.tf" becomes ".*\\.tf$"
-    - ["*.tf", "*.md"] becomes [".*\\.tf$", ".*\\.md$"]
+    This function handles parameter conversion without modifying the patterns themselves,
+    since the underlying implementation uses pathlib.Path.match() for glob matching.
 
     Args:
         param: The parameter value to sanitize
         param_name: Name of the parameter for logging
 
     Returns:
-        Sanitized list with glob patterns converted to regex or None
+        Sanitized list of patterns or None
 
     Raises:
         ValueError: If the parameter cannot be converted to a proper format
@@ -157,31 +155,8 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
         return None
 
     def _process_pattern_list(patterns: list[str]) -> list[str]:
-        """Process a list of patterns, converting globs to regex as needed."""
-        processed = []
-        converted_any = False
-
-        for pattern in patterns:
-            if _is_glob_pattern(pattern):
-                converted_pattern = _convert_glob_to_regex(pattern)
-                processed.append(converted_pattern)
-                converted_any = True
-                logger.info(
-                    f"Converted glob pattern to regex in {param_name}",
-                    original=pattern,
-                    converted=converted_pattern,
-                )
-            else:
-                processed.append(pattern)
-
-        if converted_any:
-            logger.info(
-                f"Auto-converted glob patterns to regex in {param_name}",
-                original_patterns=patterns,
-                converted_patterns=processed,
-            )
-
-        return processed
+        """Process a list of patterns, keeping them as-is for glob matching."""
+        return patterns
 
     if isinstance(param, list):
         # Validate all items are strings
@@ -224,23 +199,17 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
 @mcp.tool()
 async def search_modules(
     query: str,
-    limit: int = 10,
+    limit: int = 5,
 ) -> str:
     """
     Search Terraform Registry for modules with intelligent result optimization.
-
-    RESULT OPTIMIZATION BY USE CASE:
-    - SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
-    - EXPLORING OPTIONS: limit=10-15 (default, good balance)
-    - COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
-    - QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
 
     SEARCH TIPS:
     - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
 
     Args:
         query: Specific search term (e.g., "vpc", "kubernetes", "security")
-        limit: Maximum results based on use case (see optimization guidance above)
+        limit: Maximum results based on use case (optional only use if asked)
 
     Returns:
         JSON formatted module search results with download counts, descriptions, and verification status
@@ -505,44 +474,22 @@ async def get_content(
     path: str = "",
     include_files: str | list[str] | None = None,
     exclude_files: str | list[str] | None = None,
-    include_readme: bool = True,
     version: str = "latest",
 ) -> str:
     """
-    Retrieve source code, examples, solutions from GitHub repositories with targeted content filtering.
+    Retrieve source code, examples, solutions from GitHub repositories with glob pattern filtering.
 
-    SIMPLE FILE PATTERNS (Recommended - Easy to Use):
-    - INPUT VARIABLES: include_files=["variables.tf"], include_readme=false
-    - OUTPUT VALUES: include_files=["outputs.tf"], include_readme=false
-    - BASIC EXAMPLES: path="examples/basic", include_files=["*.tf"]
-    - MODULE STRUCTURE: include_files=["main.tf"], include_readme=true
-    - ALL TERRAFORM FILES: include_files=["*.tf"]
-    - DOCUMENTATION: include_files=["*.md"]
-    - SPECIFIC FILE: include_files=["main.tf", "variables.tf"]
-
-    USAGE PATTERNS BY GOAL:
-    - Understand module inputs: include_files=["variables.tf"]
-    - See module outputs: include_files=["outputs.tf"]
-    - Get working example: path="examples/basic", include_files=["*.tf"]
-    - Browse all terraform: include_files=["*.tf"]
-    - Get documentation: include_files=["README.md", "*.md"]
-
-    FILE PATTERN FORMATS (Both supported):
-    - Simple patterns: ["*.tf", "*.md", "main.tf"] (Recommended)
-    - Regex patterns: [".*\\.tf$", ".*\\.md$", "^main\\.tf$"] (Advanced)
-    - Tool auto-converts simple patterns to regex internally
-
-    PARAMETER FORMATS (Multiple formats supported):
-    - List format (recommended): include_files=["*.tf", "*.md"]
-    - JSON string format: include_files='["*.tf", "*.md"]'
-    - Single string: include_files="*.tf"
+    Common patterns:
+    - All Terraform files: include_files=["*.tf"]
+    - Specific files: include_files=["main.tf", "variables.tf"]
+    - Documentation: include_files=["*.md"]
+    - Examples: path="examples/basic", include_files=["*.tf"]
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        path: Specific path: "" (root), "examples/basic", "modules/vpc", "solutions/pattern1"
-        include_files: File patterns (list, JSON string, or single string)
-        exclude_files: File patterns (list, JSON string, or single string)
-        include_readme: Include README.md for context (default: true)
+        path: Specific path: "" (root), "examples/basic", "modules/vpc"
+        include_files: Glob patterns for files to include (e.g., ["*.tf"], ["*.md"])
+        exclude_files: Glob patterns for files to exclude (e.g., ["*test*"])
         version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
@@ -565,7 +512,6 @@ async def get_content(
             path=path,
             include_files=sanitized_include_files,
             exclude_files=sanitized_exclude_files,
-            include_readme=include_readme,
             version=version,
         )
 
@@ -597,7 +543,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
@@ -616,7 +561,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
@@ -634,7 +578,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "include_readme": include_readme,
                 "version": version,
             },
             duration_ms,
@@ -645,10 +588,31 @@ async def get_content(
         raise TIMError(f"Unexpected error: {e}") from e
 
 
-def main():
-    """Run the MCP server."""
+def main(transport_config=None):
+    """
+    Run the MCP server with specified transport configuration.
+
+    Args:
+        transport_config: Transport configuration (None = default STDIO)
+    """
     logger.info("Starting TIM-MCP server", config=config.model_dump())
-    mcp.run()
+
+    if transport_config is None:
+        # Default STDIO mode
+        mcp.run()
+    elif transport_config.mode == "stdio":
+        # Explicit STDIO mode
+        mcp.run()
+    elif transport_config.mode == "http":
+        # HTTP mode with specified host and port
+        logger.info(
+            f"Starting HTTP server on {transport_config.host}:{transport_config.port}"
+        )
+        mcp.run(
+            transport="http", host=transport_config.host, port=transport_config.port
+        )
+    else:
+        raise ValueError(f"Unsupported transport mode: {transport_config.mode}")
 
 
 if __name__ == "__main__":

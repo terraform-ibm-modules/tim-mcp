@@ -7,7 +7,6 @@ Supports both GitHub.com and GitHub Enterprise.
 """
 
 import base64
-import re
 import time
 from typing import Any
 
@@ -106,6 +105,61 @@ class GitHubClient:
             repo_name = f"terraform-{name}-{provider}"
 
         return namespace, repo_name
+
+    def parse_github_url(self, source_url: str) -> tuple[str, str] | None:
+        """
+        Parse GitHub URL to extract owner and repository name.
+
+        Args:
+            source_url: GitHub source URL in various formats
+
+        Returns:
+            Tuple of (owner, repo_name) or None if not a valid GitHub URL
+
+        Examples:
+            https://github.com/terraform-ibm-modules/terraform-ibm-vpc -> ("terraform-ibm-modules", "terraform-ibm-vpc")
+            git::https://github.com/owner/repo.git -> ("owner", "repo")
+        """
+        from urllib.parse import urlparse
+
+        if not source_url:
+            return None
+
+        # Remove git:: prefix if present
+        clean_url = source_url
+        if clean_url.startswith("git::"):
+            clean_url = clean_url[5:]
+
+        # Parse the URL
+        try:
+            parsed = urlparse(clean_url)
+
+            # Check if it's a GitHub URL
+            if parsed.netloc not in ["github.com", "www.github.com"]:
+                return None
+
+            # Extract path and clean it
+            path = parsed.path.strip("/")
+
+            # Remove .git suffix if present
+            if path.endswith(".git"):
+                path = path[:-4]
+
+            # Split path into parts
+            path_parts = path.split("/")
+            if len(path_parts) < 2:
+                return None
+
+            owner = path_parts[0]
+            repo_name = path_parts[1]
+
+            return owner, repo_name
+
+        except Exception as e:
+            self.logger.warning(
+                "Failed to parse GitHub URL", url=source_url, error=str(e)
+            )
+            return None
 
     @retry(
         stop=stop_after_attempt(3),
@@ -519,56 +573,35 @@ class GitHubClient:
         exclude_patterns: list[str] | None = None,
     ) -> bool:
         """
-        Check if file matches include/exclude patterns.
+        Check if file matches include/exclude glob patterns.
 
         Args:
             file_path: File path to check
-            include_patterns: List of regex patterns to include
-            exclude_patterns: List of regex patterns to exclude
+            include_patterns: List of glob patterns to include (e.g., "*.tf", "**/*.md")
+            exclude_patterns: List of glob patterns to exclude (e.g., "*test*", "examples/**")
 
         Returns:
             True if file should be included
         """
+        from pathlib import Path
+
+        path = Path(file_path)
+
         # Check exclude patterns first
         if exclude_patterns:
             for pattern in exclude_patterns:
-                try:
-                    if re.search(pattern, file_path):
-                        return False
-                except re.error as e:
-                    self.logger.warning(
-                        "Invalid exclude pattern skipped",
-                        pattern=pattern,
-                        error=str(e),
-                        file_path=file_path,
-                    )
-                    # Continue with other patterns
+                if path.match(pattern):
+                    return False
 
         # Check include patterns
         if include_patterns:
-            valid_include_matched = False
             for pattern in include_patterns:
-                try:
-                    match_result = re.search(pattern, file_path)
-                    valid_include_matched = (
-                        True  # At least one valid pattern was processed
-                    )
-                    if match_result:
-                        return True
-                except re.error as e:
-                    self.logger.warning(
-                        "Invalid include pattern skipped",
-                        pattern=pattern,
-                        error=str(e),
-                        file_path=file_path,
-                    )
-                    # Continue with other patterns
+                if path.match(pattern):
+                    return True
+            # If we had include patterns but none matched, exclude the file
+            return False
 
-            # If we had include patterns but none matched (and at least one was valid)
-            if valid_include_matched:
-                return False
-
-        return True  # No patterns specified or all patterns were invalid, include by default
+        return True  # No patterns specified, include by default
 
     def clone_repository(
         self, repo_url: str, target_dir: str, branch: str | None = None
@@ -705,8 +738,8 @@ class GitHubClient:
                 tag_name=data.get("tag_name"),
             )
 
-            # Cache the result with shorter TTL for latest release
-            self.cache.set(cache_key, data, ttl=300)  # 5 minutes for latest release
+            # Cache the result
+            self.cache.set(cache_key, data)
             log_cache_operation(self.logger, "set", cache_key)
 
             return data

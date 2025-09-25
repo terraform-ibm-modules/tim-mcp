@@ -85,8 +85,68 @@ uv sync
 # Run tests
 uv run pytest
 
-# Run the server locally
+# Run the server locally (STDIO mode - default)
 uv run tim-mcp
+```
+
+## Transport Modes
+
+TIM-MCP supports two transport modes for different deployment scenarios:
+
+### STDIO Mode (Default)
+
+STDIO is the default transport mode, perfect for MCP clients like Claude Desktop that spawn server processes on-demand.
+
+```bash
+# STDIO mode (default)
+tim-mcp
+
+# Explicit STDIO mode (same as default)
+tim-mcp --log-level DEBUG
+```
+
+### HTTP Mode
+
+HTTP mode runs the server as a web service, ideal for network deployments and multiple concurrent clients.
+
+```bash
+# HTTP mode with defaults (127.0.0.1:8000)
+tim-mcp --http
+
+# HTTP mode with custom port
+tim-mcp --http --port 8080
+
+# HTTP mode with custom host and port
+tim-mcp --http --host 0.0.0.0 --port 9000
+
+# HTTP mode with debug logging
+tim-mcp --http --log-level DEBUG
+```
+
+**HTTP Server URLs:**
+- Server runs at: `http://host:port/`
+- MCP endpoint: `http://host:port/mcp`
+
+**Production HTTPS:**
+For production deployments requiring HTTPS, use nginx as a reverse proxy:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    # SSL configuration
+    ssl_certificate /path/to/your/cert.pem;
+    ssl_certificate_key /path/to/your/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ### Environment Variables
@@ -171,6 +231,8 @@ This method downloads and runs TIM-MCP directly from the GitHub repository witho
 
 This method is ideal for development and testing, using your local clone of the repository.
 
+#### For Claude Desktop
+
 **Basic Configuration:**
 ```json
 {
@@ -213,6 +275,30 @@ This method is ideal for development and testing, using your local clone of the 
 4. Update the `cwd` path in the configuration above to match your local repository path
 5. Add the configuration to your Claude Desktop settings
 
+#### For Claude Code
+
+For local development with Claude Code:
+
+```bash
+# Navigate to your tim-mcp directory first
+cd /path/to/your/tim-mcp
+
+# Add the local MCP server with GitHub token
+claude mcp add tim-mcp --env GITHUB_TOKEN=your_github_token_here \
+  -- uv run tim-mcp
+
+# Or without GitHub token (may hit rate limits)
+claude mcp add tim-mcp -- uv run tim-mcp
+
+# List configured MCP servers
+claude mcp list
+
+# Remove if needed
+claude mcp remove tim-mcp
+```
+
+**Important:** Run these commands from within your local tim-mcp repository directory, as Claude Code will use the current working directory when executing the MCP server.
+
 
 ## Verification
 
@@ -241,7 +327,7 @@ Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraf
 
 **Usage Examples:**
 - Quick reference: `limit=3` for "I need a VPC module"
-- Exploring options: `limit=10-15` (default) for comparing alternatives
+- Exploring options: `limit=5-15` (default=5) for comparing alternatives
 - Comprehensive research: `limit=20+` for thorough analysis
 
 ### 2. `get_module_details`
@@ -287,20 +373,22 @@ Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraf
 **Inputs:**
 - `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
 - `path` (string, optional): Specific path - "" (root), "examples/basic", "modules/vpc", etc.
-- `include_files` (list[string], optional): Regex patterns for files to include
-- `exclude_files` (list[string], optional): Regex patterns for files to exclude
-- `include_readme` (boolean, optional): Include README.md for context (default: true)
+- `include_files` (list[string], optional): Glob patterns for files to include
+- `exclude_files` (list[string], optional): Glob patterns for files to exclude
 - `version` (string, optional): Git tag/branch to fetch from (default: "latest")
 
 **Output:** Markdown formatted content with file contents, organized by:
-- File paths and content
+- File paths and content with appropriate syntax highlighting
 - File sizes for reference
-- Context from README files when requested
+- README files are included if they match the patterns (like any other file)
 
-**Common Patterns:**
-- Input variables only: `include_files=["variables\\.tf$"]`
-- Basic example: `path="examples/basic", include_files=["main\\.tf$", "variables\\.tf$"]`
-- Complete module: `include_files=[".*\\.tf$"]`
+**Common Glob Patterns:**
+- Input variables only: `include_files=["variables.tf"]`
+- Basic example: `path="examples/basic", include_files=["*.tf"]`
+- Complete module: `include_files=["*.tf"]`
+- Documentation: `include_files=["*.md"]`
+- README only: `include_files=["README.md"]`
+- Everything: `include_files=["*"]` (or omit entirely)
 
 ## Tool Workflow
 
