@@ -85,8 +85,68 @@ uv sync
 # Run tests
 uv run pytest
 
-# Run the server locally
+# Run the server locally (STDIO mode - default)
 uv run tim-mcp
+```
+
+## Transport Modes
+
+TIM-MCP supports two transport modes for different deployment scenarios:
+
+### STDIO Mode (Default)
+
+STDIO is the default transport mode, perfect for MCP clients like Claude Desktop that spawn server processes on-demand.
+
+```bash
+# STDIO mode (default)
+tim-mcp
+
+# Explicit STDIO mode (same as default)
+tim-mcp --log-level DEBUG
+```
+
+### HTTP Mode
+
+HTTP mode runs the server as a web service, ideal for network deployments and multiple concurrent clients.
+
+```bash
+# HTTP mode with defaults (127.0.0.1:8000)
+tim-mcp --http
+
+# HTTP mode with custom port
+tim-mcp --http --port 8080
+
+# HTTP mode with custom host and port
+tim-mcp --http --host 0.0.0.0 --port 9000
+
+# HTTP mode with debug logging
+tim-mcp --http --log-level DEBUG
+```
+
+**HTTP Server URLs:**
+- Server runs at: `http://host:port/`
+- MCP endpoint: `http://host:port/mcp`
+
+**Production HTTPS:**
+For production deployments requiring HTTPS, use nginx as a reverse proxy:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    # SSL configuration
+    ssl_certificate /path/to/your/cert.pem;
+    ssl_certificate_key /path/to/your/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ### Environment Variables

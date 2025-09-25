@@ -14,10 +14,11 @@ dependencies = [
     "pydantic>=2.11.7",
     "tenacity==9.0.0",
     "structlog==24.4.0",
+    "click>=8.0.0",
 ]
 
 [project.scripts]
-tim-mcp = "tim_mcp.server:main"
+tim-mcp = "tim_mcp.main:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -30,7 +31,7 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 130
+line-length = 88
 target-version = "py311"
 exclude = ["common-dev-assets"]
 
@@ -44,7 +45,11 @@ select = [
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
 ]
-ignore = []
+ignore = [
+    "E203",  # whitespace before ':' (conflicts with black/ruff formatter)
+    "E501",  # line too long (handled by formatter)
+    "B007",  # unused loop control variable (sometimes intentional)
+]
 
 [tool.ruff.format]
 quote-style = "double"

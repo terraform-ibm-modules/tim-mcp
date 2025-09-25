@@ -645,10 +645,31 @@ async def get_content(
         raise TIMError(f"Unexpected error: {e}") from e
 
 
-def main():
-    """Run the MCP server."""
+def main(transport_config=None):
+    """
+    Run the MCP server with specified transport configuration.
+
+    Args:
+        transport_config: Transport configuration (None = default STDIO)
+    """
     logger.info("Starting TIM-MCP server", config=config.model_dump())
-    mcp.run()
+
+    if transport_config is None:
+        # Default STDIO mode
+        mcp.run()
+    elif transport_config.mode == "stdio":
+        # Explicit STDIO mode
+        mcp.run()
+    elif transport_config.mode == "http":
+        # HTTP mode with specified host and port
+        logger.info(
+            f"Starting HTTP server on {transport_config.host}:{transport_config.port}"
+        )
+        mcp.run(
+            transport="http", host=transport_config.host, port=transport_config.port
+        )
+    else:
+        raise ValueError(f"Unsupported transport mode: {transport_config.mode}")
 
 
 if __name__ == "__main__":
