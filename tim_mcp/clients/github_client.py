@@ -738,8 +738,8 @@ class GitHubClient:
                 tag_name=data.get("tag_name"),
             )
 
-            # Cache the result with shorter TTL for latest release
-            self.cache.set(cache_key, data, ttl=300)  # 5 minutes for latest release
+            # Cache the result
+            self.cache.set(cache_key, data)
             log_cache_operation(self.logger, "set", cache_key)
 
             return data

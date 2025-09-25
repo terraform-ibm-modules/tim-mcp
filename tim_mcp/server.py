@@ -138,17 +138,15 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
     """
     Sanitize list parameters that might be passed as JSON strings by LLMs.
 
-    This function handles common patterns and automatically converts glob patterns
-    to regex patterns for easier use by LLMs. Examples:
-    - "*.tf" becomes ".*\\.tf$"
-    - ["*.tf", "*.md"] becomes [".*\\.tf$", ".*\\.md$"]
+    This function handles parameter conversion without modifying the patterns themselves,
+    since the underlying implementation uses pathlib.Path.match() for glob matching.
 
     Args:
         param: The parameter value to sanitize
         param_name: Name of the parameter for logging
 
     Returns:
-        Sanitized list with glob patterns converted to regex or None
+        Sanitized list of patterns or None
 
     Raises:
         ValueError: If the parameter cannot be converted to a proper format
@@ -157,31 +155,8 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
         return None
 
     def _process_pattern_list(patterns: list[str]) -> list[str]:
-        """Process a list of patterns, converting globs to regex as needed."""
-        processed = []
-        converted_any = False
-
-        for pattern in patterns:
-            if _is_glob_pattern(pattern):
-                converted_pattern = _convert_glob_to_regex(pattern)
-                processed.append(converted_pattern)
-                converted_any = True
-                logger.info(
-                    f"Converted glob pattern to regex in {param_name}",
-                    original=pattern,
-                    converted=converted_pattern,
-                )
-            else:
-                processed.append(pattern)
-
-        if converted_any:
-            logger.info(
-                f"Auto-converted glob patterns to regex in {param_name}",
-                original_patterns=patterns,
-                converted_patterns=processed,
-            )
-
-        return processed
+        """Process a list of patterns, keeping them as-is for glob matching."""
+        return patterns
 
     if isinstance(param, list):
         # Validate all items are strings

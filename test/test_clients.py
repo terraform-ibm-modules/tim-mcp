@@ -439,5 +439,47 @@ class TestGitHubClient:
             "main.tf", include_patterns=None, exclude_patterns=None
         )
 
+    def test_match_file_patterns_bug_regression(self, github_client, mock_cache):
+        """Regression test for specific bug scenario reported by user.
+
+        Tests the exact scenario: filtering .tf files in examples/basic directory
+        with the pattern ["*.tf"]. This previously failed when patterns were
+        treated as regex instead of glob patterns.
+        """
+        # Test files that would be in examples/basic directory
+        test_files = [
+            "examples/basic/main.tf",
+            "examples/basic/variables.tf",
+            "examples/basic/outputs.tf",
+            "examples/basic/provider.tf",
+            "examples/basic/version.tf",
+            "examples/basic/README.md",
+            "examples/basic/catalogValidationValues.json.template",
+        ]
+
+        include_pattern = ["*.tf"]
+
+        # All .tf files should match
+        tf_files = [f for f in test_files if f.endswith(".tf")]
+        for tf_file in tf_files:
+            assert github_client.match_file_patterns(
+                tf_file, include_pattern, None
+            ), f"{tf_file} should match pattern {include_pattern}"
+
+        # Non-.tf files should NOT match
+        non_tf_files = [f for f in test_files if not f.endswith(".tf")]
+        for non_tf_file in non_tf_files:
+            assert not github_client.match_file_patterns(
+                non_tf_file, include_pattern, None
+            ), f"{non_tf_file} should NOT match pattern {include_pattern}"
+
+        # Verify we found the expected number of matches
+        matches = [
+            f
+            for f in test_files
+            if github_client.match_file_patterns(f, include_pattern, None)
+        ]
+        assert len(matches) == 5, f"Expected 5 .tf files, got {len(matches)}: {matches}"
+
 
 # Made with Bob

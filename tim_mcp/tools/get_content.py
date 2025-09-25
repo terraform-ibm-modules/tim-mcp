@@ -235,8 +235,8 @@ def _filter_files(
     Args:
         directory_contents: List of directory items from GitHub API
         github_client: GitHub client for pattern matching
-        include_patterns: List of regex patterns to include
-        exclude_patterns: List of regex patterns to exclude
+        include_patterns: List of glob patterns to include
+        exclude_patterns: List of glob patterns to exclude
 
     Returns:
         List of filtered file items
