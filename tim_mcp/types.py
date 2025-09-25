@@ -15,7 +15,7 @@ class ModuleSearchRequest(BaseModel):
     """Request model for module search."""
 
     query: str = Field(..., min_length=1, description="Search term")
-    limit: int = Field(10, ge=1, le=100, description="Maximum results to return")
+    limit: int = Field(5, ge=1, le=100, description="Maximum results to return")
 
 
 class ModuleInfo(BaseModel):

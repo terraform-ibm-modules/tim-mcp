@@ -700,7 +700,7 @@ class TestModuleSearchRequestValidation:
     def test_default_limit(self):
         """Test default limit is applied."""
         request = ModuleSearchRequest(query="vpc")
-        assert request.limit == 10
+        assert request.limit == 5
 
     def test_limit_validation_min(self):
         """Test limit minimum validation."""

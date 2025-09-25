@@ -224,14 +224,14 @@ def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
 @mcp.tool()
 async def search_modules(
     query: str,
-    limit: int = 10,
+    limit: int = 5,
 ) -> str:
     """
     Search Terraform Registry for modules with intelligent result optimization.
 
     RESULT OPTIMIZATION BY USE CASE:
     - SPECIFIC MODULE lookup: limit=3-5 (user knows what they want)
-    - EXPLORING OPTIONS: limit=10-15 (default, good balance)
+    - EXPLORING OPTIONS: limit=5-15 (default=5, good balance)
     - COMPREHENSIVE RESEARCH: limit=20+ (when user wants to compare many options)
     - QUICK REFERENCE: limit=1-3 (when user just needs "a VPC module" or similar)
 

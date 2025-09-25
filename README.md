@@ -301,7 +301,7 @@ Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraf
 
 **Usage Examples:**
 - Quick reference: `limit=3` for "I need a VPC module"
-- Exploring options: `limit=10-15` (default) for comparing alternatives
+- Exploring options: `limit=5-15` (default=5) for comparing alternatives
 - Comprehensive research: `limit=20+` for thorough analysis
 
 ### 2. `get_module_details`
