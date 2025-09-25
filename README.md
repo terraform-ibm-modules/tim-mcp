@@ -231,6 +231,8 @@ This method downloads and runs TIM-MCP directly from the GitHub repository witho
 
 This method is ideal for development and testing, using your local clone of the repository.
 
+#### For Claude Desktop
+
 **Basic Configuration:**
 ```json
 {
@@ -272,6 +274,30 @@ This method is ideal for development and testing, using your local clone of the 
 3. Install dependencies: `uv sync`
 4. Update the `cwd` path in the configuration above to match your local repository path
 5. Add the configuration to your Claude Desktop settings
+
+#### For Claude Code
+
+For local development with Claude Code:
+
+```bash
+# Navigate to your tim-mcp directory first
+cd /path/to/your/tim-mcp
+
+# Add the local MCP server with GitHub token
+claude mcp add tim-mcp --env GITHUB_TOKEN=your_github_token_here \
+  -- uv run tim-mcp
+
+# Or without GitHub token (may hit rate limits)
+claude mcp add tim-mcp -- uv run tim-mcp
+
+# List configured MCP servers
+claude mcp list
+
+# Remove if needed
+claude mcp remove tim-mcp
+```
+
+**Important:** Run these commands from within your local tim-mcp repository directory, as Claude Code will use the current working directory when executing the MCP server.
 
 
 ## Verification
