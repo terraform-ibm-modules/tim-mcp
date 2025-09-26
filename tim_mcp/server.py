@@ -5,7 +5,6 @@ This module implements the main MCP server using FastMCP with tools
 for Terraform IBM Modules discovery and implementation support.
 """
 
-import fnmatch
 import json
 import time
 from typing import Any
@@ -73,65 +72,6 @@ IBM CLOUD FOCUS:
 - This server specializes in IBM Cloud modules and patterns
 - Higher download counts indicate better maintained modules""",
 )
-
-
-def _is_glob_pattern(pattern: str) -> bool:
-    """
-    Check if a pattern looks like a glob pattern rather than a regex.
-
-    Simple heuristics to detect glob patterns:
-    - Contains * or ? without regex escaping
-    - Looks like file extensions (*.ext)
-    - Doesn't contain regex-specific characters like ^, $, [], etc.
-    """
-    # If it contains regex anchors or character classes, it's probably regex
-    if any(char in pattern for char in ["^", "$", "[", "]", "\\."]):
-        return False
-
-    # If it contains glob wildcards, it's probably glob
-    if any(char in pattern for char in ["*", "?"]):
-        return True
-
-    # If it looks like a simple filename, treat as glob
-    if "." in pattern and not pattern.startswith("."):
-        return True
-
-    return False
-
-
-def _convert_glob_to_regex(pattern: str) -> str:
-    """
-    Convert glob pattern to regex pattern.
-
-    Uses fnmatch.translate which handles standard shell wildcards:
-    - * matches everything
-    - ? matches any single character
-    - [seq] matches any character in seq
-    - [!seq] matches any character not in seq
-    """
-    regex_pattern = fnmatch.translate(pattern)
-
-    # fnmatch.translate output format: '(?s:PATTERN)\Z'
-    # Clean these up for compatibility with our existing regex matching
-
-    # Convert \Z (end of string) to $ for consistency first
-    if regex_pattern.endswith("\\Z"):
-        regex_pattern = regex_pattern[:-2] + "$"
-
-    # Remove (?s:...) wrapper if present
-    if regex_pattern.startswith("(?s:") and ")$" in regex_pattern:
-        # Find the last )$ to properly handle nested groups
-        close_pos = regex_pattern.rfind(")$")
-        if close_pos > 4:
-            inner_pattern = regex_pattern[4:close_pos]
-            regex_pattern = inner_pattern + "$"
-    elif regex_pattern.startswith("(?ms:") and ")$" in regex_pattern:
-        close_pos = regex_pattern.rfind(")$")
-        if close_pos > 5:
-            inner_pattern = regex_pattern[5:close_pos]
-            regex_pattern = inner_pattern + "$"
-
-    return regex_pattern
 
 
 def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
