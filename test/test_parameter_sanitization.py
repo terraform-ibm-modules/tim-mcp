@@ -17,8 +17,8 @@ class TestParameterSanitization:
         """Test sanitization of lists with mixed patterns."""
         input_list = [".*\\.tf$", ".*\\.md$", "main.tf"]
         result = _sanitize_list_parameter(input_list, "test_param")
-        # main.tf is detected as a glob pattern and converted to regex
-        expected = [".*\\.tf$", ".*\\.md$", "main\\.tf$"]
+        # Patterns are preserved as-is for glob matching
+        expected = [".*\\.tf$", ".*\\.md$", "main.tf"]
         assert result == expected
 
     def test_sanitize_none(self):
@@ -41,10 +41,10 @@ class TestParameterSanitization:
         expected = [".*\\.tf$", ".*\\.md$"]
         assert result == expected
 
-        # Test with single item (glob pattern gets converted)
+        # Test with single item (glob pattern preserved)
         json_str = '["main.tf"]'
         result = _sanitize_list_parameter(json_str, "test_param")
-        assert result == ["main\\.tf$"]
+        assert result == ["main.tf"]
 
         # Test with empty array
         json_str = "[]"
@@ -53,12 +53,12 @@ class TestParameterSanitization:
 
     def test_sanitize_single_string(self):
         """Test sanitization converts single strings to lists."""
-        # Glob patterns get converted to regex
+        # Glob patterns are preserved
         result = _sanitize_list_parameter("*.tf", "test_param")
-        assert result == [".*\\.tf$"]
+        assert result == ["*.tf"]
 
         result = _sanitize_list_parameter("main.tf", "test_param")
-        assert result == ["main\\.tf$"]
+        assert result == ["main.tf"]
 
         # Regex patterns are preserved
         result = _sanitize_list_parameter(".*\\.tf$", "test_param")
@@ -112,12 +112,11 @@ class TestParameterSanitization:
         result = _sanitize_list_parameter(json_str, "test_param")
         assert result == [".*\\.tf$", ".*\\.md$"]
 
-        # Regular string with whitespace (treated as glob pattern with spaces)
+        # Regular string with whitespace preserved as-is
         result = _sanitize_list_parameter("  *.tf  ", "test_param")
-        # Glob conversion will preserve the whitespace but convert to regex
+        # Pattern is preserved as-is
         assert len(result) == 1
-        assert result[0].endswith("$")
-        assert "tf" in result[0]
+        assert result[0] == "  *.tf  "
 
     def test_sanitize_complex_patterns(self):
         """Test sanitization with complex regex patterns."""
@@ -140,13 +139,13 @@ class TestParameterSanitization:
         assert result == patterns
 
     def test_glob_pattern_conversion(self):
-        """Test automatic conversion of glob patterns to regex."""
+        """Test glob patterns are preserved as-is."""
         # Test basic glob patterns
         glob_patterns = ["*.tf", "*.md", "main.tf"]
         result = _sanitize_list_parameter(glob_patterns, "test_param")
 
-        # Should convert to regex patterns
-        expected = [".*\\.tf$", ".*\\.md$", "main\\.tf$"]
+        # Patterns are preserved as-is for glob matching
+        expected = ["*.tf", "*.md", "main.tf"]
         assert result == expected
 
     def test_mixed_glob_and_regex_patterns(self):
@@ -154,8 +153,8 @@ class TestParameterSanitization:
         mixed_patterns = ["*.tf", ".*\\.py$", "README.md", "^test.*\\.js$"]
         result = _sanitize_list_parameter(mixed_patterns, "test_param")
 
-        # Only glob patterns should be converted
-        expected = [".*\\.tf$", ".*\\.py$", "README\\.md$", "^test.*\\.js$"]
+        # All patterns are preserved as-is
+        expected = ["*.tf", ".*\\.py$", "README.md", "^test.*\\.js$"]
         assert result == expected
 
     def test_complex_glob_patterns(self):
@@ -163,52 +162,20 @@ class TestParameterSanitization:
         glob_patterns = ["examples/*.tf", "modules/*/main.tf", "*.{tf,py}"]
         result = _sanitize_list_parameter(glob_patterns, "test_param")
 
-        # Should convert appropriately
-        assert all(pattern.endswith("$") for pattern in result)
-        assert "examples/" in result[0]
-        assert "modules/" in result[1]
-
-    def test_glob_pattern_detection(self):
-        """Test the glob pattern detection logic."""
-        from tim_mcp.server import _is_glob_pattern
-
-        # These should be detected as glob patterns
-        assert _is_glob_pattern("*.tf") is True
-        assert _is_glob_pattern("main.tf") is True
-        assert _is_glob_pattern("examples/*.py") is True
-        assert _is_glob_pattern("test?.md") is True
-
-        # These should be detected as regex patterns
-        assert _is_glob_pattern(".*\\.tf$") is False
-        assert _is_glob_pattern("^main\\.tf$") is False
-        assert _is_glob_pattern("[abc].tf") is False
-        assert _is_glob_pattern("test\\.py") is False
-
-    def test_glob_to_regex_conversion(self):
-        """Test the glob to regex conversion function."""
-        from tim_mcp.server import _convert_glob_to_regex
-
-        # Test basic conversions
-        assert _convert_glob_to_regex("*.tf") == ".*\\.tf$"
-        assert _convert_glob_to_regex("main.tf") == "main\\.tf$"
-        assert _convert_glob_to_regex("test?.py") == "test.\\.py$"
-
-        # Test path patterns
-        result = _convert_glob_to_regex("examples/*.tf")
-        assert "examples" in result
-        assert result.endswith("$")
+        # Patterns are preserved as-is
+        assert result == glob_patterns
 
     def test_single_glob_string_conversion(self):
-        """Test conversion of single glob pattern string."""
+        """Test single glob pattern string preserved."""
         result = _sanitize_list_parameter("*.tf", "test_param")
-        assert result == [".*\\.tf$"]
+        assert result == ["*.tf"]
 
         result = _sanitize_list_parameter("main.py", "test_param")
-        assert result == ["main\\.py$"]
+        assert result == ["main.py"]
 
     def test_json_string_with_glob_patterns(self):
         """Test JSON string containing glob patterns."""
         json_str = '["*.tf", "*.md"]'
         result = _sanitize_list_parameter(json_str, "test_param")
-        expected = [".*\\.tf$", ".*\\.md$"]
+        expected = ["*.tf", "*.md"]
         assert result == expected

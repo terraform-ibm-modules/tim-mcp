@@ -5,7 +5,7 @@ Following TDD methodology - these tests define the behavior we want to implement
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -19,6 +19,33 @@ from tim_mcp.types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
 
 class TestSearchModulesImpl:
     """Test the search_modules_impl function."""
+
+    def _create_mock_github_client(self):
+        """Create a properly configured mock GitHub client."""
+        mock_github_client = AsyncMock()
+        mock_github_client.parse_github_url.side_effect = lambda url: (
+            ("terraform-ibm-modules", "terraform-ibm-vpc")
+            if "vpc" in url
+            else ("terraform-ibm-modules", "terraform-ibm-security-group")
+            if "security-group" in url
+            else None
+        )
+
+        # Mock async function to return the expected dict with topics
+        async def mock_get_repo_info(*args, **kwargs):
+            return {
+                "default_branch": "main",
+                "size": 100,
+                "archived": False,
+                "topics": [
+                    "terraform",
+                    "ibm-cloud",
+                    "terraform-module",
+                ],  # Add required topics
+            }
+
+        mock_github_client.get_repository_info = mock_get_repo_info
+        return mock_github_client
 
     @pytest.fixture
     def config(self):
@@ -114,23 +141,40 @@ class TestSearchModulesImpl:
         self, config, mock_terraform_client, sample_registry_response, expected_response
     ):
         """Test successful module search with basic query."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        # Setup - return the response only on first call, empty on subsequent calls
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,  # First call returns modules
+            {
+                "modules": [],
+                "meta": {"limit": 50, "offset": 50, "total_count": 23},
+            },  # Second call returns empty
+        ]
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        # Create a mock GitHub client
+        mock_github_client = self._create_mock_github_client()
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            # Always return True for repository validation
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config)
 
             # Verify
             assert result == expected_response
-            mock_terraform_client.search_modules.assert_called_once_with(
+            # Check that search was called twice due to batching
+            assert mock_terraform_client.search_modules.call_count == 2
+            mock_terraform_client.search_modules.assert_any_call(
                 query="vpc",
                 namespace="terraform-ibm-modules",
-                limit=100,  # Always fetch 100 results internally
+                limit=50,  # batch_size is 50
                 offset=0,
             )
 
@@ -139,27 +183,39 @@ class TestSearchModulesImpl:
         self, config, mock_terraform_client, sample_registry_response
     ):
         """Test successful module search with custom limit."""
-        # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        # Setup - return modules in batches
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,  # First batch
+            sample_registry_response,  # Second batch
+            sample_registry_response,  # Third batch
+            {
+                "modules": [],
+                "meta": {"limit": 50, "offset": 150, "total_count": 23},
+            },  # Empty
+        ]
         request = ModuleSearchRequest(query="vpc", limit=5)
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        # Create a mock GitHub client
+        mock_github_client = self._create_mock_github_client()
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            # Always return True for repository validation
+            mock_is_valid.return_value = True
             # Execute
             result = await search_modules_impl(request, config)
 
             # Verify
             assert result.query == "vpc"
             assert result.total_found == 23
-            assert len(result.modules) == 2
-            mock_terraform_client.search_modules.assert_called_once_with(
-                query="vpc",
-                namespace="terraform-ibm-modules",
-                limit=100,  # Always fetch 100 results internally
-                offset=0,
-            )
+            assert len(result.modules) == 5  # Should get 5 modules as requested
+            # Should be called multiple times due to batching
+            assert mock_terraform_client.search_modules.call_count >= 3
 
     @pytest.mark.asyncio
     async def test_empty_search_results(self, config, mock_terraform_client):
@@ -172,10 +228,18 @@ class TestSearchModulesImpl:
         mock_terraform_client.search_modules.return_value = empty_response
         request = ModuleSearchRequest(query="nonexistent")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        # Create a mock GitHub client
+        mock_github_client = self._create_mock_github_client()
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            # Always return True for repository validation
+            mock_is_valid.return_value = True
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -226,8 +290,8 @@ class TestSearchModulesImpl:
 
     @pytest.mark.asyncio
     async def test_malformed_api_response(self, config, mock_terraform_client):
-        """Test handling of malformed API responses."""
-        # Setup - missing required fields
+        """Test handling of malformed API responses - invalid modules are skipped."""
+        # Setup - all modules have missing required fields
         malformed_response = {
             "modules": [
                 {
@@ -238,29 +302,39 @@ class TestSearchModulesImpl:
             ],
             "meta": {"limit": 10, "offset": 0, "total_count": 1},
         }
-        mock_terraform_client.search_modules.return_value = malformed_response
+        mock_terraform_client.search_modules.side_effect = [
+            malformed_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
-            # Execute & Verify
-            with pytest.raises(TIMValidationError) as exc_info:
-                await search_modules_impl(request, config)
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
 
-            assert "Invalid module data" in str(exc_info.value)
+            # Execute - should handle malformed data gracefully
+            result = await search_modules_impl(request, config)
+
+            # Verify - no modules should be in results since all were invalid
+            assert len(result.modules) == 0
+            assert result.total_found == 1
 
     @pytest.mark.asyncio
     async def test_invalid_datetime_format(self, config, mock_terraform_client):
-        """Test handling of invalid datetime formats in API response."""
+        """Test handling of invalid datetime formats - modules with bad dates are skipped."""
         # Setup
         invalid_datetime_response = {
             "modules": [
                 {
-                    "id": "terraform-ibm-modules/vpc/ibm",
+                    "id": "terraform-ibm-modules/bad-date/ibm",
                     "namespace": "terraform-ibm-modules",
-                    "name": "vpc",
+                    "name": "bad-date",
                     "provider": "ibm",
                     "version": "5.1.0",
                     "description": "Test module",
@@ -268,22 +342,45 @@ class TestSearchModulesImpl:
                     "downloads": 123,
                     "verified": False,
                     "published_at": "invalid-date-format",
-                }
+                },
+                {  # Valid module
+                    "id": "terraform-ibm-modules/vpc/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "vpc",
+                    "provider": "ibm",
+                    "version": "1.0.0",
+                    "description": "Valid module",
+                    "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
+                    "downloads": 100,
+                    "verified": False,
+                    "published_at": "2025-01-01T00:00:00.000Z",
+                },
             ],
-            "meta": {"limit": 10, "offset": 0, "total_count": 1},
+            "meta": {"limit": 10, "offset": 0, "total_count": 2},
         }
-        mock_terraform_client.search_modules.return_value = invalid_datetime_response
+        mock_terraform_client.search_modules.side_effect = [
+            invalid_datetime_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+        ]
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
-            # Execute & Verify
-            with pytest.raises(TIMValidationError) as exc_info:
-                await search_modules_impl(request, config)
+        mock_github_client = self._create_mock_github_client()
 
-            assert "Invalid module data" in str(exc_info.value)
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
+            # Execute - should handle invalid datetime gracefully
+            result = await search_modules_impl(request, config)
+
+            # Verify - only the valid module should be in results
+            assert len(result.modules) == 1
+            assert result.modules[0].id == "terraform-ibm-modules/vpc/ibm"
 
     @pytest.mark.asyncio
     async def test_missing_meta_information(self, config, mock_terraform_client):
@@ -349,13 +446,22 @@ class TestSearchModulesImpl:
             ],
             "meta": {"limit": 10, "offset": 0, "total_count": 1},
         }
-        mock_terraform_client.search_modules.return_value = api_response
+        mock_terraform_client.search_modules.side_effect = [
+            api_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
         request = ModuleSearchRequest(query="test")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -384,22 +490,30 @@ class TestSearchModulesImpl:
     ):
         """Test that the configured namespace is used from config."""
         # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 23}},
+        ]
         # Request without namespace parameter
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
             # Verify that the search was called with the first allowed namespace
-            mock_terraform_client.search_modules.assert_called_once_with(
+            mock_terraform_client.search_modules.assert_any_call(
                 query="vpc",
                 namespace="terraform-ibm-modules",  # First allowed namespace from config
-                limit=100,  # Always fetch 100 results internally
+                limit=50,  # batch_size is 50
                 offset=0,
             )
             assert result.query == "vpc"
@@ -452,20 +566,31 @@ class TestSearchModulesImpl:
             "meta": {"limit": 10, "offset": 0, "total_count": 3},
         }
 
-        mock_terraform_client.search_modules.return_value = response_with_excluded
+        mock_terraform_client.search_modules.side_effect = [
+            response_with_excluded,
+            response_with_excluded,  # May need more batches
+            response_with_excluded,
+            {"modules": [], "meta": {"limit": 50, "offset": 150, "total_count": 3}},
+        ]
         request = ModuleSearchRequest(query="modules")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config_with_filtering)
 
             # Verify that only non-excluded modules are in the results
             assert result.query == "modules"
             assert result.total_found == 3  # Original total from API
-            assert len(result.modules) == 2  # One module was excluded
+            assert len(result.modules) == 5  # Should reach limit of 5 (default)
 
             # Verify the excluded module is not in results
             module_ids = [module.id for module in result.modules]
@@ -480,21 +605,29 @@ class TestSearchModulesImpl:
         """Test behavior when allowed_namespaces is empty - no namespace filtering should occur."""
         # Setup config with empty allowed namespaces
         config_no_filtering = Config(allowed_namespaces=[], excluded_modules=[])
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 23}},
+        ]
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
             # Execute
             result = await search_modules_impl(request, config_no_filtering)
 
             # Verify that None namespace was passed (no filtering)
-            mock_terraform_client.search_modules.assert_called_once_with(
+            mock_terraform_client.search_modules.assert_any_call(
                 query="vpc",
                 namespace=None,  # No namespace filtering when config is empty
-                limit=100,  # Always fetch 100 results internally
+                limit=50,  # batch_size is 50
                 offset=0,
             )
             assert result.query == "vpc"
@@ -545,13 +678,22 @@ class TestSearchModulesImpl:
             "meta": {"limit": 100, "offset": 0, "total_count": 3},
         }
 
-        mock_terraform_client.search_modules.return_value = unsorted_response
+        mock_terraform_client.search_modules.side_effect = [
+            unsorted_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 3}},
+        ]
         request = ModuleSearchRequest(query="modules")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -614,14 +756,23 @@ class TestSearchModulesImpl:
             "meta": {"limit": 100, "offset": 0, "total_count": 3},
         }
 
-        mock_terraform_client.search_modules.return_value = unsorted_response
+        mock_terraform_client.search_modules.side_effect = [
+            unsorted_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 3}},
+        ]
         # Request only top 2 results
         request = ModuleSearchRequest(query="modules", limit=2)
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -670,13 +821,22 @@ class TestSearchModulesImpl:
             "meta": {"limit": 100, "offset": 0, "total_count": 2},
         }
 
-        mock_terraform_client.search_modules.return_value = same_downloads_response
+        mock_terraform_client.search_modules.side_effect = [
+            same_downloads_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+        ]
         request = ModuleSearchRequest(query="modules")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = (
-                mock_terraform_client
-            )
+        mock_github_client = AsyncMock()
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
             # Execute
             result = await search_modules_impl(request, config)
 
@@ -704,7 +864,20 @@ class TestRepositoryFiltering:
     @pytest.fixture
     def mock_github_client(self):
         """Create a mock GitHub client."""
-        return AsyncMock()
+        mock_client = MagicMock()
+        # parse_github_url is a regular method (not async)
+        mock_client.parse_github_url.return_value = (
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
+        )
+        # get_repository_info is async
+        mock_client.get_repository_info = AsyncMock(
+            return_value={
+                "archived": False,
+                "topics": ["core-team"],  # Required topic for valid repos
+            }
+        )
+        return mock_client
 
     @pytest.fixture
     def sample_registry_response(self):
@@ -749,7 +922,10 @@ class TestRepositoryFiltering:
     ):
         """Test that valid repositories pass filtering."""
         # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 23}},
+        ]
 
         # Mock GitHub client to return valid repository info
         def mock_parse_url(url):
@@ -762,15 +938,14 @@ class TestRepositoryFiltering:
         mock_github_client.parse_github_url.side_effect = mock_parse_url
 
         # Mock repository info - both repos are valid
-        def mock_get_repo_info(owner, repo):
-            return {
+        mock_github_client.get_repository_info = AsyncMock(
+            return_value={
                 "archived": False,
-                "topics": ["core-team", "terraform", "ibm-cloud"],
+                "topics": ["core-team"],  # Required topic for valid repos
             }
+        )
 
-        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
-
-        request = ModuleSearchRequest(query="vpc", limit=5)
+        request = ModuleSearchRequest(query="vpc", limit=2)
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -797,7 +972,11 @@ class TestRepositoryFiltering:
     ):
         """Test that archived repositories are filtered out."""
         # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,
+            sample_registry_response,  # Need more to get enough valid
+            {"modules": [], "meta": {"limit": 50, "offset": 100, "total_count": 23}},
+        ]
 
         def mock_parse_url(url):
             if "vpc" in url:
@@ -809,19 +988,21 @@ class TestRepositoryFiltering:
         mock_github_client.parse_github_url.side_effect = mock_parse_url
 
         # Mock repository info - first repo is archived
-        def mock_get_repo_info(owner, repo):
+        async def mock_get_repo_info(owner, repo):
             if "vpc" in repo:
                 return {
                     "archived": True,  # This repo is archived
-                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                    "topics": ["core-team"],
                 }
             else:
                 return {
                     "archived": False,
-                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                    "topics": ["core-team"],  # Required topic for valid repos
                 }
 
-        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+        mock_github_client.get_repository_info = AsyncMock(
+            side_effect=mock_get_repo_info
+        )
 
         request = ModuleSearchRequest(query="vpc", limit=5)
 
@@ -835,8 +1016,8 @@ class TestRepositoryFiltering:
             # Execute
             result = await search_modules_impl(request, config)
 
-            # Verify - only non-archived repo should be in results
-            assert len(result.modules) == 1
+            # Verify - only non-archived repo should be in results (security-group)
+            assert len(result.modules) == 2
             assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
 
     @pytest.mark.asyncio
@@ -849,7 +1030,11 @@ class TestRepositoryFiltering:
     ):
         """Test that repositories without required topics are filtered out."""
         # Setup
-        mock_terraform_client.search_modules.return_value = sample_registry_response
+        mock_terraform_client.search_modules.side_effect = [
+            sample_registry_response,
+            sample_registry_response,  # Need more to get enough valid
+            {"modules": [], "meta": {"limit": 50, "offset": 100, "total_count": 23}},
+        ]
 
         def mock_parse_url(url):
             if "vpc" in url:
@@ -861,7 +1046,7 @@ class TestRepositoryFiltering:
         mock_github_client.parse_github_url.side_effect = mock_parse_url
 
         # Mock repository info - first repo missing core-team topic
-        def mock_get_repo_info(owner, repo):
+        async def mock_get_repo_info(owner, repo):
             if "vpc" in repo:
                 return {
                     "archived": False,
@@ -870,10 +1055,12 @@ class TestRepositoryFiltering:
             else:
                 return {
                     "archived": False,
-                    "topics": ["core-team", "terraform", "ibm-cloud"],
+                    "topics": ["core-team"],  # Required topic for valid repos
                 }
 
-        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+        mock_github_client.get_repository_info = AsyncMock(
+            side_effect=mock_get_repo_info
+        )
 
         request = ModuleSearchRequest(query="vpc", limit=5)
 
@@ -888,7 +1075,7 @@ class TestRepositoryFiltering:
             result = await search_modules_impl(request, config)
 
             # Verify - only repo with required topics should be in results
-            assert len(result.modules) == 1
+            assert len(result.modules) == 2
             assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
 
 
