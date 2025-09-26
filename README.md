@@ -107,7 +107,7 @@ tim-mcp --log-level DEBUG
 
 ### HTTP Mode
 
-HTTP mode runs the server as a web service, ideal for network deployments and multiple concurrent clients.
+HTTP mode runs the server as a stateless web service, ideal for network deployments and multiple concurrent clients. The server runs in stateless mode, which means no session IDs are required and each request is handled independently.
 
 ```bash
 # HTTP mode with defaults (127.0.0.1:8000)
@@ -126,6 +126,12 @@ tim-mcp --http --log-level DEBUG
 **HTTP Server URLs:**
 - Server runs at: `http://host:port/`
 - MCP endpoint: `http://host:port/mcp`
+
+**Stateless Operation:**
+- No session IDs required for HTTP requests
+- Each request is processed independently
+- Ideal for load balancing and horizontal scaling
+- Simplified client implementation
 
 **Production HTTPS:**
 For production deployments requiring HTTPS, use nginx as a reverse proxy:
