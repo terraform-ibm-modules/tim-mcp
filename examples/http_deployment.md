@@ -4,11 +4,13 @@ This guide covers deploying TIM-MCP server using HTTP transport for network acce
 
 ## Overview
 
-HTTP transport mode enables TIM-MCP to run as a web service, allowing:
+HTTP transport mode enables TIM-MCP to run as a stateless web service, allowing:
 - Network access from remote clients
 - Multiple concurrent client connections
 - Integration with existing web infrastructure
 - Load balancing and reverse proxy configurations
+- No session ID requirements (stateless operation)
+- Horizontal scaling without session affinity
 
 ## Basic HTTP Deployment
 
@@ -33,6 +35,8 @@ tim-mcp --http --log-level DEBUG
 The server will be available at:
 - Server: `http://127.0.0.1:8000/`
 - MCP endpoint: `http://127.0.0.1:8000/mcp`
+
+**Note:** The server runs in stateless mode, so no session IDs are required. Each request is handled independently, making it perfect for load balancing and scaling.
 
 ### Environment Variables
 
