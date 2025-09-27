@@ -5,11 +5,9 @@
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#)
 
-A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the Terraform IBM Modules (TIM) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices.
+A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices. See the [Overview](#overview) for further details on rational.
 
 This server acts as a bridge, enabling AI models and other tools to intelligently discover and utilize the extensive documentation, examples, and implementation patterns bundled with the [TIM modules](https://github.com/terraform-ibm-modules). It is designed to support AI-assisted coding workflows for creating IBM Cloud infrastructure.
-
-**About TIM:** [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) is a collection of curated IBM Cloud Terraform modules available on the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules). Full documentation is available at https://github.com/terraform-ibm-modules/documentation.
 
 ## Quick Start
 
@@ -100,6 +98,9 @@ uv run pytest
 
 # Run the server locally (STDIO mode - default)
 uv run tim-mcp
+
+# Launch the MCP inspector
+npx @modelcontextprotocol/inspector uv run tim-mcp
 ```
 
 **Requirements:**
@@ -330,101 +331,6 @@ claude mcp remove tim-mcp
 After configuration, restart Claude Desktop completely. You should see a hammer icon (🔨) in the bottom left of the input box, indicating that MCP tools are available.
 
 Test the connection by asking Claude: "What IBM Cloud Terraform modules are available for VPC?"
-
-## Available MCP Tools
-
-Once configured, TIM-MCP provides these tools to Claude for comprehensive Terraform module discovery and implementation:
-
-### 1. `search_modules`
-**Search Terraform Registry for IBM Cloud modules with intelligent result optimization.**
-
-**Purpose:** Find relevant modules based on search terms, with results optimized by download count for better quality.
-
-**Inputs:**
-- `query` (string, required): Specific search term (e.g., "vpc", "kubernetes", "security")
-- `limit` (integer, optional): Maximum results to return (default: 10, range: 1-100)
-
-**Output:** JSON formatted search results including:
-- Module identifiers and basic metadata
-- Download counts and verification status
-- Descriptions and source repository URLs
-- Publication dates and version information
-
-**Usage Examples:**
-- Quick reference: `limit=3` for "I need a VPC module"
-- Exploring options: `limit=5-15` (default=5) for comparing alternatives
-- Comprehensive research: `limit=20+` for thorough analysis
-
-### 2. `get_module_details`
-**Retrieve structured module metadata from Terraform Registry - lightweight module interface overview.**
-
-**Purpose:** Get comprehensive module interface information including inputs, outputs, and dependencies without fetching source code.
-
-**Inputs:**
-- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-- `version` (string, optional): Specific version or "latest" (default: "latest")
-
-**Output:** Markdown formatted module details including:
-- Module description and documentation
-- Required and optional input variables with types, descriptions, and defaults
-- Available outputs with types and descriptions
-- Provider requirements and version constraints
-- Module dependencies and available versions
-
-**When to Use:** First step after finding a module to understand its interface - often sufficient to answer user questions without fetching implementation files.
-
-### 3. `list_content`
-**Discover available paths in a module repository with README summaries.**
-
-**Purpose:** Explore repository structure to understand available examples, submodules, and solutions before fetching specific content.
-
-**Inputs:**
-- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-- `version` (string, optional): Git tag/branch to scan (default: "latest")
-
-**Output:** Markdown formatted content listing organized by category:
-- **Root Module:** Main terraform files, inputs/outputs definitions
-- **Examples:** Deployable examples showing module usage (ideal starting point)
-- **Submodules:** Reusable components within the module
-- **Solutions:** Complete architecture patterns for complex scenarios
-
-**Usage Tips:** Use before `get_content` to select the most relevant path for your needs.
-
-### 4. `get_content`
-**Retrieve source code, examples, and documentation from GitHub repositories with targeted content filtering.**
-
-**Purpose:** Fetch actual implementation files, examples, and documentation with precise filtering to avoid large responses.
-
-**Inputs:**
-- `module_id` (string, required): Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-- `path` (string, optional): Specific path - "" (root), "examples/basic", "modules/vpc", etc.
-- `include_files` (list[string], optional): Glob patterns for files to include
-- `exclude_files` (list[string], optional): Glob patterns for files to exclude
-- `version` (string, optional): Git tag/branch to fetch from (default: "latest")
-
-**Output:** Markdown formatted content with file contents, organized by:
-- File paths and content with appropriate syntax highlighting
-- File sizes for reference
-- README files are included if they match the patterns (like any other file)
-
-**Common Glob Patterns:**
-- Input variables only: `include_files=["variables.tf"]`
-- Basic example: `path="examples/basic", include_files=["*.tf"]`
-- Complete module: `include_files=["*.tf"]`
-- Documentation: `include_files=["*.md"]`
-- README only: `include_files=["README.md"]`
-- Everything: `include_files=["*"]` (or omit entirely)
-
-## Tool Workflow
-
-The tools are designed to work together in an efficient workflow:
-
-1. **`search_modules`** → Find relevant modules
-2. **`get_module_details`** → Understand module interface (often sufficient)
-3. **`list_content`** → Explore repository structure if needed
-4. **`get_content`** → Fetch specific implementation details
-
-This progressive approach minimizes API calls and provides context-aware information at each step.
 
 ## Troubleshooting
 
