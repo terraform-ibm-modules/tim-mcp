@@ -3,8 +3,13 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com/)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
+[![Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#)
 
-A Model Context Protocol (MCP) server that provides comprehensive Terraform module context for IBM Cloud architectures. This MCP server enhances the TIM Designer backend by bridging the gap between module discovery and implementation, enabling more accurate and context-aware Terraform code generation.
+A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the Terraform IBM Modules (TIM) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices.
+
+This server acts as a bridge, enabling AI models and other tools to intelligently discover and utilize the extensive documentation, examples, and implementation patterns bundled with the [TIM modules](https://github.com/terraform-ibm-modules). It is designed to support AI-assisted coding workflows for creating IBM Cloud infrastructure.
+
+**About TIM:** [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) is a collection of curated IBM Cloud Terraform modules available on the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules). Full documentation is available at https://github.com/terraform-ibm-modules/documentation.
 
 ## Quick Start
 
@@ -54,25 +59,33 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
 
 ## Overview
 
-TIM-MCP combines data from the HashiCorp Terraform Registry with actual implementation details from GitHub repositories to provide rich context about IBM Cloud Terraform modules. While existing tools can search for modules and retrieve basic metadata, they lack access to real implementation code, working examples, and detailed integration patterns that are essential for generating production-ready Terraform configurations.
+This MCP server provides tools for AI models to navigate the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM modules are bundled with extensive documentation, working examples, and architectural patterns, but these resources are distributed across many GitHub repositories.
 
-## Installation
+This server exposes a set of tools that allow an AI assistant to:
+- **Discover** relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules).
+- **Inspect** module details, including inputs, outputs, and dependencies.
+- **Explore** the contents of a module's repository, such as examples and submodules.
+- **Retrieve** specific file contents, like example code or documentation.
 
-TIM-MCP requires Python 3.11 or higher and uses [uv](https://docs.astral.sh/uv/) for dependency management.
+The goal is to provide a structured and efficient way for an AI to gather the necessary context to generate accurate and high-quality Infrastructure as Code solutions for IBM Cloud.
 
-```bash
-# Install from PyPI (when published)
-uv tool install tim-mcp
+### Key Features
 
-# Install from source
-git clone https://github.com/terraform-ibm-modules/tim-mcp.git
-cd tim-mcp
-uv sync
-```
+- **Module Search**: Find modules in the Terraform Registry with quality-based ranking.
+- **Module Details**: Get structured information about a module's interface.
+- **Repository Exploration**: List the contents of a module's repository, including examples and submodules.
+- **Content Retrieval**: Fetch specific files from a module's repository.
+- **AI-Assisted Workflows**: The tools are designed to be used in sequence to support a typical AI-assisted coding workflow.
 
-## Development Setup
+### Important Notes
 
-To set up the development environment:
+⚠️ **Experimental Status**: This MCP server and the solutions it helps generate are experimental. Generated configurations should always be reviewed by skilled practitioners before use in any environment.
+
+⚠️ **Human Review Required**: Even when the tools and workflows mature, human expertise will remain essential for reviewing outputs, making final adjustments, and ensuring configurations meet specific requirements.
+
+## Development Installation
+
+For developers who want to contribute to TIM-MCP or run it locally for development purposes:
 
 ```bash
 # Clone the repository
@@ -88,6 +101,12 @@ uv run pytest
 # Run the server locally (STDIO mode - default)
 uv run tim-mcp
 ```
+
+**Requirements:**
+- Python 3.11 or higher
+- [uv](https://docs.astral.sh/uv/) package manager
+
+> **Note:** For most users, we recommend using the Quick Start guide above rather than installing locally. The Quick Start method automatically handles dependencies and is easier to maintain.
 
 ## Transport Modes
 
