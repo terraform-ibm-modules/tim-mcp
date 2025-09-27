@@ -10,44 +10,11 @@ from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
-from ..exceptions import (
-    ModuleNotFoundError,  # pylint: disable=redefined-builtin
-    TerraformRegistryError,
-    ValidationError,
-)
+from ..exceptions import ModuleNotFoundError, TerraformRegistryError
+from ..exceptions import ValidationError
+from ..logging import get_logger
 from ..types import ModuleDetailsRequest
-
-
-def parse_module_id(module_id: str) -> tuple[str, str, str]:
-    """
-    Parse a module ID into its components.
-
-    Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-
-    Returns:
-        Tuple of (namespace, name, provider)
-
-    Raises:
-        ValidationError: If module_id format is invalid
-    """
-    if not module_id or not isinstance(module_id, str):
-        raise ValidationError("module_id cannot be empty", field="module_id")
-
-    parts = module_id.split("/")
-
-    if len(parts) != 3:
-        raise ValidationError(
-            f"Invalid module_id format. Expected 'namespace/name/provider', got '{module_id}'",
-            field="module_id",
-        )
-
-    namespace, name, provider = parts
-
-    if not all([namespace.strip(), name.strip(), provider.strip()]):
-        raise ValidationError("module_id components cannot be empty", field="module_id")
-
-    return namespace.strip(), name.strip(), provider.strip()
+from ..utils.module_id import parse_module_id_with_version
 
 
 def format_download_count(count: int) -> str:
@@ -296,9 +263,9 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
         ModuleNotFoundError: If module is not found in the registry
         TerraformRegistryError: If API request fails or returns invalid data
     """
-    # Parse and validate module ID
+    # Parse and validate module ID with version
     try:
-        namespace, name, provider = parse_module_id(request.module_id)
+        namespace, name, provider, version = parse_module_id_with_version(request.module_id)
     except ValidationError as e:
         # Re-raise validation errors with original context
         raise TerraformRegistryError(f"Module ID validation failed: {e}") from e
@@ -315,7 +282,7 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
                 namespace=namespace,
                 name=name,
                 provider=provider,
-                version=request.version,
+                version=version,
             )
 
             # Get available versions for the module
@@ -337,7 +304,7 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
             if e.status_code == 404:
                 raise ModuleNotFoundError(
                     request.module_id,
-                    version=request.version if request.version != "latest" else None,
+                    version=version if version != "latest" else None,
                 ) from e
             # Re-raise other registry errors unchanged
             raise

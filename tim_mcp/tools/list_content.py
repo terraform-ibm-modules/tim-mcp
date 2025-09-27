@@ -14,6 +14,7 @@ from ..exceptions import ModuleNotFoundError
 from ..logging import get_logger
 from ..types import ListContentRequest
 from ..utils.cache import Cache
+from ..utils.module_id import parse_module_id_with_version, get_module_base_id, transform_version_for_github
 
 logger = get_logger(__name__)
 
@@ -23,7 +24,7 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     Implementation function for the list_content tool.
 
     Args:
-        request: ListContentRequest with module_id and version
+        request: ListContentRequest with module_id (may include version)
         config: Configuration instance
 
     Returns:
@@ -34,8 +35,12 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         GitHubError: If GitHub API request fails
         RateLimitError: If GitHub rate limit is exceeded
     """
-    # Extract repository information from module ID
-    owner, repo_name = _extract_repo_from_module_id(request.module_id)
+    # Parse module ID to extract version if included
+    namespace, name, provider, version = parse_module_id_with_version(request.module_id)
+    base_module_id = f"{namespace}/{name}/{provider}"
+    
+    # Extract repository information from base module ID
+    owner, repo_name = _extract_repo_from_module_id(base_module_id)
 
     # Initialize GitHub client
     cache = Cache(ttl=config.cache_ttl)
@@ -45,17 +50,20 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         # Get repository information
         await github_client.get_repository_info(owner, repo_name)
 
+        # Transform version for GitHub tag lookup (add "v" prefix if needed)
+        github_version = transform_version_for_github(version)
+
         # Resolve version to actual git reference
         resolved_version = await github_client.resolve_version(
-            owner, repo_name, request.version
+            owner, repo_name, github_version
         )
 
         logger.info(
             "Listing content for module",
-            module_id=request.module_id,
+            module_id=base_module_id,
             owner=owner,
             repo=repo_name,
-            version=request.version,
+            version=version,
             resolved_version=resolved_version,
         )
 
@@ -73,8 +81,9 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
         )
 
         # Format output
+        # Return formatted content listing
         return _format_content_listing(
-            request.module_id, resolved_version, categorized_paths, path_descriptions
+            base_module_id, resolved_version, categorized_paths, path_descriptions
         )
     finally:
         await github_client.client.aclose()

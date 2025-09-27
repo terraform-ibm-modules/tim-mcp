@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from tim_mcp.config import Config
-from tim_mcp.exceptions import GitHubError, ModuleNotFoundError, RateLimitError
+from tim_mcp.exceptions import GitHubError, ModuleNotFoundError, RateLimitError, ValidationError
 from tim_mcp.tools.list_content import list_content_impl
 from tim_mcp.types import ListContentRequest
 
@@ -119,7 +119,7 @@ class TestListContentImpl:
         """Test successful content listing with version latest."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm", version="latest"
+            module_id="terraform-ibm-modules/vpc/ibm"
         )
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
@@ -189,7 +189,7 @@ class TestListContentImpl:
         """Test content listing with specific version tag."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm", version="v5.1.0"
+            module_id="terraform-ibm-modules/vpc/ibm/v5.1.0"
         )
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
@@ -223,7 +223,7 @@ class TestListContentImpl:
         """Test error handling when module repository is not found."""
         # Setup
         request = ListContentRequest(
-            module_id="nonexistent/module/ibm", version="latest"
+            module_id="nonexistent/module/ibm"
         )
 
         mock_github_client.get_repository_info.side_effect = ModuleNotFoundError(
@@ -247,7 +247,7 @@ class TestListContentImpl:
         """Test error handling for GitHub API errors."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm", version="latest"
+            module_id="terraform-ibm-modules/vpc/ibm"
         )
 
         mock_github_client.get_repository_info.side_effect = GitHubError(
@@ -273,7 +273,7 @@ class TestListContentImpl:
         """Test error handling for GitHub rate limit errors."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm", version="latest"
+            module_id="terraform-ibm-modules/vpc/ibm"
         )
 
         mock_github_client.get_repository_tree.side_effect = RateLimitError(
@@ -301,13 +301,13 @@ class TestListContentImpl:
     async def test_list_content_invalid_module_id(self, mock_config):
         """Test error handling for invalid module ID format."""
         # Setup
-        request = ListContentRequest(module_id="invalid-module-id", version="latest")
+        request = ListContentRequest(module_id="invalid-module-id")
 
         # Execute & Verify
-        with pytest.raises(ModuleNotFoundError) as exc_info:
+        with pytest.raises(ValidationError) as exc_info:
             await list_content_impl(request, mock_config)
 
-        assert "Invalid module ID format" in str(exc_info.value.details)
+        assert "Invalid module_id format" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_list_content_empty_repository(
@@ -316,7 +316,7 @@ class TestListContentImpl:
         """Test content listing for empty repository."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/empty/ibm", version="latest"
+            module_id="terraform-ibm-modules/empty/ibm"
         )
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
@@ -348,7 +348,7 @@ class TestListContentImpl:
         """Test README parsing with fallback when content is not available."""
         # Setup
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm", version="latest"
+            module_id="terraform-ibm-modules/vpc/ibm"
         )
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
@@ -406,7 +406,7 @@ class TestListContentImpl:
         ]
 
         request = ListContentRequest(
-            module_id="terraform-ibm-modules/test/ibm", version="latest"
+            module_id="terraform-ibm-modules/test/ibm"
         )
 
         mock_github_client.get_repository_info.return_value = sample_repo_info

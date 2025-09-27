@@ -225,7 +225,7 @@ async def search_modules(
 
 
 @mcp.tool()
-async def get_module_details(module_id: str, version: str = "latest") -> str:
+async def get_module_details(module_id: str) -> str:
     """
     Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
 
@@ -247,8 +247,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
     - Module dependencies
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Specific version or "latest" (default: "latest")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
 
     Returns:
         Plain text with markdown formatted module details including inputs, outputs, and description
@@ -257,7 +256,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 
     try:
         # Validate request
-        request = ModuleDetailsRequest(module_id=module_id, version=version)
+        request = ModuleDetailsRequest(module_id=module_id)
 
         # Import here to avoid circular imports
         from .tools.details import get_module_details_impl
@@ -282,7 +281,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error="validation_error",
@@ -294,7 +293,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
         )
@@ -305,7 +304,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error=str(e),
@@ -315,7 +314,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 
 
 @mcp.tool()
-async def list_content(module_id: str, version: str = "latest") -> str:
+async def list_content(module_id: str) -> str:
     """
     Discover available examples and repository structure - FIRST step in examples workflow.
 
@@ -341,8 +340,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
     - Use descriptions to select the single most relevant example
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Git tag/branch to scan (default: "latest")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
 
     Returns:
         Plain text with markdown formatted content listing organized by category
@@ -351,7 +349,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 
     try:
         # Validate request
-        request = ListContentRequest(module_id=module_id, version=version)
+        request = ListContentRequest(module_id=module_id)
 
         # Import here to avoid circular imports
         from .tools.list_content import list_content_impl
@@ -376,7 +374,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error="validation_error",
@@ -388,7 +386,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
         )
@@ -399,7 +397,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error=str(e),
@@ -414,7 +412,6 @@ async def get_content(
     path: str = "",
     include_files: str | list[str] | None = None,
     exclude_files: str | list[str] | None = None,
-    version: str = "latest",
 ) -> str:
     """
     Retrieve source code, examples, solutions from GitHub repositories with glob pattern filtering.
@@ -426,11 +423,10 @@ async def get_content(
     - Examples: path="examples/basic", include_files=["*.tf"]
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
         path: Specific path: "" (root), "examples/basic", "modules/vpc"
         include_files: Glob patterns for files to include (e.g., ["*.tf"], ["*.md"])
         exclude_files: Glob patterns for files to exclude (e.g., ["*test*"])
-        version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
         Plain text with markdown formatted content
@@ -452,7 +448,6 @@ async def get_content(
             path=path,
             include_files=sanitized_include_files,
             exclude_files=sanitized_exclude_files,
-            version=version,
         )
 
         # Import here to avoid circular imports
@@ -483,7 +478,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,
@@ -501,7 +495,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,
@@ -518,7 +511,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,

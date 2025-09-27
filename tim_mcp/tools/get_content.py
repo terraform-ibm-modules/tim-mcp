@@ -14,6 +14,7 @@ from ..clients.github_client import GitHubClient
 from ..config import Config
 from ..logging import get_logger
 from ..types import GetContentRequest
+from ..utils.module_id import parse_module_id_with_version, transform_version_for_github
 
 logger = get_logger(__name__)
 
@@ -52,25 +53,32 @@ async def _get_content_with_client(
     Internal function to get content with a provided GitHub client.
 
     Args:
-        request: GetContentRequest with module_id, path, and filtering options
+        request: GetContentRequest with module_id (may include version), path, and filtering options
         github_client: GitHub client instance
 
     Returns:
         Formatted markdown string with repository content
     """
+    # Parse module ID to extract version if included
+    namespace, name, provider, version = parse_module_id_with_version(request.module_id)
+    base_module_id = f"{namespace}/{name}/{provider}"
+    
     # Extract repository information
-    owner, repo = github_client._extract_repo_from_module_id(request.module_id)
+    owner, repo = github_client._extract_repo_from_module_id(base_module_id)
+
+    # Transform version for GitHub tag lookup (add "v" prefix if needed)
+    github_version = transform_version_for_github(version)
 
     # Resolve version to actual git reference
-    resolved_version = await github_client.resolve_version(owner, repo, request.version)
+    resolved_version = await github_client.resolve_version(owner, repo, github_version)
 
     logger.info(
         "Fetching content for module",
-        module_id=request.module_id,
+        module_id=base_module_id,
         owner=owner,
         repo=repo,
         path=request.path,
-        version=request.version,
+        version=version,
         resolved_version=resolved_version,
     )
 
@@ -132,7 +140,7 @@ async def _get_content_with_client(
 
     # Format the output
     return _format_content_output(
-        request.module_id, request.path, resolved_version, file_contents
+        base_module_id, request.path, resolved_version, file_contents
     )
 
 
