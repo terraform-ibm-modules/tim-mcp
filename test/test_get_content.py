@@ -31,6 +31,8 @@ class TestGetContentTool:
         # Make synchronous methods actually synchronous
         client._extract_repo_from_module_id = Mock()
         client.match_file_patterns = Mock()
+        # Ensure resolve_version returns a string, not a mock
+        client.resolve_version = AsyncMock(return_value="1.0.0")
         return client
 
     @pytest.fixture
@@ -1149,3 +1151,78 @@ class TestGetContentTool:
         # Verify the matching logic worked correctly
         # With the bug, this might fail if valid_include_matched logic is broken
         assert "# main.tf content" in result
+
+    @pytest.mark.asyncio
+    async def test_get_content_source_replacement(
+        self, config, mock_github_client
+    ):
+        """Test that source = '../../' is replaced with module ID and version."""
+        # Setup
+        request = GetContentRequest(
+            module_id="terraform-ibm-modules/vpc/ibm",
+            path="examples/basic",
+            include_files=["main.tf"]
+        )
+
+        mock_github_client._extract_repo_from_module_id.return_value = (
+            "terraform-ibm-modules", "terraform-ibm-vpc"
+        )
+        mock_github_client.resolve_version.return_value = "v1.2.3"
+
+        # Mock directory contents
+        mock_github_client.get_directory_contents.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf"
+            }
+        ]
+
+        # Mock file content with source = "../../" pattern
+        async def mock_get_file_content(owner, repo, path, ref):
+            return {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "content": "encoded_content",
+                "encoding": "base64",
+                "size": 200,
+                "decoded_content": '''module "vpc" {
+  source = "../../"
+  vpc_name = var.vpc_name
+  resource_group_id = var.resource_group_id
+}
+
+module "other" {
+  source = "../.."
+  other_param = "value"
+}'''
+            }
+
+        mock_github_client.get_file_content.side_effect = mock_get_file_content
+
+        # Mock pattern matching
+        mock_github_client.match_file_patterns.return_value = [
+            {
+                "name": "main.tf",
+                "path": "examples/basic/main.tf",
+                "type": "file",
+                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf"
+            }
+        ]
+
+        # Execute
+        result = await get_content_impl(request, config, mock_github_client)
+
+        # Verify source replacement occurred
+        assert 'source = "terraform-ibm-modules/vpc/ibm"' in result
+        assert 'version = "1.2.3"' in result
+        
+        # Verify original ../../ patterns are gone
+        assert 'source = "../../"' not in result
+        assert 'source = "../.."' not in result
+
+        # Verify basic structure is maintained
+        assert "## main.tf" in result
+        assert 'module "vpc"' in result
+        assert 'module "other"' in result
