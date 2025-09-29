@@ -253,6 +253,72 @@ class TerraformClient:
             raise TerraformRegistryError(
                 f"Request error getting module versions: {e}"
             ) from e
+    @api_method(cache_key_prefix="tf_module_structure")
+    async def get_module_structure(
+        self, namespace: str, name: str, provider: str, version: str = "latest"
+    ) -> dict[str, Any]:
+        """
+        Get complete module structure including examples, submodules, and READMEs.
+
+        This method fetches the full module details from the Registry API which includes:
+        - Root module README
+        - Examples array with paths, READMEs, inputs, outputs
+        - Submodules array with paths, READMEs, inputs, outputs
+        - Module metadata (versions, dependencies, resources)
+
+        Args:
+            namespace: Module namespace
+            name: Module name
+            provider: Module provider
+            version: Module version (default: "latest")
+
+        Returns:
+            Complete module structure with examples, submodules, and documentation
+
+        Raises:
+            TerraformRegistryError: If the API request fails
+        """
+        start_time = time.time()
+
+        try:
+            url = f"/modules/{namespace}/{name}/{provider}"
+            if version != "latest":
+                url += f"/{version}"
+
+            response = await self.client.get(url)
+            duration_ms = (time.time() - start_time) * 1000
+            check_rate_limit_response(response, "Terraform Registry")
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Log successful request
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                module_id=f"{namespace}/{name}/{provider}",
+                version=version,
+                has_examples=bool(data.get("examples")),
+                has_submodules=bool(data.get("submodules")),
+            )
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            raise TerraformRegistryError(
+                f"HTTP error getting module structure: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
+
+        except httpx.RequestError as e:
+            raise TerraformRegistryError(
+                f"Request error getting module structure: {e}"
+            ) from e
+
 
     @api_method(cache_key_prefix="tf_provider_info")
     async def get_provider_info(self, namespace: str, name: str) -> dict[str, Any]:

@@ -1,25 +1,23 @@
 """
 List content tool implementation for TIM-MCP.
 
-This tool discovers available paths (examples, submodules, solutions) in a
+This tool discovers available paths (examples, submodules) in a
 module repository with README summaries to help users navigate the repository
 structure and choose appropriate content for their needs.
 """
 
-import json
 import re
 
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
-
 from ..clients.github_client import GitHubClient
+from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..context import get_cache, get_rate_limiter
-from ..exceptions import GitHubError, ModuleNotFoundError, RateLimitError
+from ..exceptions import (
+    GitHubError,
+    ModuleNotFoundError,
+    RateLimitError,
+    TerraformRegistryError,
+)
 from ..logging import get_logger
 from ..types import ListContentRequest
 from ..utils.module_id import (
@@ -33,6 +31,9 @@ logger = get_logger(__name__)
 async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     """
     Implementation function for the list_content tool.
+
+    Uses Terraform Registry API first for examples and submodules,
+    then falls back to GitHub for solutions/patterns directories.
 
     Args:
         request: ListContentRequest with module_id (may include version)
@@ -50,55 +51,200 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     namespace, name, provider, version = parse_module_id_with_version(request.module_id)
     base_module_id = f"{namespace}/{name}/{provider}"
 
-    # Extract repository information from base module ID
-    owner, repo_name = _extract_repo_from_module_id(base_module_id)
-
-    # Initialize GitHub client with shared cache and rate limiter
+    # Initialize clients with shared cache and rate limiter
     cache = get_cache()
     rate_limiter = get_rate_limiter()
+    terraform_client = TerraformClient(config, cache=cache, rate_limiter=rate_limiter)
     github_client = GitHubClient(config, cache=cache, rate_limiter=rate_limiter)
 
     try:
-        # Get repository information
-        await github_client.get_repository_info(owner, repo_name)
+        # Try Registry API first for examples and submodules
+        try:
+            logger.info(
+                "Fetching module structure from Registry API",
+                module_id=base_module_id,
+                version=version,
+            )
 
-        # Transform version for GitHub tag lookup (add "v" prefix if needed)
-        github_version = transform_version_for_github(version)
+            # Get module structure from Registry
+            module_data = await terraform_client.get_module_structure(
+                namespace, name, provider, version
+            )
 
-        # Resolve version to actual git reference
-        resolved_version = await github_client.resolve_version(
-            owner, repo_name, github_version
-        )
+            # Extract version from Registry response
+            resolved_version = module_data.get("version", version)
 
-        logger.info(
-            "Listing content for module",
-            module_id=base_module_id,
-            owner=owner,
-            repo=repo_name,
-            version=version,
-            resolved_version=resolved_version,
-        )
+            # Build categorized paths from Registry data
+            categorized_paths = _extract_registry_paths(module_data)
 
-        # Get repository tree structure
-        tree_items = await github_client.get_repository_tree(
-            owner, repo_name, resolved_version, recursive=True
-        )
+            # Extract descriptions from Registry READMEs
+            path_descriptions = _extract_registry_descriptions(module_data)
 
-        # Categorize paths and collect README information
-        categorized_paths = _categorize_tree_items(tree_items)
+            logger.info(
+                "Successfully fetched from Registry API",
+                module_id=base_module_id,
+                examples=len(categorized_paths.get("examples", [])),
+                submodules=len(categorized_paths.get("submodules", [])),
+            )
 
-        # Extract README summaries for each significant path
-        path_descriptions = await _extract_path_descriptions(
-            github_client, owner, repo_name, resolved_version, categorized_paths
-        )
+        except TerraformRegistryError as e:
+            # Fall back to full GitHub implementation if Registry fails
+            logger.warning(
+                "Registry API failed, falling back to GitHub",
+                module_id=base_module_id,
+                error=str(e),
+            )
+            return await _list_content_github_fallback(
+                base_module_id, namespace, name, provider, version, config, github_client
+            )
 
-        # Format output
         # Return formatted content listing
         return _format_content_listing(
             base_module_id, resolved_version, categorized_paths, path_descriptions
         )
+
     finally:
+        await terraform_client.client.aclose()
         await github_client.client.aclose()
+
+
+def _extract_registry_paths(module_data: dict) -> dict[str, list[str]]:
+    """
+    Extract categorized paths from Registry API response.
+
+    Args:
+        module_data: Module data from Registry API
+
+    Returns:
+        Dictionary mapping category names to lists of paths
+    """
+    categorized = {"root": [""], "examples": [], "submodules": []}
+
+    # Extract examples
+    examples = module_data.get("examples", [])
+    for example in examples:
+        path = example.get("path", "")
+        if path:
+            categorized["examples"].append(path)
+
+    # Extract submodules
+    submodules = module_data.get("submodules", [])
+    for submodule in submodules:
+        path = submodule.get("path", "")
+        if path:
+            categorized["submodules"].append(path)
+
+    return categorized
+
+
+def _extract_registry_descriptions(module_data: dict) -> dict[str, str]:
+    """
+    Extract descriptions from Registry API README fields.
+
+    Args:
+        module_data: Module data from Registry API
+
+    Returns:
+        Dictionary mapping paths to their descriptions
+    """
+    descriptions = {}
+
+    # Root module description from root README
+    root_readme = module_data.get("root", {}).get("readme", "")
+    if root_readme:
+        descriptions[""] = _extract_readme_summary(root_readme, "root")
+    else:
+        descriptions[""] = _get_generic_description("", "root")
+
+    # Example descriptions from example READMEs
+    examples = module_data.get("examples", [])
+    for example in examples:
+        path = example.get("path", "")
+        readme = example.get("readme", "")
+        if path:
+            if readme:
+                descriptions[path] = _extract_readme_summary(readme, "examples")
+            else:
+                descriptions[path] = _get_generic_description(path, "examples")
+
+    # Submodule descriptions from submodule READMEs
+    submodules = module_data.get("submodules", [])
+    for submodule in submodules:
+        path = submodule.get("path", "")
+        readme = submodule.get("readme", "")
+        if path:
+            if readme:
+                descriptions[path] = _extract_readme_summary(readme, "submodules")
+            else:
+                descriptions[path] = _get_generic_description(path, "submodules")
+
+    return descriptions
+
+
+async def _list_content_github_fallback(
+    base_module_id: str,
+    namespace: str,
+    name: str,
+    provider: str,
+    version: str,
+    config: Config,
+    github_client: GitHubClient,
+) -> str:
+    """
+    Full GitHub-based implementation as fallback when Registry API fails.
+
+    Args:
+        base_module_id: Base module identifier
+        namespace: Module namespace
+        name: Module name
+        provider: Module provider
+        version: Module version
+        config: Configuration instance
+        github_client: GitHubClient instance
+
+    Returns:
+        Formatted content listing string
+    """
+    # Extract repository information from base module ID
+    owner, repo_name = _extract_repo_from_module_id(base_module_id)
+
+    # Get repository information
+    await github_client.get_repository_info(owner, repo_name)
+
+    # Transform version for GitHub tag lookup (add "v" prefix if needed)
+    github_version = transform_version_for_github(version)
+
+    # Resolve version to actual git reference
+    resolved_version = await github_client.resolve_version(
+        owner, repo_name, github_version
+    )
+
+    logger.info(
+        "Using GitHub fallback for module",
+        module_id=base_module_id,
+        owner=owner,
+        repo=repo_name,
+        version=version,
+        resolved_version=resolved_version,
+    )
+
+    # Get repository tree structure
+    tree_items = await github_client.get_repository_tree(
+        owner, repo_name, resolved_version, recursive=True
+    )
+
+    # Categorize paths and collect README information
+    categorized_paths = _categorize_tree_items(tree_items)
+
+    # Extract README summaries for each significant path
+    path_descriptions = await _extract_path_descriptions(
+        github_client, owner, repo_name, resolved_version, categorized_paths
+    )
+
+    # Return formatted content listing
+    return _format_content_listing(
+        base_module_id, resolved_version, categorized_paths, path_descriptions
+    )
 
 
 def _extract_repo_from_module_id(module_id: str) -> tuple[str, str]:
@@ -142,7 +288,7 @@ def _categorize_tree_items(tree_items: list[dict]) -> dict[str, list[str]]:
     Returns:
         Dictionary mapping category names to lists of paths
     """
-    categorized = {"root": [], "examples": [], "submodules": [], "solutions": []}
+    categorized = {"root": [], "examples": [], "submodules": []}
 
     # Track directories we've seen to avoid duplicates
     seen_dirs = set()
@@ -190,10 +336,6 @@ def _categorize_path(path: str) -> str | None:
     elif path_lower.startswith("modules/"):
         return "submodules"
 
-    # Solutions/patterns directory
-    elif path_lower.startswith(("patterns/", "solutions/")):
-        return "solutions"
-
     # Handle alternative naming conventions
     elif path_lower.startswith(("sample/", "samples/")):
         return "examples"
@@ -213,6 +355,8 @@ def _categorize_path(path: str) -> str | None:
             "__pycache__/",
             ".pytest_cache/",
             "coverage/",
+            "patterns/",
+            "solutions/",
         )
     ):
         return None
@@ -234,9 +378,8 @@ async def _extract_path_descriptions(
     """
     Extract descriptions for each significant path.
 
-    For solutions, uses ibm_catalog.json descriptions. For other paths,
-    uses README files. Falls back to generic descriptions if neither
-    is available.
+    Uses README files for path descriptions. Falls back to generic
+    descriptions if README is not available.
 
     Args:
         github_client: GitHubClient instance
@@ -250,25 +393,14 @@ async def _extract_path_descriptions(
     """
     descriptions = {}
 
-    # Check if we have solutions - if so, try to load catalog descriptions
-    catalog_descriptions = {}
-    if "solutions" in categorized_paths and categorized_paths["solutions"]:
-        catalog_descriptions = await _get_catalog_descriptions(
-            github_client, owner, repo_name, version
-        )
-
     # Extract descriptions for all paths
     for category, paths in categorized_paths.items():
         for path in paths:
-            # For solutions, try catalog description first
-            if category == "solutions" and path in catalog_descriptions:
-                descriptions[path] = catalog_descriptions[path]
-            else:
-                # Use README-based description
-                description = await _get_path_description(
-                    github_client, owner, repo_name, version, path, category
-                )
-                descriptions[path] = description
+            # Use README-based description
+            description = await _get_path_description(
+                github_client, owner, repo_name, version, path, category
+            )
+            descriptions[path] = description
 
     return descriptions
 
@@ -560,204 +692,6 @@ def _clean_readme_content(text: str, path_type: str) -> str:
     return text
 
 
-@retry(
-    stop=stop_after_attempt(5),  # More attempts for rate limits
-    wait=wait_exponential(multiplier=2, min=4, max=60),  # Longer waits for rate limits
-    retry=retry_if_exception_type((RateLimitError, GitHubError)),
-)
-async def _fetch_catalog_with_retry(
-    github_client: GitHubClient,
-    owner: str,
-    repo_name: str,
-    version: str,
-) -> dict[str, any] | None:
-    """
-    Fetch ibm_catalog.json with intelligent retry logic for rate limits.
-
-    Args:
-        github_client: GitHubClient instance
-        owner: Repository owner
-        repo_name: Repository name
-        version: Git reference
-
-    Returns:
-        Parsed catalog data or None if failed
-
-    Raises:
-        RateLimitError: If rate limited after all retries
-        GitHubError: If other GitHub errors persist after retries
-    """
-    try:
-        file_content = await github_client.get_file_content(
-            owner, repo_name, "ibm_catalog.json", version
-        )
-
-        if "decoded_content" not in file_content:
-            return None
-
-        return json.loads(file_content["decoded_content"])
-
-    except RateLimitError as e:
-        logger.warning(
-            "Rate limited fetching catalog, will retry",
-            repo=f"{owner}/{repo_name}",
-            reset_time=e.reset_time,
-        )
-        raise  # Let tenacity handle the retry
-
-    except GitHubError as e:
-        if e.status_code == 404:
-            # File doesn't exist, no point retrying
-            logger.debug(
-                "Catalog file not found",
-                repo=f"{owner}/{repo_name}",
-                path="ibm_catalog.json",
-            )
-            return None
-        else:
-            # Other GitHub errors might be transient
-            logger.warning(
-                "GitHub error fetching catalog, will retry",
-                repo=f"{owner}/{repo_name}",
-                error=str(e),
-                status_code=e.status_code,
-            )
-            raise
-
-    except Exception as e:
-        # JSON parsing or other errors - no point retrying
-        logger.debug(
-            "Failed to parse catalog", repo=f"{owner}/{repo_name}", error=str(e)
-        )
-        return None
-
-
-async def _get_catalog_descriptions(
-    github_client: GitHubClient,
-    owner: str,
-    repo_name: str,
-    version: str,
-) -> dict[str, str]:
-    """
-    Fetch and parse ibm_catalog.json to extract solution descriptions.
-
-    Args:
-        github_client: GitHubClient instance
-        owner: Repository owner
-        repo_name: Repository name
-        version: Git reference
-
-    Returns:
-        Dictionary mapping working_directory paths to descriptions
-    """
-    try:
-        # Try to fetch ibm_catalog.json with retry logic
-        catalog = await _fetch_catalog_with_retry(
-            github_client, owner, repo_name, version
-        )
-
-        if not catalog:
-            return {}
-
-        descriptions = {}
-
-        # Parse products/flavors (solutions) - check both formats
-        catalog_items = []
-        if "flavors" in catalog:
-            catalog_items = catalog["flavors"]
-        elif "products" in catalog:
-            # Some catalogs use 'products' containing 'flavors'
-            for product in catalog["products"]:
-                if "flavors" in product:
-                    catalog_items.extend(product["flavors"])
-                # Also treat the product itself as a catalog item
-                catalog_items.append(product)
-
-        for flavor in catalog_items:
-            working_dir = flavor.get("working_directory", "")
-            if not working_dir:
-                continue
-
-            # Build comprehensive description from catalog data
-            description_parts = []
-
-            # Add label as primary description
-            if "label" in flavor:
-                description_parts.append(flavor["label"])
-
-            # Add product short description (important high-level context)
-            for desc_field in ["short_description", "long_description", "description"]:
-                if desc_field in flavor:
-                    desc = flavor[desc_field].strip()
-                    if desc and desc not in description_parts:
-                        description_parts.append(desc)
-
-            # Add ALL architecture features (comprehensive feature list)
-            if "architecture" in flavor:
-                arch = flavor["architecture"]
-
-                # Features are in an array - include ALL of them
-                if "features" in arch and isinstance(arch["features"], list):
-                    for feature in arch["features"]:
-                        if isinstance(feature, str) and feature.strip():
-                            feature_text = feature.strip()
-                            if feature_text not in description_parts:
-                                description_parts.append(feature_text)
-
-                # Architecture description if available
-                if "description" in arch:
-                    arch_desc = arch["description"].strip()
-                    if arch_desc and arch_desc not in description_parts:
-                        description_parts.append(arch_desc)
-
-                # Diagram descriptions provide deployment context
-                if "diagrams" in arch and isinstance(arch["diagrams"], list):
-                    for diagram in arch["diagrams"]:
-                        if isinstance(diagram, dict) and "description" in diagram:
-                            desc = diagram["description"].strip()
-                            if desc:
-                                # Clean up the description to be more readable
-                                desc = desc.replace("This variation", "This solution")
-                                desc = desc.replace("This deployment", "This solution")
-                                if desc not in description_parts:
-                                    description_parts.append(desc)
-
-                # Add any other descriptive fields in architecture
-                for field in ["summary", "overview", "purpose"]:
-                    if field in arch and isinstance(arch[field], str):
-                        field_desc = arch[field].strip()
-                        if field_desc and field_desc not in description_parts:
-                            description_parts.append(field_desc)
-
-            # Combine all parts
-            if description_parts:
-                # Clean up each part to avoid double periods
-                cleaned_parts = []
-                for part in description_parts:
-                    part = part.rstrip(".")
-                    if part:
-                        cleaned_parts.append(part)
-
-                if cleaned_parts:
-                    description = ". ".join(cleaned_parts) + "."
-                    descriptions[working_dir] = description
-
-        logger.info(
-            "Loaded catalog descriptions",
-            repo=f"{owner}/{repo_name}",
-            solution_count=len(descriptions),
-        )
-        return descriptions
-
-    except Exception as e:
-        logger.debug(
-            "Failed to load catalog descriptions",
-            repo=f"{owner}/{repo_name}",
-            error=str(e),
-        )
-        return {}
-
-
 def _get_generic_description(path: str, category: str) -> str:
     """
     Get a generic description for a path based on its category.
@@ -775,23 +709,6 @@ def _get_generic_description(path: str, category: str) -> str:
         return f"Example configuration demonstrating usage of the {path.split('/')[-1]} pattern."
     elif category == "submodules":
         return f"Submodule providing {path.split('/')[-1]} functionality."
-    elif category == "solutions":
-        # Provide meaningful descriptions based on common solution patterns
-        solution_name = path.split("/")[-1]
-
-        if "quickstart" in solution_name.lower():
-            return "Quickstart solution for rapid deployment. Provides a simplified configuration to get started quickly with minimal setup and basic infrastructure components."
-        elif (
-            "fully-configurable" in solution_name.lower()
-            or "complete" in solution_name.lower()
-        ):
-            return "Fully configurable solution offering comprehensive control over all infrastructure parameters, service integrations, and advanced deployment options."
-        elif "standard" in solution_name.lower():
-            return "Standard solution providing a balanced configuration with commonly used infrastructure patterns and best practices."
-        elif "basic" in solution_name.lower():
-            return "Basic solution with essential infrastructure components for straightforward deployments."
-        else:
-            return f"Pre-configured solution pattern for {solution_name} deployment with optimized settings and infrastructure components."
     else:
         return "Additional module content."
 
@@ -824,10 +741,9 @@ def _format_content_listing(
         "root": "Root Module",
         "examples": "Examples",
         "submodules": "Submodules",
-        "solutions": "Solutions",
     }
 
-    for category in ["root", "examples", "submodules", "solutions"]:
+    for category in ["root", "examples", "submodules"]:
         paths = categorized_paths.get(category, [])
         if not paths:
             continue
