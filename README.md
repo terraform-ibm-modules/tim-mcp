@@ -72,8 +72,11 @@ The goal is to provide a structured and efficient way for an AI to gather the ne
 - **Module Search**: Find modules in the Terraform Registry with quality-based ranking.
 - **Module Details**: Get structured information about a module's interface.
 - **Repository Exploration**: List the contents of a module's repository, including examples and submodules.
+- **Example Details**: Get example metadata and requirements from the Registry.
 - **Content Retrieval**: Fetch specific files from a module's repository.
 - **AI-Assisted Workflows**: The tools are designed to be used in sequence to support a typical AI-assisted coding workflow.
+
+📚 **[Complete Tools Documentation](docs/tools.md)** - Detailed reference for all available MCP tools.
 
 ### Important Notes
 
