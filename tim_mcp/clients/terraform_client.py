@@ -533,7 +533,9 @@ class TerraformClient:
         except httpx.RequestError as e:
             duration_ms = (time.time() - start_time) * 1000
             self.logger.error("Request error searching providers", error=str(e))
-            raise TerraformRegistryError(f"Request error searching providers: {e}") from e
+            raise TerraformRegistryError(
+                f"Request error searching providers: {e}"
+            ) from e
 
     @retry(
         stop=stop_after_attempt(3),

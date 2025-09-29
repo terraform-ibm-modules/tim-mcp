@@ -97,7 +97,7 @@ class TestFormatProviderDetails:
         assert "Available Versions" in result
         assert "Usage" in result
         assert "terraform {" in result  # HCL code block
-        assert "provider \"aws\"" in result
+        assert 'provider "aws"' in result
 
     def test_format_provider_details_missing_id(self):
         """Test formatting with missing provider ID."""
@@ -242,13 +242,11 @@ class TestGetProviderDetailsImpl:
             assert "validation failed" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
-    async def test_get_provider_details_not_found(
-        self, config, mock_terraform_client
-    ):
+    async def test_get_provider_details_not_found(self, config, mock_terraform_client):
         """Test getting provider details for non-existent provider."""
         # Setup
-        mock_terraform_client.get_provider_details.side_effect = (
-            TerraformRegistryError("Not found", status_code=404)
+        mock_terraform_client.get_provider_details.side_effect = TerraformRegistryError(
+            "Not found", status_code=404
         )
         request = ProviderDetailsRequest(provider_id="nonexistent/provider")
 
@@ -267,13 +265,11 @@ class TestGetProviderDetailsImpl:
             assert "not found" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
-    async def test_get_provider_details_api_error(
-        self, config, mock_terraform_client
-    ):
+    async def test_get_provider_details_api_error(self, config, mock_terraform_client):
         """Test getting provider details with API error."""
         # Setup
-        mock_terraform_client.get_provider_details.side_effect = (
-            TerraformRegistryError("Service unavailable", status_code=503)
+        mock_terraform_client.get_provider_details.side_effect = TerraformRegistryError(
+            "Service unavailable", status_code=503
         )
         request = ProviderDetailsRequest(provider_id="hashicorp/aws")
 

@@ -109,7 +109,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = sample_registry_response
         request = ProviderSearchRequest(query="aws", limit=10, offset=0)
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -132,7 +134,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = sample_registry_response
         request = ProviderSearchRequest(query=None, limit=10, offset=0)
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -157,7 +161,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = sample_registry_response
         request = ProviderSearchRequest(query="hashicorp", limit=20, offset=10)
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -184,7 +190,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = empty_response
         request = ProviderSearchRequest(query="nonexistent")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -206,7 +214,9 @@ class TestSearchProvidersImpl:
         )
         request = ProviderSearchRequest(query="aws")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -227,7 +237,9 @@ class TestSearchProvidersImpl:
         )
         request = ProviderSearchRequest(query="aws")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -256,7 +268,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = malformed_response
         request = ProviderSearchRequest(query="aws")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -302,7 +316,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = invalid_datetime_response
         request = ProviderSearchRequest(query="test")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -325,7 +341,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = no_meta_response
         request = ProviderSearchRequest(query="aws")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -381,7 +399,9 @@ class TestSearchProvidersImpl:
         mock_terraform_client.search_providers.return_value = unsorted_response
         request = ProviderSearchRequest(query="providers")
 
-        with patch("tim_mcp.tools.search_providers.TerraformClient") as mock_client_class:
+        with patch(
+            "tim_mcp.tools.search_providers.TerraformClient"
+        ) as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )

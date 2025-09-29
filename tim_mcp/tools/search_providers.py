@@ -29,7 +29,9 @@ def _validate_api_response_structure(api_response: Any) -> None:
         raise TIMValidationError("Invalid API response format: expected dictionary")
 
     if "providers" not in api_response:
-        raise TIMValidationError("Invalid API response format: missing 'providers' field")
+        raise TIMValidationError(
+            "Invalid API response format: missing 'providers' field"
+        )
 
     if "meta" not in api_response:
         raise TIMValidationError("Invalid API response format: missing 'meta' field")
@@ -88,7 +90,7 @@ async def search_providers_impl(
             _validate_api_response_structure(api_response)
 
             # Extract metadata from response
-            meta = api_response["meta"]
+            api_response["meta"]
 
             # Transform and validate each provider's data
             providers = []

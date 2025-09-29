@@ -10,9 +10,7 @@ from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
-from ..exceptions import TerraformRegistryError
-from ..exceptions import ValidationError
-from ..logging import get_logger
+from ..exceptions import TerraformRegistryError, ValidationError
 from ..types import ProviderDetailsRequest
 
 

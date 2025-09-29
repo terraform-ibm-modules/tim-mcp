@@ -44,7 +44,9 @@ class ModuleSearchResponse(BaseModel):
 class ModuleDetailsRequest(BaseModel):
     """Request model for module details."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
 
 
 class ModuleInput(BaseModel):
@@ -75,7 +77,9 @@ class ModuleDependency(BaseModel):
 class ListContentRequest(BaseModel):
     """Request model for listing repository content."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
 
 
 class ContentPath(BaseModel):
@@ -99,7 +103,9 @@ class ListContentResponse(BaseModel):
 class GetContentRequest(BaseModel):
     """Request model for getting repository content."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
     path: str = Field("", description="Specific path to fetch")
     include_files: list[str] | None = Field(
         None, description="Glob patterns for files to include (e.g., '*.tf', '**/*.md')"
@@ -139,7 +145,9 @@ class ErrorDetail(BaseModel):
 class ProviderSearchRequest(BaseModel):
     """Request model for provider search."""
 
-    query: str | None = Field(None, description="Optional search term to filter providers")
+    query: str | None = Field(
+        None, description="Optional search term to filter providers"
+    )
     limit: int = Field(10, ge=1, le=100, description="Maximum results to return")
     offset: int = Field(0, ge=0, description="Pagination offset")
 
@@ -171,4 +179,8 @@ class ProviderSearchResponse(BaseModel):
 class ProviderDetailsRequest(BaseModel):
     """Request model for provider details."""
 
-    provider_id: str = Field(..., min_length=1, description="Provider identifier (namespace/name or namespace/name/version)")
+    provider_id: str = Field(
+        ...,
+        min_length=1,
+        description="Provider identifier (namespace/name or namespace/name/version)",
+    )
