@@ -1,10 +1,12 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "tim-mcp"
-version = "1.2.0"
+# Version is managed dynamically via git tags using hatch-vcs
+# Do not add a static version field here as it will conflict with dynamic versioning
+dynamic = ["version"]
 description = "Terraform IBM Modules MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -79,3 +81,9 @@ packages = ["tim_mcp"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "static" = "tim_mcp/static"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "tim_mcp/_version.py"
