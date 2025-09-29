@@ -436,3 +436,198 @@ class TerraformClient:
             raise TerraformRegistryError(
                 f"Request error getting provider info: {e}"
             ) from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    async def search_providers(
+        self,
+        query: str | None = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """
+        Search for providers in the Terraform Registry.
+
+        Args:
+            query: Optional search query to filter providers
+            limit: Maximum results to return
+            offset: Offset for pagination
+
+        Returns:
+            Search results with providers and metadata
+
+        Raises:
+            TerraformRegistryError: If the API request fails
+            RateLimitError: If rate limited
+        """
+        # Build cache key
+        cache_key = f"provider_search_{query}_{limit}_{offset}"
+
+        # Check cache first
+        cached = self.cache.get(cache_key)
+        if cached:
+            log_cache_operation(self.logger, "get", cache_key, hit=True)
+            return cached
+
+        log_cache_operation(self.logger, "get", cache_key, hit=False)
+
+        # Build query parameters
+        params = {"limit": limit, "offset": offset}
+        if query:
+            params["q"] = query
+
+        start_time = time.time()
+
+        try:
+            response = await self.client.get("/providers", params=params)
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Handle rate limiting
+            if response.status_code == 429:
+                reset_time = response.headers.get("X-RateLimit-Reset")
+                raise RateLimitError(
+                    "Terraform Registry rate limit exceeded",
+                    reset_time=int(reset_time) if reset_time else None,
+                    api_name="Terraform Registry",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Log successful request
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                query=query,
+                result_count=len(data.get("providers", [])),
+            )
+
+            # Cache the result
+            self.cache.set(cache_key, data)
+            log_cache_operation(self.logger, "set", cache_key)
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_api_request(
+                self.logger,
+                "GET",
+                str(e.request.url),
+                e.response.status_code,
+                duration_ms,
+                error=str(e),
+            )
+            raise TerraformRegistryError(
+                f"HTTP error searching providers: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
+
+        except httpx.RequestError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self.logger.error("Request error searching providers", error=str(e))
+            raise TerraformRegistryError(f"Request error searching providers: {e}") from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    async def get_provider_details(
+        self, namespace: str, name: str, version: str = "latest"
+    ) -> dict[str, Any]:
+        """
+        Get detailed information about a specific provider version.
+
+        Args:
+            namespace: Provider namespace
+            name: Provider name
+            version: Provider version (default: "latest")
+
+        Returns:
+            Provider details including versions list
+
+        Raises:
+            TerraformRegistryError: If the API request fails
+            RateLimitError: If rate limited
+        """
+        # Build cache key
+        cache_key = f"provider_details_{namespace}_{name}_{version}"
+
+        # Check cache first
+        cached = self.cache.get(cache_key)
+        if cached:
+            log_cache_operation(self.logger, "get", cache_key, hit=True)
+            return cached
+
+        log_cache_operation(self.logger, "get", cache_key, hit=False)
+
+        start_time = time.time()
+
+        try:
+            # Build URL - API returns latest version if no version specified
+            url = f"/providers/{namespace}/{name}"
+            if version != "latest":
+                url += f"/{version}"
+
+            response = await self.client.get(url)
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Handle rate limiting
+            if response.status_code == 429:
+                reset_time = response.headers.get("X-RateLimit-Reset")
+                raise RateLimitError(
+                    "Terraform Registry rate limit exceeded",
+                    reset_time=int(reset_time) if reset_time else None,
+                    api_name="Terraform Registry",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Log successful request
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                provider_id=f"{namespace}/{name}",
+                version=version,
+            )
+
+            # Cache the result
+            self.cache.set(cache_key, data)
+            log_cache_operation(self.logger, "set", cache_key)
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_api_request(
+                self.logger,
+                "GET",
+                str(e.request.url),
+                e.response.status_code,
+                duration_ms,
+                error=str(e),
+            )
+            raise TerraformRegistryError(
+                f"HTTP error getting provider details: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
+
+        except httpx.RequestError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self.logger.error("Request error getting provider details", error=str(e))
+            raise TerraformRegistryError(
+                f"Request error getting provider details: {e}"
+            ) from e

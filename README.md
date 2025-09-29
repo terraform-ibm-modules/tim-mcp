@@ -7,7 +7,7 @@
 
 A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices. See the [Overview](#overview) for further details on rational.
 
-This server acts as a bridge, enabling AI models and other tools to intelligently discover and utilize the extensive documentation, examples, and implementation patterns bundled with the [TIM modules](https://github.com/terraform-ibm-modules). It is designed to support AI-assisted coding workflows for creating IBM Cloud infrastructure.
+This server acts as a bridge, enabling AI models and other tools to intelligently discover and utilize Terraform providers and modules, including extensive documentation, examples, and implementation patterns from the [TIM modules](https://github.com/terraform-ibm-modules). It is designed to support AI-assisted coding workflows for creating IBM Cloud infrastructure.
 
 ## Quick Start
 
@@ -60,20 +60,24 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
 This MCP server provides tools for AI models to navigate the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM modules are bundled with extensive documentation, working examples, and architectural patterns, but these resources are distributed across many GitHub repositories.
 
 This server exposes a set of tools that allow an AI assistant to:
-- **Discover** relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules).
-- **Inspect** module details, including inputs, outputs, and dependencies.
-- **Explore** the contents of a module's repository, such as examples and submodules.
-- **Retrieve** specific file contents, like example code or documentation.
+- **Discover Providers** - Search and explore Terraform providers by name or keyword
+- **Provider Details** - Get comprehensive provider information including versions, tier status, and usage examples
+- **Discover Modules** - Find relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules)
+- **Inspect Modules** - View module details including inputs, outputs, and dependencies
+- **Explore Repositories** - List the contents of a module's repository, such as examples and submodules
+- **Retrieve Content** - Fetch specific file contents, like example code or documentation
 
 The goal is to provide a structured and efficient way for an AI to gather the necessary context to generate accurate and high-quality Infrastructure as Code solutions for IBM Cloud.
 
 ### Key Features
 
-- **Module Search**: Find modules in the Terraform Registry with quality-based ranking.
-- **Module Details**: Get structured information about a module's interface.
-- **Repository Exploration**: List the contents of a module's repository, including examples and submodules.
-- **Content Retrieval**: Fetch specific files from a module's repository.
-- **AI-Assisted Workflows**: The tools are designed to be used in sequence to support a typical AI-assisted coding workflow.
+- **Provider Search**: Search for Terraform providers by name or keyword with download-based ranking
+- **Provider Details**: Get comprehensive provider information including versions, tier status, and ready-to-use configuration examples
+- **Module Search**: Find modules in the Terraform Registry with quality-based ranking
+- **Module Details**: Get structured information about a module's interface, inputs, outputs, and dependencies
+- **Repository Exploration**: List the contents of a module's repository, including examples and submodules
+- **Content Retrieval**: Fetch specific files from a module's repository with glob pattern filtering
+- **AI-Assisted Workflows**: Tools designed to be used in sequence to support typical AI-assisted coding workflows
 
 ### Important Notes
 
