@@ -19,6 +19,7 @@ from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
     GetContentRequest,
+    GetExampleDetailsRequest,
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
@@ -315,18 +316,16 @@ async def list_content(module_id: str) -> str:
 
     SECONDARY USE CASE (Development workflow):
     - Explore repository structure during development
-    - Find specific submodules or solutions
+    - Find specific submodules
 
     CONTENT CATEGORIES:
     - Examples: Deployable examples showing module usage (PRIMARY TARGET for samples)
-    - Solutions: Complete architecture patterns
     - Root Module: Main terraform files (for development)
     - Submodules: Reusable components (for advanced development)
 
     EXAMPLE SELECTION STRATEGY:
     - examples/basic or examples/simple → for straightforward demos
     - examples/complete → for comprehensive usage
-    - solutions/ → for complex architecture patterns
     - Use descriptions to select the single most relevant example
 
     Args:
@@ -397,6 +396,100 @@ async def list_content(module_id: str) -> str:
 
 
 @mcp.tool()
+async def get_example_details(module_id: str, example_path: str) -> str:
+    """
+    Get detailed example information from Terraform Registry - fast alternative to fetching source code.
+
+    WHEN TO USE:
+    - After list_content shows available examples
+    - To understand example requirements (inputs/outputs) before fetching code
+    - For quick reference of what an example does and needs
+    - When you need to know dependencies and resources created
+
+    WHAT THIS PROVIDES:
+    - Example description from README
+    - Required and optional inputs with types and defaults
+    - Outputs the example produces
+    - Provider and module dependencies
+    - Resources that will be created
+    - Full README content
+
+    WORKFLOW:
+    1. Use list_content to discover available examples
+    2. Use this tool to understand example details
+    3. Use get_content to fetch actual source code if needed
+
+    Args:
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
+        example_path: Example path from list_content (e.g., "examples/basic")
+
+    Returns:
+        Plain text with markdown formatted example details
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = GetExampleDetailsRequest(
+            module_id=module_id, example_path=example_path
+        )
+
+        # Import here to avoid circular imports
+        from .tools.get_example_details import get_example_details_impl
+
+        # Execute example details retrieval
+        response = await get_example_details_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_example_details",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_example_details",
+            {"module_id": module_id, "example_path": example_path},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_example_details",
+            {"module_id": module_id, "example_path": example_path},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_example_details",
+            {"module_id": module_id, "example_path": example_path},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_example_details")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
 async def get_content(
     module_id: str,
     path: str = "",
@@ -404,7 +497,7 @@ async def get_content(
     exclude_files: str | list[str] | None = None,
 ) -> str:
     """
-    Retrieve source code, examples, solutions from GitHub repositories with glob pattern filtering.
+    Retrieve source code and examples from GitHub repositories with glob pattern filtering.
 
     Common patterns:
     - All Terraform files: include_files=["*.tf"]

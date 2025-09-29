@@ -354,6 +354,111 @@ class TerraformClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    async def get_module_structure(
+        self, namespace: str, name: str, provider: str, version: str = "latest"
+    ) -> dict[str, Any]:
+        """
+        Get complete module structure including examples, submodules, and READMEs.
+
+        This method fetches the full module details from the Registry API which includes:
+        - Root module README
+        - Examples array with paths, READMEs, inputs, outputs
+        - Submodules array with paths, READMEs, inputs, outputs
+        - Module metadata (versions, dependencies, resources)
+
+        Args:
+            namespace: Module namespace
+            name: Module name
+            provider: Module provider
+            version: Module version (default: "latest")
+
+        Returns:
+            Complete module structure with examples, submodules, and documentation
+
+        Raises:
+            TerraformRegistryError: If the API request fails
+            RateLimitError: If rate limited
+        """
+        # Build cache key
+        cache_key = f"module_structure_{namespace}_{name}_{provider}_{version}"
+
+        # Check cache first
+        cached = self.cache.get(cache_key)
+        if cached:
+            log_cache_operation(self.logger, "get", cache_key, hit=True)
+            return cached
+
+        log_cache_operation(self.logger, "get", cache_key, hit=False)
+
+        start_time = time.time()
+
+        try:
+            url = f"/modules/{namespace}/{name}/{provider}"
+            if version != "latest":
+                url += f"/{version}"
+
+            response = await self.client.get(url)
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Handle rate limiting
+            if response.status_code == 429:
+                reset_time = response.headers.get("X-RateLimit-Reset")
+                raise RateLimitError(
+                    "Terraform Registry rate limit exceeded",
+                    reset_time=int(reset_time) if reset_time else None,
+                    api_name="Terraform Registry",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Log successful request
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                module_id=f"{namespace}/{name}/{provider}",
+                version=version,
+                has_examples=bool(data.get("examples")),
+                has_submodules=bool(data.get("submodules")),
+            )
+
+            # Cache the result
+            self.cache.set(cache_key, data)
+            log_cache_operation(self.logger, "set", cache_key)
+
+            return data
+
+        except httpx.HTTPStatusError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_api_request(
+                self.logger,
+                "GET",
+                str(e.request.url),
+                e.response.status_code,
+                duration_ms,
+                error=str(e),
+            )
+            raise TerraformRegistryError(
+                f"HTTP error getting module structure: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
+
+        except httpx.RequestError as e:
+            duration_ms = (time.time() - start_time) * 1000
+            self.logger.error("Request error getting module structure", error=str(e))
+            raise TerraformRegistryError(
+                f"Request error getting module structure: {e}"
+            ) from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
     async def get_provider_info(self, namespace: str, name: str) -> dict[str, Any]:
         """
         Get information about a provider.
