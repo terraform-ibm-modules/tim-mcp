@@ -443,13 +443,18 @@ async def list_content(module_id: str) -> str:
 @mcp.tool()
 async def get_example_details(module_id: str, example_path: str) -> str:
     """
-    Get detailed example information from Terraform Registry - fast alternative to fetching source code.
+    Get detailed example information from Terraform Registry - CONTEXT-EFFICIENT alternative to fetching source code.
 
     WHEN TO USE:
     - After list_content shows available examples
-    - To understand example requirements (inputs/outputs) before fetching code
-    - For quick reference of what an example does and needs
-    - When you need to know dependencies and resources created
+    - To verify an example matches user needs BEFORE fetching code (saves tokens!)
+    - Multiple examples exist and you need to pick the right one
+    - User asks "what does this example need" or "what will this create"
+
+    CONTEXT EFFICIENCY:
+    - Uses Registry metadata (fast, lightweight)
+    - Avoids fetching full source code from GitHub
+    - Often sufficient without needing get_content
 
     WHAT THIS PROVIDES:
     - Example description from README
@@ -459,10 +464,10 @@ async def get_example_details(module_id: str, example_path: str) -> str:
     - Resources that will be created
     - Full README content
 
-    WORKFLOW:
-    1. Use list_content to discover available examples
-    2. Use this tool to understand example details
-    3. Use get_content to fetch actual source code if needed
+    RECOMMENDED WORKFLOW:
+    1. list_content - discover available examples (lightweight)
+    2. get_example_details - verify relevance (medium, recommended)
+    3. get_content - fetch code only if needed (heavy, use filters!)
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
@@ -542,18 +547,29 @@ async def get_content(
     exclude_files: str | list[str] | None = None,
 ) -> str:
     """
-    Retrieve source code and examples from GitHub repositories with glob pattern filtering.
+    Retrieve source code from GitHub repositories - HEAVIEST tool, use filters to minimize context.
 
-    Common patterns:
-    - All Terraform files: include_files=["*.tf"]
+    CONTEXT EFFICIENCY (CRITICAL):
+    - This is the most token-intensive tool
+    - ALWAYS use include_files to fetch only what's needed
+    - Prefer ["*.tf"] over fetching all files (excludes README, LICENSE, etc.)
+    - Use get_example_details first to verify relevance before fetching code
+
+    RECOMMENDED PATTERNS (most to least efficient):
+    - Terraform only: include_files=["*.tf"]
     - Specific files: include_files=["main.tf", "variables.tf"]
-    - Documentation: include_files=["*.md"]
-    - Examples: path="examples/basic", include_files=["*.tf"]
+    - With docs: include_files=["*.tf", "*.md"]
+    - All files: No filter (use sparingly - includes LICENSE, CI configs, etc.)
+
+    WHEN TO USE:
+    - User needs actual source code
+    - After list_content identified the right content
+    - After get_example_details verified relevance (recommended)
 
     Args:
         module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
         path: Specific path: "" (root), "examples/basic", "modules/vpc"
-        include_files: Glob patterns for files to include (e.g., ["*.tf"], ["*.md"])
+        include_files: Glob patterns for files to include - USE THIS to minimize context!
         exclude_files: Glob patterns for files to exclude (e.g., ["*test*"])
 
     Returns:
