@@ -127,9 +127,7 @@ class ContentPath(BaseModel):
 
     path: str = Field(..., description="Path string")
     description: str = Field(..., description="Path description from README")
-    type: str = Field(
-        ..., description="Path type (root, examples, submodules)"
-    )
+    type: str = Field(..., description="Path type (root, examples, submodules)")
 
 
 class ListContentResponse(BaseModel):
@@ -143,7 +141,9 @@ class ListContentResponse(BaseModel):
 class GetExampleDetailsRequest(BaseModel):
     """Request model for getting example details."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
     example_path: str = Field(..., description="Example path (e.g., 'examples/basic')")
 
 

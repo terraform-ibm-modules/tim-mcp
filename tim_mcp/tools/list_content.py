@@ -13,7 +13,6 @@ from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..context import get_cache, get_rate_limiter
 from ..exceptions import (
-    GitHubError,
     ModuleNotFoundError,
     RateLimitError,
     TerraformRegistryError,
@@ -95,7 +94,13 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
                 error=str(e),
             )
             return await _list_content_github_fallback(
-                base_module_id, namespace, name, provider, version, config, github_client
+                base_module_id,
+                namespace,
+                name,
+                provider,
+                version,
+                config,
+                github_client,
             )
 
         # Return formatted content listing

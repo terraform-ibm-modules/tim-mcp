@@ -131,7 +131,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -265,7 +267,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -300,7 +304,9 @@ class TestListContentImpl:
 
         # Execute & Verify
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -313,15 +319,19 @@ class TestListContentImpl:
 
                 from tim_mcp.exceptions import TerraformRegistryError
 
-                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
-                    "HTTP error getting module structure: 429 Too Many Requests",
-                    status_code=429,
-                    response_body="Too Many Requests",
+                mock_terraform_client.get_module_structure.side_effect = (
+                    TerraformRegistryError(
+                        "HTTP error getting module structure: 429 Too Many Requests",
+                        status_code=429,
+                        response_body="Too Many Requests",
+                    )
                 )
 
                 # Mock GitHub fallback to also fail with rate limit
                 mock_github_client.get_repository_info.side_effect = RateLimitError(
-                    "GitHub rate limit exceeded", reset_time=1234567890, api_name="GitHub"
+                    "GitHub rate limit exceeded",
+                    reset_time=1234567890,
+                    api_name="GitHub",
                 )
 
                 with pytest.raises(RateLimitError) as exc_info:
@@ -390,7 +400,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
