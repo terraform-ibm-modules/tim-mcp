@@ -44,8 +44,7 @@ class ModuleSearchResponse(BaseModel):
 class ModuleDetailsRequest(BaseModel):
     """Request model for module details."""
 
-    module_id: str = Field(..., description="Full module identifier")
-    version: str = Field("latest", description="Specific version or latest")
+    module_id: str = Field(..., description="Full module identifier (with or without version)")
 
 
 class ModuleInput(BaseModel):
@@ -76,8 +75,7 @@ class ModuleDependency(BaseModel):
 class ListContentRequest(BaseModel):
     """Request model for listing repository content."""
 
-    module_id: str = Field(..., description="Full module identifier")
-    version: str = Field("latest", description="Git tag/branch to scan")
+    module_id: str = Field(..., description="Full module identifier (with or without version)")
 
 
 class ContentPath(BaseModel):
@@ -101,7 +99,7 @@ class ListContentResponse(BaseModel):
 class GetContentRequest(BaseModel):
     """Request model for getting repository content."""
 
-    module_id: str = Field(..., description="Full module identifier")
+    module_id: str = Field(..., description="Full module identifier (with or without version)")
     path: str = Field("", description="Specific path to fetch")
     include_files: list[str] | None = Field(
         None, description="Glob patterns for files to include (e.g., '*.tf', '**/*.md')"
@@ -110,7 +108,6 @@ class GetContentRequest(BaseModel):
         None,
         description="Glob patterns for files to exclude (e.g., '*test*', 'examples/**')",
     )
-    version: str = Field("latest", description="Git tag/branch to fetch from")
 
 
 class FileContent(BaseModel):

@@ -129,7 +129,7 @@ class TestGetModuleDetailsValidation:
     def test_valid_module_id_parsing(self):
         """Test that valid module IDs are parsed correctly."""
         # This will be implemented when we create the actual function
-        from tim_mcp.tools.details import parse_module_id
+        from tim_mcp.utils.module_id import parse_module_id
 
         # Test standard format
         namespace, name, provider = parse_module_id("terraform-ibm-modules/vpc/ibm")
@@ -137,9 +137,17 @@ class TestGetModuleDetailsValidation:
         assert name == "vpc"
         assert provider == "ibm"
 
+        # Test with version included
+        from tim_mcp.utils.module_id import parse_module_id_with_version
+        namespace, name, provider, version = parse_module_id_with_version("terraform-ibm-modules/vpc/ibm/1.2.3")
+        assert namespace == "terraform-ibm-modules"
+        assert name == "vpc"
+        assert provider == "ibm"
+        assert version == "1.2.3"
+
     def test_invalid_module_id_format(self):
         """Test validation fails for invalid module ID format."""
-        from tim_mcp.tools.details import parse_module_id
+        from tim_mcp.utils.module_id import parse_module_id
 
         with pytest.raises(ValidationError) as exc_info:
             parse_module_id("invalid-format")
@@ -149,17 +157,19 @@ class TestGetModuleDetailsValidation:
 
     def test_empty_module_id_components(self):
         """Test validation fails for empty components."""
-        from tim_mcp.tools.details import parse_module_id
+        from tim_mcp.utils.module_id import parse_module_id
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             parse_module_id("//")
 
+        assert exc_info.value.field == "module_id"
+
     def test_module_id_with_extra_slashes(self):
-        """Test validation fails for module ID with extra slashes."""
-        from tim_mcp.tools.details import parse_module_id
+        """Test validation fails for module ID with too many slashes."""
+        from tim_mcp.utils.module_id import parse_module_id
 
         with pytest.raises(ValidationError):
-            parse_module_id("namespace/name/provider/extra")
+            parse_module_id("namespace/name/provider/version/extra")
 
 
 class TestGetModuleDetailsSuccess:
@@ -221,7 +231,7 @@ class TestGetModuleDetailsSuccess:
             ]
 
             request = ModuleDetailsRequest(
-                module_id="terraform-ibm-modules/vpc/ibm", version="7.4.1"
+                module_id="terraform-ibm-modules/vpc/ibm/7.4.1"
             )
 
             result = await get_module_details_impl(request, config)
