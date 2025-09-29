@@ -9,8 +9,7 @@ from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
-from ..exceptions import ModuleNotFoundError, TerraformRegistryError
-from ..exceptions import ValidationError
+from ..exceptions import ModuleNotFoundError, TerraformRegistryError, ValidationError
 from ..logging import get_logger
 from ..types import GetExampleDetailsRequest
 from ..utils.module_id import parse_module_id_with_version

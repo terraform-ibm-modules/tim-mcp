@@ -44,7 +44,9 @@ class ModuleSearchResponse(BaseModel):
 class ModuleDetailsRequest(BaseModel):
     """Request model for module details."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
 
 
 class ModuleInput(BaseModel):
@@ -75,7 +77,9 @@ class ModuleDependency(BaseModel):
 class ListContentRequest(BaseModel):
     """Request model for listing repository content."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
 
 
 class ContentPath(BaseModel):
@@ -83,9 +87,7 @@ class ContentPath(BaseModel):
 
     path: str = Field(..., description="Path string")
     description: str = Field(..., description="Path description from README")
-    type: str = Field(
-        ..., description="Path type (root, examples, submodules)"
-    )
+    type: str = Field(..., description="Path type (root, examples, submodules)")
 
 
 class ListContentResponse(BaseModel):
@@ -99,14 +101,18 @@ class ListContentResponse(BaseModel):
 class GetExampleDetailsRequest(BaseModel):
     """Request model for getting example details."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
     example_path: str = Field(..., description="Example path (e.g., 'examples/basic')")
 
 
 class GetContentRequest(BaseModel):
     """Request model for getting repository content."""
 
-    module_id: str = Field(..., description="Full module identifier (with or without version)")
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
     path: str = Field("", description="Specific path to fetch")
     include_files: list[str] | None = Field(
         None, description="Glob patterns for files to include (e.g., '*.tf', '**/*.md')"

@@ -11,7 +11,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from tim_mcp.config import Config
-from tim_mcp.exceptions import GitHubError, ModuleNotFoundError, RateLimitError, ValidationError
+from tim_mcp.exceptions import (
+    GitHubError,
+    ModuleNotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 from tim_mcp.tools.list_content import list_content_impl
 from tim_mcp.types import ListContentRequest
 
@@ -111,9 +116,7 @@ class TestListContentImpl:
     ):
         """Test successful content listing using Registry API."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         # Mock GitHub for solutions lookup
         mock_github_client.resolve_version.return_value = "main"
@@ -128,7 +131,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -197,9 +202,7 @@ class TestListContentImpl:
     ):
         """Test content listing with specific version tag."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm/v5.1.0"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm/v5.1.0")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.resolve_version.return_value = "v5.1.0"
@@ -231,9 +234,7 @@ class TestListContentImpl:
     async def test_list_content_module_not_found(self, mock_config, mock_github_client):
         """Test error handling when module repository is not found."""
         # Setup
-        request = ListContentRequest(
-            module_id="nonexistent/module/ibm"
-        )
+        request = ListContentRequest(module_id="nonexistent/module/ibm")
 
         mock_github_client.get_repository_info.side_effect = ModuleNotFoundError(
             "nonexistent/terraform-ibm-module",
@@ -255,9 +256,7 @@ class TestListContentImpl:
     async def test_list_content_github_api_error(self, mock_config, mock_github_client):
         """Test that Registry API is used even when GitHub API fails (for solutions)."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         # GitHub fails for solutions lookup, but Registry succeeds
         mock_github_client.resolve_version.side_effect = GitHubError(
@@ -268,7 +267,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -299,13 +300,13 @@ class TestListContentImpl:
     async def test_list_content_rate_limit_error(self, mock_config, mock_github_client):
         """Test error handling for Registry API rate limit errors."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         # Execute & Verify
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -318,15 +319,19 @@ class TestListContentImpl:
 
                 from tim_mcp.exceptions import TerraformRegistryError
 
-                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
-                    "HTTP error getting module structure: 429 Too Many Requests",
-                    status_code=429,
-                    response_body="Too Many Requests",
+                mock_terraform_client.get_module_structure.side_effect = (
+                    TerraformRegistryError(
+                        "HTTP error getting module structure: 429 Too Many Requests",
+                        status_code=429,
+                        response_body="Too Many Requests",
+                    )
                 )
 
                 # Mock GitHub fallback to also fail with rate limit
                 mock_github_client.get_repository_info.side_effect = RateLimitError(
-                    "GitHub rate limit exceeded", reset_time=1234567890, api_name="GitHub"
+                    "GitHub rate limit exceeded",
+                    reset_time=1234567890,
+                    api_name="GitHub",
                 )
 
                 with pytest.raises(RateLimitError) as exc_info:
@@ -353,9 +358,7 @@ class TestListContentImpl:
     ):
         """Test content listing for empty repository."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/empty/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/empty/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.resolve_version.return_value = "main"
@@ -384,9 +387,7 @@ class TestListContentImpl:
     ):
         """Test fallback to generic descriptions when Registry has no READMEs."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         mock_github_client.resolve_version.return_value = "main"
         mock_github_client.get_repository_tree.return_value = sample_tree_response
@@ -399,7 +400,9 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+            with patch(
+                "tim_mcp.tools.list_content.TerraformClient"
+            ) as MockTerraformClient:
                 MockGitHubClient.return_value = mock_github_client
                 mock_github_client.client = AsyncMock()
                 mock_github_client.client.aclose = AsyncMock()
@@ -461,9 +464,7 @@ class TestListContentImpl:
             {"path": ".github", "type": "tree", "mode": "040000"},
         ]
 
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/test/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/test/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.get_repository_tree.return_value = diverse_tree
