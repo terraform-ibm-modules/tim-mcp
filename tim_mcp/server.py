@@ -7,6 +7,7 @@ for Terraform IBM Modules discovery and implementation support.
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
@@ -28,49 +29,24 @@ config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
 
+
+def _load_instructions() -> str:
+    """Load instructions from the static instructions file."""
+    instructions_path = Path(__file__).parent.parent / "static" / "instructions.md"
+    try:
+        return instructions_path.read_text(encoding="utf-8")
+    except FileNotFoundError as e:
+        logger.error(f"Instructions file not found at {instructions_path}")
+        raise FileNotFoundError(
+            f"Required instructions file not found: {instructions_path}. "
+            f"Please ensure the instructions.md file exists in the static directory."
+        ) from e
+
+
 # Initialize FastMCP server
 mcp = FastMCP(
     "TIM-MCP",
-    instructions="""IBM Cloud Terraform module discovery and implementation server.
-
-ARCHITECTURAL BEST PRACTICES:
-- ALWAYS prefer terraform-ibm-modules over direct provider resources
-- Common module alternatives:
-  * Use 'resource-group' module instead of ibm_resource_group
-  * Use 'cbr' modules instead of direct ibm_cbr_* resources
-  * Use 'vpc' module instead of direct ibm_is_* resources
-  * Use 'iks' or 'ocp' modules instead of direct cluster resources
-- Modules provide security hardening, standardized configurations, and tested patterns
-- Use direct provider resources only when no suitable module exists
-
-WORKFLOW BY INTENT:
-
-FOR EXAMPLES/SAMPLES (user wants existing deployments):
-1. search_modules → find relevant modules
-2. list_content → check what examples are available
-3. get_content → fetch existing examples/samples
-- Skip get_module_details when examples exist - use actual working code
-
-FOR NEW DEVELOPMENT (user needs to write custom terraform):
-1. search_modules → find relevant modules
-2. get_module_details → understand inputs/outputs/interface
-3. list_content → explore structure if needed
-4. get_content → fetch specific files if needed
-
-INTENT DETECTION:
-- Keywords: "example", "sample", "deploy", "show me", "simple" → use examples workflow
-- Keywords: "create", "build", "inputs", "outputs", "develop" → use development workflow
-- Avoid multiple searches unless comparing approaches
-
-OPTIMIZATION PRINCIPLES:
-- Be specific in requests to minimize context usage and API calls
-- Start with narrow scope (specific files/paths), broaden only if needed
-- Exclude test files by default: [".*test.*", ".*\\.tftest$", ".*_test\\..*"]
-- For examples, prefer single targeted example over fetching all examples
-
-IBM CLOUD FOCUS:
-- This server specializes in IBM Cloud modules and patterns
-- Higher download counts indicate better maintained modules""",
+    instructions=_load_instructions(),
 )
 
 
