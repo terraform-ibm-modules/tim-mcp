@@ -32,15 +32,29 @@ logger = get_logger(__name__)
 
 def _load_instructions() -> str:
     """Load instructions from the static instructions file."""
-    instructions_path = Path(__file__).parent.parent / "static" / "instructions.md"
-    try:
-        return instructions_path.read_text(encoding="utf-8")
-    except FileNotFoundError as e:
-        logger.error(f"Instructions file not found at {instructions_path}")
-        raise FileNotFoundError(
-            f"Required instructions file not found: {instructions_path}. "
-            f"Please ensure the instructions.md file exists in the static directory."
-        ) from e
+    # First try the packaged location (when installed via pip/uvx)
+    packaged_path = Path(__file__).parent / "static" / "instructions.md"
+    # Then try the development location (when running from source)
+    dev_path = Path(__file__).parent.parent / "static" / "instructions.md"
+
+    for instructions_path in [packaged_path, dev_path]:
+        if instructions_path.exists():
+            try:
+                return instructions_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logger.error(
+                    f"Error reading instructions file at {instructions_path}: {e}"
+                )
+                continue
+
+    # If neither path works, provide helpful error message
+    logger.error(f"Instructions file not found at {packaged_path} or {dev_path}")
+    raise FileNotFoundError(
+        f"Required instructions file not found. Searched locations:\n"
+        f"  - {packaged_path} (packaged installation)\n"
+        f"  - {dev_path} (development installation)\n"
+        f"Please ensure the instructions.md file exists in the static directory."
+    )
 
 
 # Initialize FastMCP server
