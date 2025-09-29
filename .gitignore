@@ -121,3 +121,5 @@ dmypy.json
 
 .bob/
 .bobignore
+# do not commit to source control it is dynamicly generated
+*_version.py

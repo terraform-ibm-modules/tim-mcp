@@ -7,6 +7,7 @@ for Terraform IBM Modules discovery and implementation support.
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
@@ -28,49 +29,38 @@ config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
 
+
+def _load_instructions() -> str:
+    """Load instructions from the static instructions file."""
+    # First try the packaged location (when installed via pip/uvx)
+    packaged_path = Path(__file__).parent / "static" / "instructions.md"
+    # Then try the development location (when running from source)
+    dev_path = Path(__file__).parent.parent / "static" / "instructions.md"
+
+    for instructions_path in [packaged_path, dev_path]:
+        if instructions_path.exists():
+            try:
+                return instructions_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logger.error(
+                    f"Error reading instructions file at {instructions_path}: {e}"
+                )
+                continue
+
+    # If neither path works, provide helpful error message
+    logger.error(f"Instructions file not found at {packaged_path} or {dev_path}")
+    raise FileNotFoundError(
+        f"Required instructions file not found. Searched locations:\n"
+        f"  - {packaged_path} (packaged installation)\n"
+        f"  - {dev_path} (development installation)\n"
+        f"Please ensure the instructions.md file exists in the static directory."
+    )
+
+
 # Initialize FastMCP server
 mcp = FastMCP(
     "TIM-MCP",
-    instructions="""IBM Cloud Terraform module discovery and implementation server.
-
-ARCHITECTURAL BEST PRACTICES:
-- ALWAYS prefer terraform-ibm-modules over direct provider resources
-- Common module alternatives:
-  * Use 'resource-group' module instead of ibm_resource_group
-  * Use 'cbr' modules instead of direct ibm_cbr_* resources
-  * Use 'vpc' module instead of direct ibm_is_* resources
-  * Use 'iks' or 'ocp' modules instead of direct cluster resources
-- Modules provide security hardening, standardized configurations, and tested patterns
-- Use direct provider resources only when no suitable module exists
-
-WORKFLOW BY INTENT:
-
-FOR EXAMPLES/SAMPLES (user wants existing deployments):
-1. search_modules → find relevant modules
-2. list_content → check what examples are available
-3. get_content → fetch existing examples/samples
-- Skip get_module_details when examples exist - use actual working code
-
-FOR NEW DEVELOPMENT (user needs to write custom terraform):
-1. search_modules → find relevant modules
-2. get_module_details → understand inputs/outputs/interface
-3. list_content → explore structure if needed
-4. get_content → fetch specific files if needed
-
-INTENT DETECTION:
-- Keywords: "example", "sample", "deploy", "show me", "simple" → use examples workflow
-- Keywords: "create", "build", "inputs", "outputs", "develop" → use development workflow
-- Avoid multiple searches unless comparing approaches
-
-OPTIMIZATION PRINCIPLES:
-- Be specific in requests to minimize context usage and API calls
-- Start with narrow scope (specific files/paths), broaden only if needed
-- Exclude test files by default: [".*test.*", ".*\\.tftest$", ".*_test\\..*"]
-- For examples, prefer single targeted example over fetching all examples
-
-IBM CLOUD FOCUS:
-- This server specializes in IBM Cloud modules and patterns
-- Higher download counts indicate better maintained modules""",
+    instructions=_load_instructions(),
 )
 
 
@@ -225,7 +215,7 @@ async def search_modules(
 
 
 @mcp.tool()
-async def get_module_details(module_id: str, version: str = "latest") -> str:
+async def get_module_details(module_id: str) -> str:
     """
     Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
 
@@ -247,8 +237,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
     - Module dependencies
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Specific version or "latest" (default: "latest")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
 
     Returns:
         Plain text with markdown formatted module details including inputs, outputs, and description
@@ -257,7 +246,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 
     try:
         # Validate request
-        request = ModuleDetailsRequest(module_id=module_id, version=version)
+        request = ModuleDetailsRequest(module_id=module_id)
 
         # Import here to avoid circular imports
         from .tools.details import get_module_details_impl
@@ -282,7 +271,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error="validation_error",
@@ -294,7 +283,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
         )
@@ -305,7 +294,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "get_module_details",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error=str(e),
@@ -315,7 +304,7 @@ async def get_module_details(module_id: str, version: str = "latest") -> str:
 
 
 @mcp.tool()
-async def list_content(module_id: str, version: str = "latest") -> str:
+async def list_content(module_id: str) -> str:
     """
     Discover available examples and repository structure - FIRST step in examples workflow.
 
@@ -341,8 +330,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
     - Use descriptions to select the single most relevant example
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
-        version: Git tag/branch to scan (default: "latest")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
 
     Returns:
         Plain text with markdown formatted content listing organized by category
@@ -351,7 +339,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
 
     try:
         # Validate request
-        request = ListContentRequest(module_id=module_id, version=version)
+        request = ListContentRequest(module_id=module_id)
 
         # Import here to avoid circular imports
         from .tools.list_content import list_content_impl
@@ -376,7 +364,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error="validation_error",
@@ -388,7 +376,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
         )
@@ -399,7 +387,7 @@ async def list_content(module_id: str, version: str = "latest") -> str:
         log_tool_execution(
             logger,
             "list_content",
-            {"module_id": module_id, "version": version},
+            {"module_id": module_id},
             duration_ms,
             success=False,
             error=str(e),
@@ -414,7 +402,6 @@ async def get_content(
     path: str = "",
     include_files: str | list[str] | None = None,
     exclude_files: str | list[str] | None = None,
-    version: str = "latest",
 ) -> str:
     """
     Retrieve source code, examples, solutions from GitHub repositories with glob pattern filtering.
@@ -426,11 +413,10 @@ async def get_content(
     - Examples: path="examples/basic", include_files=["*.tf"]
 
     Args:
-        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm")
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
         path: Specific path: "" (root), "examples/basic", "modules/vpc"
         include_files: Glob patterns for files to include (e.g., ["*.tf"], ["*.md"])
         exclude_files: Glob patterns for files to exclude (e.g., ["*test*"])
-        version: Git tag/branch to fetch from (default: "latest")
 
     Returns:
         Plain text with markdown formatted content
@@ -452,7 +438,6 @@ async def get_content(
             path=path,
             include_files=sanitized_include_files,
             exclude_files=sanitized_exclude_files,
-            version=version,
         )
 
         # Import here to avoid circular imports
@@ -483,7 +468,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,
@@ -501,7 +485,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,
@@ -518,7 +501,6 @@ async def get_content(
                 "path": path,
                 "include_files": include_files,
                 "exclude_files": exclude_files,
-                "version": version,
             },
             duration_ms,
             success=False,
