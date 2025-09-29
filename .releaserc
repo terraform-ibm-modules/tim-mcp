@@ -4,12 +4,14 @@
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
-    "@semantic-release/github",
-    ["@semantic-release/git", {
-      "assets": "false"
-    }],
     ["@semantic-release/exec", {
+      "prepareCmd": "if [ -f pyproject.toml ]; then python3 -c \"import re; content = open('pyproject.toml').read(); content = re.sub(r'(version\\s*=\\s*)[\\\"\\'][^\\\"\\']+([\\\"\\'\\)])', r'\\\\1\\\"${nextRelease.version}\\\"\\\\2', content); open('pyproject.toml', 'w').write(content); print('Updated pyproject.toml version to ${nextRelease.version}')\"; else echo 'No pyproject.toml found, skipping Python version update'; fi",
       "successCmd": "echo \"SEMVER_VERSION=${nextRelease.version}\" >> $GITHUB_ENV"
-    }]
+    }],
+    ["@semantic-release/git", {
+      "assets": ["pyproject.toml"],
+      "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }],
+    "@semantic-release/github"
   ]
 }
