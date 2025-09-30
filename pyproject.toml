@@ -17,6 +17,8 @@ dependencies = [
     "tenacity==9.0.0",
     "structlog==24.4.0",
     "click>=8.0.0",
+    "pypdf2>=3.0.1",
+    "pymupdf>=1.26.4",
 ]
 
 [project.scripts]

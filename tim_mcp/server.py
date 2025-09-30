@@ -510,6 +510,13 @@ async def get_content(
         raise TIMError(f"Unexpected error: {e}") from e
 
 
+@mcp.resource("file://terraform-whitepaper")
+async def terraform_whitepaper():
+    """IBM Cloud Terraform Best Practices white paper in markdown format."""
+    whitepaper_path = Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+    return whitepaper_path.read_text(encoding="utf-8")
+
+
 def main(transport_config=None):
     """
     Run the MCP server with specified transport configuration.
