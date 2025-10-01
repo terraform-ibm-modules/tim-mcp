@@ -123,3 +123,6 @@ dmypy.json
 .bobignore
 # do not commit to source control it is dynamicly generated
 *_version.py
+
+# local testing
+test_output/
