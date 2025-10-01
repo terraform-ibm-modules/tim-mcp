@@ -22,6 +22,8 @@ from .types import (
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
+    ProviderDetailsRequest,
+    ProviderSearchRequest,
 )
 
 # Global configuration and logger
@@ -507,6 +509,186 @@ async def get_content(
             error=str(e),
         )
         logger.exception("Unexpected error in get_content")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def search_providers(
+    query: str | None = None,
+    limit: int = 10,
+    offset: int = 0,
+) -> str:
+    """
+    Search Terraform Registry for providers by name or keyword.
+
+    SEARCH TIPS:
+    - Search by provider name: "aws", "azure", "google"
+    - Or omit query to list recent providers
+    - Results are sorted by download count (most popular first)
+
+    Args:
+        query: Optional search term to filter providers (e.g., "aws", "kubernetes")
+        limit: Maximum results to return (default: 10, max: 100)
+        offset: Pagination offset for retrieving additional results (default: 0)
+
+    Returns:
+        JSON formatted provider search results with download counts, versions, and tier information
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = ProviderSearchRequest(query=query, limit=limit, offset=offset)
+
+        # Import here to avoid circular imports
+        from .tools.search_providers import search_providers_impl
+
+        # Execute search
+        response = await search_providers_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_providers",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_providers",
+            {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+            },
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_providers",
+            {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+            },
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_providers",
+            {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+            },
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in search_providers")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def get_provider_details(provider_id: str) -> str:
+    """
+    Get comprehensive provider information from Terraform Registry.
+
+    WHEN TO USE:
+    - To understand provider capabilities and features
+    - To check available versions and tier status
+    - To get usage examples and configuration snippets
+    - When planning Terraform infrastructure with specific providers
+
+    PROVIDER INFORMATION INCLUDES:
+    - Provider description and tier (official, partner, community)
+    - Latest version and complete version history
+    - Download statistics and publication date
+    - Source repository and documentation links
+    - Ready-to-use Terraform configuration examples
+
+    Args:
+        provider_id: Provider identifier (e.g., "hashicorp/aws", "hashicorp/aws/5.70.0")
+
+    Returns:
+        Plain text with markdown formatted provider details including versions and usage examples
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = ProviderDetailsRequest(provider_id=provider_id)
+
+        # Import here to avoid circular imports
+        from .tools.get_provider_details import get_provider_details_impl
+
+        # Execute details retrieval
+        response = await get_provider_details_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_provider_details")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
