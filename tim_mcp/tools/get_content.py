@@ -116,11 +116,23 @@ async def _get_content_with_client(
     for i, file_item in enumerate(filtered_files):
         result = results[i]
         if not isinstance(result, Exception):
+            file_content = result.get("decoded_content", "")
+            # If this is a Terraform file, replace source references
+            # NOTE: This sanitizes examples by replacing relative paths with absolute module references
+            if file_item["name"].endswith('.tf'):
+                # Strip 'v' prefix from version for Terraform compatibility (GitHub uses v1.2.3, Terraform uses 1.2.3)
+                terraform_version = resolved_version.lstrip('v')
+                # Replace source = "../.." or source = "../../" with source = "{base_module_id}" and add version
+                file_content = re.sub(
+                    r'source\s*=\s*"\.\.\/\.\.\/?"',
+                    f'source = "{base_module_id}"\n  version = "{terraform_version}"',
+                    file_content
+                )
             file_contents.append(
                 {
                     "name": file_item["name"],
                     "path": file_item["path"],
-                    "content": result.get("decoded_content", ""),
+                    "content": file_content,
                     "size": result.get("size", 0),
                 }
             )

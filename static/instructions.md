@@ -198,6 +198,49 @@ When generating Terraform configurations:
 4. **Ensure proper module versioning to maintain stability**
 5. **Include appropriate comments to explain the purpose and configuration of resources**
 6. **Always validate generated logic** with `terraform init` and `terraform validate`
+7. **Verify generated Terraform when possible** - Use available tools to run `terraform init`, `terraform validate`, and `terraform plan` to ensure configurations are syntactically correct and logically sound
+8. **Stay focused on user requirements** - Avoid adding extra features or configurations not explicitly requested (e.g., don't include user_data blocks when generating VSI code unless specifically asked)
+9. **Ask clarifying questions when ambiguous** - If the user's request lacks specific details or could be interpreted multiple ways, ask targeted questions to ensure accurate implementation
+10. **Leverage IBM Cloud MCP when available** - If you have access to IBM Cloud MCP tools, use them to verify region lists, image IDs (for VSIs based on region), availability zones, and other cloud-specific parameters to ensure accuracy
+11. **Generate vanilla Terraform configurations** - Always generate the most straightforward Terraform files (`.tf` files) and a README. Avoid creating scripts, Makefiles, or automation tools to launch Terraform unless explicitly requested. You may generate a template tfvars file if needed.
+
+## Validation and Quality Assurance
+
+### Terraform Validation
+- **Always attempt to verify generated Terraform configurations**
+- Run `terraform init` to ensure proper provider and module initialization
+- Execute `terraform validate` to check syntax and configuration validity
+- Use `terraform plan` when possible to verify logical correctness. Ignore authentication errors as you may not have valid credentials
+- Provide corrected configurations
+
+### Scope Management
+- **Focus strictly on user requirements** - Don't add unrequested features
+- **Common examples of scope creep to avoid:**
+  - Do not add user_data blocks to VSI configurations unless explicitly requested
+  - Do not add monitoring or logging configurations unless asked
+  - Do not add security groups beyond basic requirements
+  - Do not implement backup strategies unless specified
+- **When in doubt, ask** - It's better to clarify requirements than assume additional needs
+
+### Clarification Best Practices
+- **Ask targeted questions** when user requests are ambiguous
+- **Common clarification areas:**
+  - Specific region requirements for resource placement
+  - Network configuration preferences (subnets, CIDR blocks)
+  - Security requirements and compliance needs
+  - Resource sizing and performance requirements
+  - Integration points with existing infrastructure
+- **Provide context** in your questions to help users make informed decisions
+
+### IBM Cloud MCP Integration
+- **Leverage IBM Cloud MCP tools when available** for accurate cloud-specific information
+- **Use for verification of:**
+  - Available regions and availability zones
+  - Valid image IDs for virtual server instances (region-specific)
+  - Current service offerings and capabilities
+  - Pricing and resource limits
+  - Network and connectivity options
+- **Cross-reference generated configurations** with real IBM Cloud data when possible
 
 ## Best Practices Summary
 
