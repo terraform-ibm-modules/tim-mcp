@@ -51,7 +51,7 @@ Keywords to detect this intent: "example", "sample", "deploy", "show me", "simpl
 
 The example files provide valuable insights:
 - **Main configuration file**: Shows how to use and combine the module with others
-- **Provider configuration file**: Demonstrates proper provider configuration 
+- **Provider configuration file**: Demonstrates proper provider configuration
 - **Version constraints file**: Shows required provider versions and constraints
 - **Variables and outputs**: Define module interface and available values
 
@@ -107,13 +107,13 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
    # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0 (among others)
 2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Understand module capabilities, inputs, outputs
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0") 
+3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Find available examples: examples/basic, examples/default, etc.
 4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
    # Get configuration files showing module usage and provider setup
 ```
 
-### Example 2: User Wants to Build Custom VPC Configuration  
+### Example 2: User Wants to Build Custom VPC Configuration
 
 **User Request:** "I need to create a VPC with custom settings, what inputs does the module take?"
 **Intent Detection:** Development workflow (keywords: "create", "inputs")
@@ -140,7 +140,7 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 ```
 1. search_modules("vpc")
    # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0, etc.
-2. search_modules("security group") 
+2. search_modules("security group")
    # Returns: terraform-ibm-modules/security-group/ibm/2.7.0, etc.
 3. search_modules("cluster")
    # Returns: terraform-ibm-modules/base-ocp-vpc/ibm/3.62.0, etc.
