@@ -139,7 +139,10 @@ class TestGetModuleDetailsValidation:
 
         # Test with version included
         from tim_mcp.utils.module_id import parse_module_id_with_version
-        namespace, name, provider, version = parse_module_id_with_version("terraform-ibm-modules/vpc/ibm/1.2.3")
+
+        namespace, name, provider, version = parse_module_id_with_version(
+            "terraform-ibm-modules/vpc/ibm/1.2.3"
+        )
         assert namespace == "terraform-ibm-modules"
         assert name == "vpc"
         assert provider == "ibm"

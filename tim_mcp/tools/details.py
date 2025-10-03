@@ -10,9 +10,7 @@ from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
-from ..exceptions import ModuleNotFoundError, TerraformRegistryError
-from ..exceptions import ValidationError
-from ..logging import get_logger
+from ..exceptions import ModuleNotFoundError, TerraformRegistryError, ValidationError
 from ..types import ModuleDetailsRequest
 from ..utils.module_id import parse_module_id_with_version
 
@@ -265,7 +263,9 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
     """
     # Parse and validate module ID with version
     try:
-        namespace, name, provider, version = parse_module_id_with_version(request.module_id)
+        namespace, name, provider, version = parse_module_id_with_version(
+            request.module_id
+        )
     except ValidationError as e:
         # Re-raise validation errors with original context
         raise TerraformRegistryError(f"Module ID validation failed: {e}") from e
