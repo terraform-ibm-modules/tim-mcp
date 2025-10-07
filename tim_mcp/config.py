@@ -58,6 +58,26 @@ class Config(BaseModel):
         description="List of module IDs to exclude from search results",
     )
 
+    # Provider Allowlist Configuration
+    allowed_provider_namespaces: list[str] = Field(
+        default_factory=lambda: [],
+        description="List of allowed provider namespaces for provider search and details",
+    )
+    allowed_provider_ids: list[str] = Field(
+        default_factory=lambda: [
+            "hashicorp/time",
+            "hashicorp/null",
+            "hashicorp/local",
+            "hashicorp/kubernetes",
+            "hashicorp/random",
+            "hashicorp/helm",
+            "hashicorp/external",
+            "Mastercard/restapi",
+            "IBM-Cloud/ibm",
+        ],
+        description="List of specific allowed provider IDs (namespace/name format)",
+    )
+
     model_config = ConfigDict(env_prefix="TIM_")
 
 
@@ -123,6 +143,17 @@ def load_config() -> Config:
         if excluded_modules := os.getenv("TIM_EXCLUDED_MODULES"):
             config_data["excluded_modules"] = [
                 mod.strip() for mod in excluded_modules.split(",")
+            ]
+
+        # Provider allowlist configuration
+        if allowed_provider_namespaces := os.getenv("TIM_ALLOWED_PROVIDER_NAMESPACES"):
+            config_data["allowed_provider_namespaces"] = [
+                ns.strip() for ns in allowed_provider_namespaces.split(",")
+            ]
+
+        if allowed_provider_ids := os.getenv("TIM_ALLOWED_PROVIDER_IDS"):
+            config_data["allowed_provider_ids"] = [
+                pid.strip() for pid in allowed_provider_ids.split(",")
             ]
 
         return Config(**config_data)

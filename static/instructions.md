@@ -35,6 +35,55 @@ Modules provide:
 
 Use direct provider resources only when no suitable module exists.
 
+## Provider Tools Scope and Usage
+
+### Allowlisted Providers
+The provider search and details tools are restricted to these allowlisted providers:
+- **HashiCorp utility providers** - Essential utility providers for common Terraform patterns:
+  - `hashicorp/time` - Time-based resources and delays
+  - `hashicorp/null` - Null resources for triggers and dependencies
+  - `hashicorp/local` - Local file operations
+  - `hashicorp/kubernetes` - Kubernetes resource management
+  - `hashicorp/random` - Random value generation
+  - `hashicorp/helm` - Helm chart deployment
+  - `hashicorp/external` - External data sources and program execution
+- **Mastercard/restapi** - REST API provider for filling IBM Cloud provider functionality gaps
+- **IBM-Cloud/ibm** - Primary provider for IBM Cloud resources
+
+### Provider Usage Hierarchy
+When working with IBM Cloud infrastructure, follow this priority order:
+
+1. **FIRST: Use Terraform IBM Modules (TIM)**
+   - Always start by searching for relevant TIM modules
+   - TIM modules provide tested, secure, and standardized patterns
+
+2. **SECOND: Use IBM Cloud Provider (IBM-Cloud/ibm)**
+   - Use for IBM Cloud resources not covered by TIM modules
+   - Primary provider for all IBM Cloud infrastructure
+
+3. **THIRD: Use restapi Provider (Mastercard/restapi) - SPARINGLY**
+   - **ONLY** use to fill functionality gaps in the IBM Cloud provider
+   - This is a supplementary tool, not a primary solution
+   - Always document why the IBM Cloud provider was insufficient
+
+4. **UTILITY: HashiCorp Utility Providers**
+   - Use for cross-platform infrastructure needs
+   - Examples: time delays, random IDs, null resources for triggers
+   - These are utility providers, not primary infrastructure providers
+
+### When to Use Provider Tools
+- To stitch together TIM modules that require provider configuration
+- To fill specific gaps where no TIM module exists
+- To understand provider version requirements for TIM modules
+- For utility functions like random generation or time-based resources
+- For Kubernetes/Helm management alongside IBM Cloud infrastructure
+
+### Important Constraints
+- Only allowlisted providers are accessible through these tools
+- The restapi provider should be a last resort, not a primary tool
+- HashiCorp providers are limited to utility functions only (no cloud providers like AWS, Azure, GCP)
+- Always prefer module-based solutions over raw provider resources
+
 ## Workflow by Intent
 
 The server supports two distinct workflows based on user intent:

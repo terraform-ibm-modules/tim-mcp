@@ -519,15 +519,30 @@ async def search_providers(
     offset: int = 0,
 ) -> str:
     """
-    Search Terraform Registry for providers by name or keyword.
+    Search Terraform Registry for allowlisted providers by name or keyword.
+
+    ALLOWLISTED PROVIDERS:
+    - HashiCorp utility providers:
+      - hashicorp/time - Time-based resources
+      - hashicorp/null - Null resources for triggers
+      - hashicorp/local - Local file operations
+      - hashicorp/kubernetes - Kubernetes resources
+      - hashicorp/random - Random value generation
+      - hashicorp/helm - Helm chart deployment
+      - hashicorp/external - External data sources
+    - Mastercard/restapi - REST API provider for filling IBM Cloud provider gaps
+    - IBM-Cloud/ibm - Primary IBM Cloud provider
+
+    These providers are recommended by TIM for use with Terraform IBM Modules.
 
     SEARCH TIPS:
-    - Search by provider name: "aws", "azure", "google"
-    - Or omit query to list recent providers
+    - Search by provider name: "kubernetes", "random", "ibmcloud"
+    - Or omit query to list recent allowlisted providers
     - Results are sorted by download count (most popular first)
+    - Only allowlisted providers will be returned
 
     Args:
-        query: Optional search term to filter providers (e.g., "aws", "kubernetes")
+        query: Optional search term to filter providers (e.g., "kubernetes", "random")
         limit: Maximum results to return (default: 10, max: 100)
         offset: Pagination offset for retrieving additional results (default: 0)
 
@@ -610,13 +625,27 @@ async def search_providers(
 @mcp.tool()
 async def get_provider_details(provider_id: str) -> str:
     """
-    Get comprehensive provider information from Terraform Registry.
+    Get comprehensive provider information from Terraform Registry for allowlisted providers.
+
+    ALLOWLISTED PROVIDERS:
+    - HashiCorp utility providers (time, null, local, kubernetes, random, helm, external)
+    - Mastercard/restapi - REST API provider ONLY for filling IBM Cloud provider gaps
+    - IBM-Cloud/ibm - Primary provider for IBM Cloud resources
+
+    PROVIDER USAGE PRIORITIES:
+    1. PRIMARY: Use IBM Cloud provider (IBM-Cloud/ibm) for IBM Cloud resources
+    2. SECONDARY: Use Mastercard/restapi provider ONLY to fill functionality gaps in IBM Cloud provider
+    3. TERTIARY: Use HashiCorp utility providers for cross-platform needs (time, random, null, etc.)
+    4. Use providers to stitch together TIM modules where necessary
+
+    IMPORTANT: The restapi provider is supplementary - use it sparingly and only when IBM Cloud
+    provider lacks specific functionality. Always prefer TIM modules and IBM Cloud provider first.
 
     WHEN TO USE:
-    - To understand provider capabilities and features
+    - To understand allowlisted provider capabilities and features
     - To check available versions and tier status
     - To get usage examples and configuration snippets
-    - When planning Terraform infrastructure with specific providers
+    - When planning Terraform infrastructure with TIM modules
 
     PROVIDER INFORMATION INCLUDES:
     - Provider description and tier (official, partner, community)
@@ -626,7 +655,7 @@ async def get_provider_details(provider_id: str) -> str:
     - Ready-to-use Terraform configuration examples
 
     Args:
-        provider_id: Provider identifier (e.g., "hashicorp/aws", "hashicorp/aws/5.70.0")
+        provider_id: Provider identifier (e.g., "hashicorp/random", "IBM-Cloud/ibm", "Mastercard/restapi")
 
     Returns:
         Plain text with markdown formatted provider details including versions and usage examples

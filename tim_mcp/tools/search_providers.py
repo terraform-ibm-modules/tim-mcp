@@ -97,7 +97,14 @@ async def search_providers_impl(
             for i, provider_data in enumerate(api_response["providers"]):
                 try:
                     provider = _transform_provider_data(provider_data)
-                    providers.append(provider)
+                    # Filter to only include allowlisted providers
+                    if _is_provider_allowed(provider, config):
+                        providers.append(provider)
+                    else:
+                        logger.debug(
+                            f"Provider filtered out by allowlist: {provider.namespace}/{provider.name}",
+                            provider_id=provider.id,
+                        )
                 except Exception as e:
                     # Include context about which provider failed
                     logger.warning(
@@ -134,6 +141,29 @@ async def search_providers_impl(
             raise TIMValidationError(
                 f"Unexpected error processing search results: {e}"
             ) from e
+
+
+def _is_provider_allowed(provider: ProviderInfo, config: Config) -> bool:
+    """
+    Check if a provider is in the allowlist.
+
+    Args:
+        provider: ProviderInfo object to check
+        config: Configuration instance with allowlist settings
+
+    Returns:
+        True if provider is allowed, False otherwise
+    """
+    # Check if namespace is allowed
+    if provider.namespace in config.allowed_provider_namespaces:
+        return True
+
+    # Check if specific provider ID is allowed (namespace/name format)
+    provider_id = f"{provider.namespace}/{provider.name}"
+    if provider_id in config.allowed_provider_ids:
+        return True
+
+    return False
 
 
 def _transform_provider_data(provider_data: dict[str, Any]) -> ProviderInfo:

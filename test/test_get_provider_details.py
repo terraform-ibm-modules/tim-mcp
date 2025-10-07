@@ -154,16 +154,16 @@ class TestGetProviderDetailsImpl:
     def sample_provider_response(self):
         """Sample response from Terraform Registry API."""
         return {
-            "id": "hashicorp/aws/6.14.1",
+            "id": "hashicorp/random/3.5.1",
             "namespace": "hashicorp",
-            "name": "aws",
-            "version": "6.14.1",
-            "description": "terraform-provider-aws",
-            "source": "https://github.com/hashicorp/terraform-provider-aws",
+            "name": "random",
+            "version": "3.5.1",
+            "description": "terraform-provider-random",
+            "source": "https://github.com/hashicorp/terraform-provider-random",
             "downloads": 4966945606,
             "tier": "official",
             "published_at": "2025-09-22T17:13:05Z",
-            "versions": ["6.14.1", "6.14.0", "6.13.0"],
+            "versions": ["3.5.1", "3.5.0", "3.4.0"],
         }
 
     @pytest.mark.asyncio
@@ -175,7 +175,7 @@ class TestGetProviderDetailsImpl:
         mock_terraform_client.get_provider_details.return_value = (
             sample_provider_response
         )
-        request = ProviderDetailsRequest(provider_id="hashicorp/aws")
+        request = ProviderDetailsRequest(provider_id="hashicorp/random")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"
@@ -188,10 +188,10 @@ class TestGetProviderDetailsImpl:
             result = await get_provider_details_impl(request, config)
 
             # Verify
-            assert "hashicorp/aws - Provider Details" in result
-            assert "v6.14.1" in result
+            assert "hashicorp/random - Provider Details" in result
+            assert "v3.5.1" in result
             mock_terraform_client.get_provider_details.assert_called_once_with(
-                namespace="hashicorp", name="aws", version="latest"
+                namespace="hashicorp", name="random", version="latest"
             )
 
     @pytest.mark.asyncio
@@ -201,12 +201,12 @@ class TestGetProviderDetailsImpl:
         """Test getting provider details with specific version."""
         # Setup - modify response for specific version
         specific_version_response = sample_provider_response.copy()
-        specific_version_response["version"] = "5.70.0"
-        specific_version_response["id"] = "hashicorp/aws/5.70.0"
+        specific_version_response["version"] = "3.4.0"
+        specific_version_response["id"] = "hashicorp/random/3.4.0"
         mock_terraform_client.get_provider_details.return_value = (
             specific_version_response
         )
-        request = ProviderDetailsRequest(provider_id="hashicorp/aws/5.70.0")
+        request = ProviderDetailsRequest(provider_id="hashicorp/random/3.4.0")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"
@@ -219,9 +219,9 @@ class TestGetProviderDetailsImpl:
             result = await get_provider_details_impl(request, config)
 
             # Verify
-            assert "v5.70.0" in result
+            assert "v3.4.0" in result
             mock_terraform_client.get_provider_details.assert_called_once_with(
-                namespace="hashicorp", name="aws", version="5.70.0"
+                namespace="hashicorp", name="random", version="3.4.0"
             )
 
     @pytest.mark.asyncio
@@ -242,13 +242,111 @@ class TestGetProviderDetailsImpl:
             assert "validation failed" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
-    async def test_get_provider_details_not_found(self, config, mock_terraform_client):
-        """Test getting provider details for non-existent provider."""
+    async def test_get_provider_details_not_allowlisted(self, config):
+        """Test getting provider details for non-allowlisted provider."""
+        # Setup - provider not in allowlist
+        request = ProviderDetailsRequest(provider_id="unauthorized/provider")
+
+        with patch(
+            "tim_mcp.tools.get_provider_details.TerraformClient"
+        ) as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = AsyncMock()
+
+            # Execute & Verify
+            with pytest.raises(TIMValidationError) as exc_info:
+                await get_provider_details_impl(request, config)
+
+            assert "not in the allowlist" in str(exc_info.value)
+            assert "unauthorized/provider" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_get_provider_details_not_allowlisted_hashicorp(self, config):
+        """Test getting provider details for non-allowlisted hashicorp provider (e.g., aws)."""
+        # Setup - hashicorp/aws is NOT in the specific allowlist
+        request = ProviderDetailsRequest(provider_id="hashicorp/aws")
+
+        with patch(
+            "tim_mcp.tools.get_provider_details.TerraformClient"
+        ) as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = AsyncMock()
+
+            # Execute & Verify
+            with pytest.raises(TIMValidationError) as exc_info:
+                await get_provider_details_impl(request, config)
+
+            assert "not in the allowlist" in str(exc_info.value)
+            assert "hashicorp/aws" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_get_provider_details_allowlisted_hashicorp(
+        self, config, mock_terraform_client, sample_provider_response
+    ):
+        """Test getting provider details for allowlisted hashicorp provider."""
         # Setup
+        mock_terraform_client.get_provider_details.return_value = (
+            sample_provider_response
+        )
+        request = ProviderDetailsRequest(provider_id="hashicorp/random")
+
+        with patch(
+            "tim_mcp.tools.get_provider_details.TerraformClient"
+        ) as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+
+            # Execute - should succeed for allowlisted hashicorp provider
+            result = await get_provider_details_impl(request, config)
+
+            # Verify
+            assert "hashicorp/random - Provider Details" in result
+            mock_terraform_client.get_provider_details.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_provider_details_allowlisted_mastercard_restapi(
+        self, config, mock_terraform_client
+    ):
+        """Test getting provider details for allowlisted Mastercard/restapi provider."""
+        # Setup
+        restapi_response = {
+            "id": "Mastercard/restapi/1.18.3",
+            "namespace": "Mastercard",
+            "name": "restapi",
+            "version": "1.18.3",
+            "description": "REST API Provider",
+            "source": "https://github.com/Mastercard/terraform-provider-restapi",
+            "downloads": 5000000,
+            "tier": "partner",
+            "published_at": "2025-09-01T12:00:00Z",
+            "versions": ["1.18.3", "1.18.2", "1.18.1"],
+        }
+        mock_terraform_client.get_provider_details.return_value = restapi_response
+        request = ProviderDetailsRequest(provider_id="Mastercard/restapi")
+
+        with patch(
+            "tim_mcp.tools.get_provider_details.TerraformClient"
+        ) as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+
+            # Execute - should succeed for Mastercard/restapi provider
+            result = await get_provider_details_impl(request, config)
+
+            # Verify
+            assert "Mastercard/restapi - Provider Details" in result
+            mock_terraform_client.get_provider_details.assert_called_once_with(
+                namespace="Mastercard", name="restapi", version="latest"
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_provider_details_not_found(self, config, mock_terraform_client):
+        """Test getting provider details for non-existent allowlisted provider."""
+        # Setup - use an allowlisted provider that doesn't exist
         mock_terraform_client.get_provider_details.side_effect = TerraformRegistryError(
             "Not found", status_code=404
         )
-        request = ProviderDetailsRequest(provider_id="nonexistent/provider")
+        request = ProviderDetailsRequest(provider_id="hashicorp/time")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"
@@ -267,11 +365,11 @@ class TestGetProviderDetailsImpl:
     @pytest.mark.asyncio
     async def test_get_provider_details_api_error(self, config, mock_terraform_client):
         """Test getting provider details with API error."""
-        # Setup
+        # Setup - use an allowlisted provider
         mock_terraform_client.get_provider_details.side_effect = TerraformRegistryError(
             "Service unavailable", status_code=503
         )
-        request = ProviderDetailsRequest(provider_id="hashicorp/aws")
+        request = ProviderDetailsRequest(provider_id="hashicorp/random")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"
@@ -291,14 +389,14 @@ class TestGetProviderDetailsImpl:
         self, config, mock_terraform_client
     ):
         """Test getting provider details with malformed API response."""
-        # Setup - missing required fields
+        # Setup - missing required fields, use allowlisted provider
         malformed_response = {
             "namespace": "hashicorp",
-            "name": "aws",
+            "name": "random",
             # Missing id, version, etc.
         }
         mock_terraform_client.get_provider_details.return_value = malformed_response
-        request = ProviderDetailsRequest(provider_id="hashicorp/aws")
+        request = ProviderDetailsRequest(provider_id="hashicorp/random")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"
@@ -318,11 +416,11 @@ class TestGetProviderDetailsImpl:
         self, config, mock_terraform_client, sample_provider_response
     ):
         """Test that the TerraformClient is used as an async context manager."""
-        # Setup
+        # Setup - use allowlisted provider
         mock_terraform_client.get_provider_details.return_value = (
             sample_provider_response
         )
-        request = ProviderDetailsRequest(provider_id="hashicorp/aws")
+        request = ProviderDetailsRequest(provider_id="hashicorp/random")
 
         with patch(
             "tim_mcp.tools.get_provider_details.TerraformClient"

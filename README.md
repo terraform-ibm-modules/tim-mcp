@@ -60,19 +60,29 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
 This MCP server provides tools for AI models to navigate the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM modules are bundled with extensive documentation, working examples, and architectural patterns, but these resources are distributed across many GitHub repositories.
 
 This server exposes a set of tools that allow an AI assistant to:
-- **Discover Providers** - Search and explore Terraform providers by name or keyword
+- **Discover Providers** - Search allowlisted Terraform providers (IBM Cloud, HashiCorp utilities, REST API)
 - **Provider Details** - Get comprehensive provider information including versions, tier status, and usage examples
 - **Discover Modules** - Find relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules)
 - **Inspect Modules** - View module details including inputs, outputs, and dependencies
 - **Explore Repositories** - List the contents of a module's repository, such as examples and submodules
 - **Retrieve Content** - Fetch specific file contents, like example code or documentation
 
+### Provider Allowlist
+
+For security and best practices, provider search and details tools are restricted to these allowlisted providers:
+- **IBM-Cloud/ibm** - Primary provider for IBM Cloud resources
+- **HashiCorp utility providers** - Essential utilities for common Terraform patterns:
+  - `hashicorp/time`, `hashicorp/null`, `hashicorp/local`
+  - `hashicorp/kubernetes`, `hashicorp/random`
+  - `hashicorp/helm`, `hashicorp/external`
+- **Mastercard/restapi** - REST API provider for filling IBM Cloud provider gaps (use sparingly)
+
 The goal is to provide a structured and efficient way for an AI to gather the necessary context to generate accurate and high-quality Infrastructure as Code solutions for IBM Cloud.
 
 ### Key Features
 
-- **Provider Search**: Search for Terraform providers by name or keyword with download-based ranking
-- **Provider Details**: Get comprehensive provider information including versions, tier status, and ready-to-use configuration examples
+- **Provider Search**: Search allowlisted Terraform providers by name or keyword with download-based ranking
+- **Provider Details**: Get comprehensive provider information for allowlisted providers including versions, tier status, and ready-to-use configuration examples
 - **Module Search**: Find modules in the Terraform Registry with quality-based ranking
 - **Module Details**: Get structured information about a module's interface, inputs, outputs, and dependencies
 - **Repository Exploration**: List the contents of a module's repository, including examples and submodules
@@ -188,6 +198,8 @@ server {
   - **Create token at:** https://github.com/settings/tokens
 - `TIM_ALLOWED_NAMESPACES`: Comma-separated list of allowed module namespaces (default: `terraform-ibm-modules`)
 - `TIM_EXCLUDED_MODULES`: Comma-separated list of module IDs to exclude from search results
+- `TIM_ALLOWED_PROVIDER_NAMESPACES`: Comma-separated list of allowed provider namespaces (default: none)
+- `TIM_ALLOWED_PROVIDER_IDS`: Comma-separated list of allowed provider IDs in namespace/name format (default: `hashicorp/time,hashicorp/null,hashicorp/local,hashicorp/kubernetes,hashicorp/random,hashicorp/helm,hashicorp/external,Mastercard/restapi,IBM-Cloud/ibm`)
 
 ## MCP Configuration
 

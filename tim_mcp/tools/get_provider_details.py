@@ -165,6 +165,30 @@ For detailed documentation, visit: https://registry.terraform.io/providers/{name
     return markdown
 
 
+def _is_provider_allowed(namespace: str, name: str, config: Config) -> bool:
+    """
+    Check if a provider is in the allowlist.
+
+    Args:
+        namespace: Provider namespace
+        name: Provider name
+        config: Configuration instance with allowlist settings
+
+    Returns:
+        True if provider is allowed, False otherwise
+    """
+    # Check if namespace is allowed
+    if namespace in config.allowed_provider_namespaces:
+        return True
+
+    # Check if specific provider ID is allowed (namespace/name format)
+    provider_id = f"{namespace}/{name}"
+    if provider_id in config.allowed_provider_ids:
+        return True
+
+    return False
+
+
 async def get_provider_details_impl(
     request: ProviderDetailsRequest, config: Config
 ) -> str:
@@ -182,7 +206,7 @@ async def get_provider_details_impl(
         Formatted provider details as markdown string
 
     Raises:
-        ValidationError: If provider_id format is invalid
+        ValidationError: If provider_id format is invalid or provider is not allowlisted
         TerraformRegistryError: If API request fails or returns invalid data
     """
     # Parse and validate provider ID with version
@@ -191,6 +215,15 @@ async def get_provider_details_impl(
     except ValidationError as e:
         # Re-raise validation errors with original context
         raise TerraformRegistryError(f"Provider ID validation failed: {e}") from e
+
+    # Validate provider is in allowlist
+    if not _is_provider_allowed(namespace, name, config):
+        raise ValidationError(
+            f"Provider '{namespace}/{name}' is not in the allowlist. "
+            f"Only providers from the following namespaces are allowed: "
+            f"{', '.join(config.allowed_provider_namespaces)}. "
+            f"Specific allowed providers: {', '.join(config.allowed_provider_ids)}."
+        )
 
     # Initialize Terraform client and fetch data
     async with TerraformClient(config) as terraform_client:

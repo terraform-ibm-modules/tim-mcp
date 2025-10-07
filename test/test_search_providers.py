@@ -33,7 +33,7 @@ class TestSearchProvidersImpl:
 
     @pytest.fixture
     def sample_registry_response(self):
-        """Sample response from Terraform Registry API."""
+        """Sample response from Terraform Registry API with both allowed and disallowed providers."""
         return {
             "providers": [
                 {
@@ -48,15 +48,26 @@ class TestSearchProvidersImpl:
                     "published_at": "2025-09-22T17:13:05Z",
                 },
                 {
-                    "id": "hashicorp/azurerm/4.8.0",
+                    "id": "hashicorp/random/3.5.1",
                     "namespace": "hashicorp",
-                    "name": "azurerm",
-                    "version": "4.8.0",
-                    "description": "terraform-provider-azurerm",
-                    "source": "https://github.com/hashicorp/terraform-provider-azurerm",
+                    "name": "random",
+                    "version": "3.5.1",
+                    "description": "terraform-provider-random",
+                    "source": "https://github.com/hashicorp/terraform-provider-random",
                     "downloads": 3500000000,
                     "tier": "official",
                     "published_at": "2025-09-20T10:00:00Z",
+                },
+                {
+                    "id": "unauthorized/provider/1.0.0",
+                    "namespace": "unauthorized",
+                    "name": "provider",
+                    "version": "1.0.0",
+                    "description": "Unauthorized provider - should be filtered",
+                    "source": "https://github.com/unauthorized/provider",
+                    "downloads": 5000000000,
+                    "tier": "community",
+                    "published_at": "2025-09-25T10:00:00Z",
                 },
             ],
             "meta": {
@@ -68,31 +79,20 @@ class TestSearchProvidersImpl:
 
     @pytest.fixture
     def expected_response(self):
-        """Expected formatted response."""
+        """Expected formatted response - only random provider is allowlisted."""
         return ProviderSearchResponse(
             query="aws",
-            total_found=2,
+            total_found=1,
             limit=10,
             offset=0,
             providers=[
                 ProviderInfo(
-                    id="hashicorp/aws/6.14.1",
+                    id="hashicorp/random/3.5.1",
                     namespace="hashicorp",
-                    name="aws",
-                    version="6.14.1",
-                    description="terraform-provider-aws",
-                    source_url="https://github.com/hashicorp/terraform-provider-aws",
-                    downloads=4966945606,
-                    tier="official",
-                    published_at=datetime.fromisoformat("2025-09-22T17:13:05+00:00"),
-                ),
-                ProviderInfo(
-                    id="hashicorp/azurerm/4.8.0",
-                    namespace="hashicorp",
-                    name="azurerm",
-                    version="4.8.0",
-                    description="terraform-provider-azurerm",
-                    source_url="https://github.com/hashicorp/terraform-provider-azurerm",
+                    name="random",
+                    version="3.5.1",
+                    description="terraform-provider-random",
+                    source_url="https://github.com/hashicorp/terraform-provider-random",
                     downloads=3500000000,
                     tier="official",
                     published_at=datetime.fromisoformat("2025-09-20T10:00:00+00:00"),
@@ -104,7 +104,7 @@ class TestSearchProvidersImpl:
     async def test_successful_search_with_query(
         self, config, mock_terraform_client, sample_registry_response, expected_response
     ):
-        """Test successful provider search with query."""
+        """Test successful provider search with query - filters out non-allowlisted providers."""
         # Setup
         mock_terraform_client.search_providers.return_value = sample_registry_response
         request = ProviderSearchRequest(query="aws", limit=10, offset=0)
@@ -119,8 +119,10 @@ class TestSearchProvidersImpl:
             # Execute
             result = await search_providers_impl(request, config)
 
-            # Verify
+            # Verify - only 1 provider returned (random is allowlisted), aws and unauthorized filtered out
             assert result == expected_response
+            assert len(result.providers) == 1
+            assert result.providers[0].name == "random"
             mock_terraform_client.search_providers.assert_called_once_with(
                 query="aws", limit=10, offset=0
             )
@@ -129,7 +131,7 @@ class TestSearchProvidersImpl:
     async def test_successful_search_without_query(
         self, config, mock_terraform_client, sample_registry_response
     ):
-        """Test successful provider search without query (list all)."""
+        """Test successful provider search without query (list all) - filters allowlisted only."""
         # Setup
         mock_terraform_client.search_providers.return_value = sample_registry_response
         request = ProviderSearchRequest(query=None, limit=10, offset=0)
@@ -144,10 +146,11 @@ class TestSearchProvidersImpl:
             # Execute
             result = await search_providers_impl(request, config)
 
-            # Verify
+            # Verify - only 1 allowlisted provider (random), aws and unauthorized filtered
             assert result.query is None
-            assert result.total_found == 2
-            assert len(result.providers) == 2
+            assert result.total_found == 1
+            assert len(result.providers) == 1
+            assert result.providers[0].name == "random"
             mock_terraform_client.search_providers.assert_called_once_with(
                 query=None, limit=10, offset=0
             )
@@ -299,13 +302,13 @@ class TestSearchProvidersImpl:
                     "tier": "community",
                     "published_at": "invalid-date-format",
                 },
-                {  # Valid provider
-                    "id": "hashicorp/aws/6.14.1",
+                {  # Valid provider - must be allowlisted
+                    "id": "hashicorp/time/0.9.1",
                     "namespace": "hashicorp",
-                    "name": "aws",
-                    "version": "6.14.1",
-                    "description": "terraform-provider-aws",
-                    "source": "https://github.com/hashicorp/terraform-provider-aws",
+                    "name": "time",
+                    "version": "0.9.1",
+                    "description": "terraform-provider-time",
+                    "source": "https://github.com/hashicorp/terraform-provider-time",
                     "downloads": 100,
                     "tier": "official",
                     "published_at": "2025-01-01T00:00:00Z",
@@ -326,9 +329,9 @@ class TestSearchProvidersImpl:
             # Execute - should handle invalid datetime gracefully
             result = await search_providers_impl(request, config)
 
-            # Verify - only the valid provider should be in results
+            # Verify - only the valid allowlisted provider should be in results
             assert len(result.providers) == 1
-            assert result.providers[0].id == "hashicorp/aws/6.14.1"
+            assert result.providers[0].id == "hashicorp/time/0.9.1"
 
     @pytest.mark.asyncio
     async def test_missing_meta_information(self, config, mock_terraform_client):
@@ -356,8 +359,8 @@ class TestSearchProvidersImpl:
 
     @pytest.mark.asyncio
     async def test_download_sorting(self, config, mock_terraform_client):
-        """Test that results are sorted by downloads in descending order."""
-        # Setup - providers in wrong download order
+        """Test that results are sorted by downloads in descending order and filtered by allowlist."""
+        # Setup - providers in wrong download order, including non-allowlisted providers
         unsorted_response = {
             "providers": [
                 {
@@ -365,30 +368,30 @@ class TestSearchProvidersImpl:
                     "namespace": "low",
                     "name": "downloads",
                     "version": "1.0.0",
-                    "description": "Provider with few downloads",
+                    "description": "Provider with few downloads - not allowlisted",
                     "source": "https://github.com/low/provider",
                     "downloads": 100,
                     "tier": "community",
                     "published_at": "2025-09-01T08:00:00Z",
                 },
                 {
-                    "id": "hashicorp/aws/6.14.1",
+                    "id": "hashicorp/kubernetes/2.23.0",
                     "namespace": "hashicorp",
-                    "name": "aws",
-                    "version": "6.14.1",
-                    "description": "terraform-provider-aws",
-                    "source": "https://github.com/hashicorp/terraform-provider-aws",
+                    "name": "kubernetes",
+                    "version": "2.23.0",
+                    "description": "terraform-provider-kubernetes",
+                    "source": "https://github.com/hashicorp/terraform-provider-kubernetes",
                     "downloads": 4966945606,
                     "tier": "official",
                     "published_at": "2025-09-22T17:13:05Z",
                 },
                 {
-                    "id": "medium/downloads/1.5.0",
-                    "namespace": "medium",
-                    "name": "downloads",
+                    "id": "Mastercard/restapi/1.5.0",
+                    "namespace": "Mastercard",
+                    "name": "restapi",
                     "version": "1.5.0",
-                    "description": "Provider with medium downloads",
-                    "source": "https://github.com/medium/provider",
+                    "description": "REST API Provider",
+                    "source": "https://github.com/Mastercard/terraform-provider-restapi",
                     "downloads": 5000,
                     "tier": "partner",
                     "published_at": "2025-09-01T12:00:00Z",
@@ -409,18 +412,16 @@ class TestSearchProvidersImpl:
             # Execute
             result = await search_providers_impl(request, config)
 
-            # Verify that results are sorted by downloads descending
+            # Verify that results are sorted by downloads descending and filtered
             assert result.query == "providers"
-            assert result.total_found == 3
-            assert len(result.providers) == 3
+            assert result.total_found == 2  # Only allowlisted providers
+            assert len(result.providers) == 2
 
-            # Check order: high (4966945606) -> medium (5000) -> low (100)
+            # Check order: high (4966945606) -> medium (5000), low filtered out
             assert result.providers[0].downloads == 4966945606
-            assert result.providers[0].id == "hashicorp/aws/6.14.1"
+            assert result.providers[0].id == "hashicorp/kubernetes/2.23.0"
             assert result.providers[1].downloads == 5000
-            assert result.providers[1].id == "medium/downloads/1.5.0"
-            assert result.providers[2].downloads == 100
-            assert result.providers[2].id == "low/downloads/1.0.0"
+            assert result.providers[1].id == "Mastercard/restapi/1.5.0"
 
 
 class TestProviderSearchRequestValidation:
