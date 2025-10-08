@@ -23,7 +23,6 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
     ProviderDetailsRequest,
-    ProviderSearchRequest,
 )
 
 # Global configuration and logger
@@ -513,92 +512,69 @@ async def get_content(
 
 
 @mcp.tool()
-async def search_providers(
-    query: str | None = None,
-    limit: int = 10,
-    offset: int = 0,
-) -> str:
+async def list_providers(filter: str | None = None) -> str:
     """
-    Search Terraform Registry for allowlisted providers by name or keyword.
+    List all allowlisted Terraform providers with optional filtering.
 
-    ALLOWLISTED PROVIDERS:
-    - HashiCorp utility providers:
-      - hashicorp/time - Time-based resources
-      - hashicorp/null - Null resources for triggers
-      - hashicorp/local - Local file operations
-      - hashicorp/kubernetes - Kubernetes resources
-      - hashicorp/random - Random value generation
-      - hashicorp/helm - Helm chart deployment
-      - hashicorp/external - External data sources
-    - Mastercard/restapi - REST API provider for filling IBM Cloud provider gaps
-    - IBM-Cloud/ibm - Primary IBM Cloud provider
+    This tool provides a reliable way to discover all available providers since the
+    Terraform Registry search API has limitations. All allowlisted providers are fetched
+    and returned, with optional client-side filtering.
 
-    These providers are recommended by TIM for use with Terraform IBM Modules.
+    FILTERING:
+    - Optional case-insensitive keyword filter
+    - Matches against provider namespace, name, or description
+    - Examples: "ibm", "kubernetes", "random"
 
-    SEARCH TIPS:
-    - Search by provider name: "kubernetes", "random", "ibmcloud"
-    - Or omit query to list recent allowlisted providers
-    - Results are sorted by download count (most popular first)
-    - Only allowlisted providers will be returned
+    RESULTS:
+    - All providers are sorted by download count (most popular first)
+    - Each provider includes version, downloads, tier, and source information
+    - Providers are fetched in parallel for fast response
 
     Args:
-        query: Optional search term to filter providers (e.g., "kubernetes", "random")
-        limit: Maximum results to return (default: 10, max: 100)
-        offset: Pagination offset for retrieving additional results (default: 0)
+        filter: Optional keyword to filter providers (e.g., "ibm", "kubernetes", "random")
 
     Returns:
-        JSON formatted provider search results with download counts, versions, and tier information
+        JSON formatted list of providers with comprehensive metadata
     """
     start_time = time.time()
 
     try:
-        # Validate request
-        request = ProviderSearchRequest(query=query, limit=limit, offset=offset)
-
         # Import here to avoid circular imports
-        from .tools.search_providers import search_providers_impl
+        from .tools.list_providers import list_providers_impl
 
-        # Execute search
-        response = await search_providers_impl(request, config)
+        # Execute list
+        providers = await list_providers_impl(filter, config)
+
+        # Convert to JSON
+        providers_json = [p.model_dump() for p in providers]
+        result = json.dumps(
+            {
+                "filter": filter,
+                "total_found": len(providers),
+                "providers": providers_json,
+            },
+            indent=2,
+            default=str,
+        )
 
         # Log successful execution
         duration_ms = (time.time() - start_time) * 1000
         log_tool_execution(
             logger,
-            "search_providers",
-            request.model_dump(),
+            "list_providers",
+            {"filter": filter},
             duration_ms,
             success=True,
         )
 
-        return response.model_dump_json(indent=2)
-
-    except ValidationError as e:
-        duration_ms = (time.time() - start_time) * 1000
-        log_tool_execution(
-            logger,
-            "search_providers",
-            {
-                "query": query,
-                "limit": limit,
-                "offset": offset,
-            },
-            duration_ms,
-            success=False,
-            error="validation_error",
-        )
-        raise TIMValidationError(f"Invalid parameters: {e}") from e
+        return result
 
     except TIMError:
         duration_ms = (time.time() - start_time) * 1000
         log_tool_execution(
             logger,
-            "search_providers",
-            {
-                "query": query,
-                "limit": limit,
-                "offset": offset,
-            },
+            "list_providers",
+            {"filter": filter},
             duration_ms,
             success=False,
         )
@@ -608,17 +584,13 @@ async def search_providers(
         duration_ms = (time.time() - start_time) * 1000
         log_tool_execution(
             logger,
-            "search_providers",
-            {
-                "query": query,
-                "limit": limit,
-                "offset": offset,
-            },
+            "list_providers",
+            {"filter": filter},
             duration_ms,
             success=False,
             error=str(e),
         )
-        logger.exception("Unexpected error in search_providers")
+        logger.exception("Unexpected error in list_providers")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
@@ -627,25 +599,21 @@ async def get_provider_details(provider_id: str) -> str:
     """
     Get comprehensive provider information from Terraform Registry for allowlisted providers.
 
-    ALLOWLISTED PROVIDERS:
+    PRIMARY PROVIDER:
+    - ibm-cloud/ibm - Primary provider for IBM Cloud resources
+
+    ADDITIONAL ALLOWLISTED PROVIDERS:
     - HashiCorp utility providers (time, null, local, kubernetes, random, helm, external)
-    - Mastercard/restapi - REST API provider ONLY for filling IBM Cloud provider gaps
-    - IBM-Cloud/ibm - Primary provider for IBM Cloud resources
+    - Mastercard/restapi - REST API provider for filling IBM Cloud provider gaps
 
     PROVIDER USAGE PRIORITIES:
-    1. PRIMARY: Use IBM Cloud provider (IBM-Cloud/ibm) for IBM Cloud resources
+    1. PRIMARY: Use IBM Cloud provider (ibm-cloud/ibm) for IBM Cloud resources
     2. SECONDARY: Use Mastercard/restapi provider ONLY to fill functionality gaps in IBM Cloud provider
     3. TERTIARY: Use HashiCorp utility providers for cross-platform needs (time, random, null, etc.)
     4. Use providers to stitch together TIM modules where necessary
 
     IMPORTANT: The restapi provider is supplementary - use it sparingly and only when IBM Cloud
     provider lacks specific functionality. Always prefer TIM modules and IBM Cloud provider first.
-
-    WHEN TO USE:
-    - To understand allowlisted provider capabilities and features
-    - To check available versions and tier status
-    - To get usage examples and configuration snippets
-    - When planning Terraform infrastructure with TIM modules
 
     PROVIDER INFORMATION INCLUDES:
     - Provider description and tier (official, partner, community)
@@ -655,7 +623,7 @@ async def get_provider_details(provider_id: str) -> str:
     - Ready-to-use Terraform configuration examples
 
     Args:
-        provider_id: Provider identifier (e.g., "hashicorp/random", "IBM-Cloud/ibm", "Mastercard/restapi")
+        provider_id: Provider identifier (e.g., "ibm-cloud/ibm", "hashicorp/random", "Mastercard/restapi")
 
     Returns:
         Plain text with markdown formatted provider details including versions and usage examples

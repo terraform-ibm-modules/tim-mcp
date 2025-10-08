@@ -69,19 +69,13 @@ This server exposes a set of tools that allow an AI assistant to:
 
 ### Provider Allowlist
 
-For security and best practices, provider search and details tools are restricted to these allowlisted providers:
-- **IBM-Cloud/ibm** - Primary provider for IBM Cloud resources
-- **HashiCorp utility providers** - Essential utilities for common Terraform patterns:
-  - `hashicorp/time`, `hashicorp/null`, `hashicorp/local`
-  - `hashicorp/kubernetes`, `hashicorp/random`
-  - `hashicorp/helm`, `hashicorp/external`
-- **Mastercard/restapi** - REST API provider for filling IBM Cloud provider gaps (use sparingly)
+For security and best practices, provider tools are restricted to a curated allowlist. The primary provider is **ibm-cloud/ibm** for all IBM Cloud resources. To discover all available allowlisted providers (including HashiCorp utilities and Mastercard restapi), use the `list_providers` tool.
 
 The goal is to provide a structured and efficient way for an AI to gather the necessary context to generate accurate and high-quality Infrastructure as Code solutions for IBM Cloud.
 
 ### Key Features
 
-- **Provider Search**: Search allowlisted Terraform providers by name or keyword with download-based ranking
+- **Provider List**: List all allowlisted Terraform providers with optional keyword filtering and download-based ranking
 - **Provider Details**: Get comprehensive provider information for allowlisted providers including versions, tier status, and ready-to-use configuration examples
 - **Module Search**: Find modules in the Terraform Registry with quality-based ranking
 - **Module Details**: Get structured information about a module's interface, inputs, outputs, and dependencies
@@ -199,7 +193,7 @@ server {
 - `TIM_ALLOWED_NAMESPACES`: Comma-separated list of allowed module namespaces (default: `terraform-ibm-modules`)
 - `TIM_EXCLUDED_MODULES`: Comma-separated list of module IDs to exclude from search results
 - `TIM_ALLOWED_PROVIDER_NAMESPACES`: Comma-separated list of allowed provider namespaces (default: none)
-- `TIM_ALLOWED_PROVIDER_IDS`: Comma-separated list of allowed provider IDs in namespace/name format (default: `hashicorp/time,hashicorp/null,hashicorp/local,hashicorp/kubernetes,hashicorp/random,hashicorp/helm,hashicorp/external,Mastercard/restapi,IBM-Cloud/ibm`)
+- `TIM_ALLOWED_PROVIDER_IDS`: Comma-separated list of allowed provider IDs in namespace/name format (default: `hashicorp/time,hashicorp/null,hashicorp/local,hashicorp/kubernetes,hashicorp/random,hashicorp/helm,hashicorp/external,Mastercard/restapi,ibm-cloud/ibm`)
 
 ## MCP Configuration
 

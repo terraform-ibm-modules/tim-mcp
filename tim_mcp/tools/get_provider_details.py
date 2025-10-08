@@ -177,13 +177,13 @@ def _is_provider_allowed(namespace: str, name: str, config: Config) -> bool:
     Returns:
         True if provider is allowed, False otherwise
     """
-    # Check if namespace is allowed
-    if namespace in config.allowed_provider_namespaces:
+    # Check if namespace is allowed (case-insensitive)
+    if namespace.lower() in [ns.lower() for ns in config.allowed_provider_namespaces]:
         return True
 
-    # Check if specific provider ID is allowed (namespace/name format)
-    provider_id = f"{namespace}/{name}"
-    if provider_id in config.allowed_provider_ids:
+    # Check if specific provider ID is allowed (namespace/name format, case-insensitive)
+    provider_id = f"{namespace}/{name}".lower()
+    if provider_id in [pid.lower() for pid in config.allowed_provider_ids]:
         return True
 
     return False

@@ -73,7 +73,7 @@ class Config(BaseModel):
             "hashicorp/helm",
             "hashicorp/external",
             "Mastercard/restapi",
-            "IBM-Cloud/ibm",
+            "ibm-cloud/ibm",
         ],
         description="List of specific allowed provider IDs (namespace/name format)",
     )
