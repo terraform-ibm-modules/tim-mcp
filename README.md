@@ -62,6 +62,8 @@ This MCP server provides tools for AI models to navigate the [Terraform IBM Modu
 This server exposes a set of tools that allow an AI assistant to:
 - **Discover Providers** - Search allowlisted Terraform providers (IBM Cloud, HashiCorp utilities, REST API)
 - **Provider Details** - Get comprehensive provider information including versions, tier status, and usage examples
+- **Search Provider Resources** - Search within a provider's resources and data sources with intelligent filtering and relevance scoring
+- **Provider Resource Details** - Get detailed documentation for specific resources including arguments, attributes, examples, and default values
 - **Discover Modules** - Find relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules)
 - **Inspect Modules** - View module details including inputs, outputs, and dependencies
 - **Explore Repositories** - List the contents of a module's repository, such as examples and submodules
@@ -77,6 +79,8 @@ The goal is to provide a structured and efficient way for an AI to gather the ne
 
 - **Provider List**: List all allowlisted Terraform providers with optional keyword filtering and download-based ranking
 - **Provider Details**: Get comprehensive provider information for allowlisted providers including versions, tier status, and ready-to-use configuration examples
+- **Provider Resource Search**: Search within provider documentation to find relevant resources and data sources with multi-field matching, relevance scoring, and category filtering
+- **Provider Resource Documentation**: Retrieve detailed structured documentation for specific provider resources including arguments with types and defaults, output attributes, code examples, and related resources
 - **Module Search**: Find modules in the Terraform Registry with quality-based ranking
 - **Module Details**: Get structured information about a module's interface, inputs, outputs, and dependencies
 - **Repository Exploration**: List the contents of a module's repository, including examples and submodules
