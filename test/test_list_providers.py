@@ -387,3 +387,212 @@ class TestListProvidersImpl:
                 await list_providers_impl(None, config)
 
             assert "Failed to fetch any providers" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_provider_with_prerelease_version_resolution(
+        self, config, mock_terraform_client
+    ):
+        """Test that providers with pre-release versions get updated to stable version."""
+        # Provider info with pre-release version
+        prerelease_provider = {
+            "id": "hashicorp/random/3.6.0-beta1",
+            "namespace": "hashicorp",
+            "name": "random",
+            "version": "3.6.0-beta1",  # Pre-release
+            "description": "Random provider",
+            "source": "https://github.com/hashicorp/terraform-provider-random",
+            "downloads": 1000000,
+            "tier": "official",
+            "published_at": "2025-09-01T12:00:00Z",
+        }
+
+        # Provider details with versions list (chronological order - oldest first)
+        provider_details = {
+            "id": "hashicorp/random/3.6.0-beta1",
+            "namespace": "hashicorp",
+            "name": "random",
+            "version": "3.6.0-beta1",
+            "description": "Random provider",
+            "source": "https://github.com/hashicorp/terraform-provider-random",
+            "downloads": 1000000,
+            "tier": "official",
+            "published_at": "2025-09-01T12:00:00Z",
+            "versions": ["3.5.0", "3.5.1", "3.6.0-beta1"],
+        }
+
+        # Provider details for stable version
+        stable_provider_details = {
+            "id": "hashicorp/random/3.5.1",
+            "namespace": "hashicorp",
+            "name": "random",
+            "version": "3.5.1",
+            "description": "Random provider (stable)",
+            "source": "https://github.com/hashicorp/terraform-provider-random",
+            "downloads": 950000,
+            "tier": "official",
+            "published_at": "2025-08-15T10:00:00Z",
+        }
+
+        # Mock to return pre-release for one provider, stable for others
+        async def mock_get_provider_info(namespace, name):
+            if name == "random":
+                return prerelease_provider
+            # Return stable version for other providers
+            return {
+                "id": f"{namespace}/{name}/1.0.0",
+                "namespace": namespace,
+                "name": name,
+                "version": "1.0.0",
+                "description": f"{name} provider",
+                "source": f"https://github.com/{namespace}/terraform-provider-{name}",
+                "downloads": 1000,
+                "tier": "official",
+                "published_at": "2025-01-01T00:00:00Z",
+            }
+
+        async def mock_get_provider_details(namespace, name, version=None):
+            if name == "random":
+                # First call (no version) returns versions list
+                if version is None:
+                    return provider_details
+                # Second call (with version) returns stable version details
+                return stable_provider_details
+            # For other providers, return simple details
+            return {
+                "id": f"{namespace}/{name}/1.0.0",
+                "namespace": namespace,
+                "name": name,
+                "version": "1.0.0",
+                "description": f"{name} provider",
+                "source": f"https://github.com/{namespace}/terraform-provider-{name}",
+                "downloads": 1000,
+                "tier": "official",
+                "published_at": "2025-01-01T00:00:00Z",
+                "versions": ["1.0.0"],
+            }
+
+        mock_terraform_client.get_provider_info.side_effect = mock_get_provider_info
+        mock_terraform_client.get_provider_details.side_effect = (
+            mock_get_provider_details
+        )
+
+        with patch("tim_mcp.tools.list_providers.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+
+            result = await list_providers_impl(None, config)
+
+            # Should fetch complete details for latest stable version
+            assert len(result) == len(config.allowed_provider_ids)
+            random_provider = next(p for p in result if p.name == "random")
+            assert random_provider.version == "3.5.1"  # Latest stable
+            assert random_provider.description == "Random provider (stable)"
+            assert random_provider.downloads == 950000  # From stable version
+
+    @pytest.mark.asyncio
+    async def test_provider_with_only_prerelease_versions_excluded(
+        self, config, mock_terraform_client
+    ):
+        """Test that providers with only pre-release versions are excluded."""
+        # Provider info with pre-release version
+        prerelease_provider = {
+            "id": "hashicorp/test/1.0.0-alpha",
+            "namespace": "hashicorp",
+            "name": "test",
+            "version": "1.0.0-alpha",
+            "description": "Test provider",
+            "source": "https://github.com/hashicorp/terraform-provider-test",
+            "downloads": 100,
+            "tier": "community",
+            "published_at": "2025-01-01T00:00:00Z",
+        }
+
+        # Provider details with only pre-release versions
+        provider_details = {
+            "id": "hashicorp/test/1.0.0-alpha",
+            "namespace": "hashicorp",
+            "name": "test",
+            "version": "1.0.0-alpha",
+            "description": "Test provider",
+            "source": "https://github.com/hashicorp/terraform-provider-test",
+            "downloads": 100,
+            "tier": "community",
+            "published_at": "2025-01-01T00:00:00Z",
+            "versions": ["1.0.0-alpha", "1.0.0-beta"],
+        }
+
+        call_count = 0
+
+        async def mock_get_provider_info(namespace, name):
+            nonlocal call_count
+            call_count += 1
+            # Return prerelease for one provider, normal for others
+            if name == "random":
+                return prerelease_provider
+            # Return valid data for other providers
+            return {
+                "id": f"{namespace}/{name}/1.0.0",
+                "namespace": namespace,
+                "name": name,
+                "version": "1.0.0",
+                "description": f"{name} provider",
+                "source": f"https://github.com/{namespace}/terraform-provider-{name}",
+                "downloads": 1000,
+                "tier": "official",
+                "published_at": "2025-01-01T00:00:00Z",
+            }
+
+        mock_terraform_client.get_provider_info.side_effect = mock_get_provider_info
+        mock_terraform_client.get_provider_details.return_value = provider_details
+
+        with patch("tim_mcp.tools.list_providers.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+
+            result = await list_providers_impl(None, config)
+
+            # Should exclude provider with no stable versions
+            provider_names = [p.name for p in result]
+            assert "random" not in provider_names  # Excluded due to no stable versions
+
+    @pytest.mark.asyncio
+    async def test_provider_with_stable_version_unchanged(
+        self, config, mock_terraform_client, sample_providers_response
+    ):
+        """Test that providers with stable versions are not modified."""
+
+        async def mock_get_provider_info(namespace, name):
+            # Try to find in sample_providers_response first
+            for provider in sample_providers_response:
+                if provider["namespace"] == namespace and provider["name"] == name:
+                    return provider
+            # Generate a default provider for other allowed providers
+            return {
+                "id": f"{namespace}/{name}/1.0.0",
+                "namespace": namespace,
+                "name": name,
+                "version": "1.0.0",  # Stable version
+                "description": f"{name} provider",
+                "source": f"https://github.com/{namespace}/terraform-provider-{name}",
+                "downloads": 1000,
+                "tier": "official",
+                "published_at": "2025-01-01T00:00:00Z",
+            }
+
+        mock_terraform_client.get_provider_info.side_effect = mock_get_provider_info
+
+        with patch("tim_mcp.tools.list_providers.TerraformClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_terraform_client
+            )
+
+            result = await list_providers_impl(None, config)
+
+            # All providers should have stable versions, none should be modified
+            assert len(result) == len(config.allowed_provider_ids)
+            # Verify all versions are stable
+            assert all("." in p.version and "-" not in p.version for p in result)
+            # get_provider_details should NOT be called for stable versions
+            mock_terraform_client.get_provider_details.assert_not_called()

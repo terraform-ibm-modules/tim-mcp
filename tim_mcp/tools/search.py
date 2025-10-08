@@ -20,6 +20,7 @@ from ..config import Config
 from ..exceptions import TIMError
 from ..exceptions import ValidationError as TIMValidationError
 from ..types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
+from ..utils.version import get_latest_stable_version, is_stable_version
 
 # Required topics that must be present in the GitHub repository
 REQUIRED_TOPICS = ["core-team"]
@@ -93,7 +94,44 @@ async def search_modules_impl(
         GitHubClient(config) as github_client,
     ):
         try:
-            # We need to fetch and validate modules until we have enough valid ones
+            # First, count total matching modules by paginating through all results
+            total_count = 0
+            count_offset = 0
+            count_batch_size = 100  # Larger batches for counting (faster)
+
+            logger.info(
+                "Counting total matching modules",
+                query=request.query,
+                namespace=namespace,
+            )
+
+            while True:
+                count_response = await terraform_client.search_modules(
+                    query=request.query,
+                    namespace=namespace,
+                    limit=count_batch_size,
+                    offset=count_offset,
+                )
+
+                modules_in_batch = len(count_response.get("modules", []))
+                total_count += modules_in_batch
+
+                # Check if there are more results
+                meta = count_response.get("meta", {})
+                next_offset = meta.get("next_offset")
+
+                if not next_offset or modules_in_batch == 0:
+                    break
+
+                count_offset = next_offset
+
+            logger.info(
+                "Total matching modules counted",
+                total_count=total_count,
+                query=request.query,
+            )
+
+            # Now fetch and validate modules until we have enough valid ones
             validated_modules = []
             offset = 0
             batch_size = 50  # Fetch modules in smaller batches
@@ -113,10 +151,6 @@ async def search_modules_impl(
 
                 # Validate API response structure before processing
                 _validate_api_response_structure(api_response)
-
-                # Extract metadata from response
-                meta = api_response["meta"]
-                total_count = meta.get("total_count", 0)
 
                 # If no more modules available, break
                 if not api_response["modules"]:
@@ -138,6 +172,23 @@ async def search_modules_impl(
                                 "Module excluded from results", module_id=module.id
                             )
                             continue
+
+                        # Check if the module's version is pre-release
+                        if not is_stable_version(module.version):
+                            # Fetch complete module details for the latest stable version
+                            stable_module = await _get_stable_module_details(
+                                module, terraform_client, logger
+                            )
+                            if stable_module:
+                                # Replace with complete stable module details
+                                module = stable_module
+                            else:
+                                # No stable version available, skip this module
+                                logger.info(
+                                    "Skipping module with no stable versions",
+                                    module_id=module.id,
+                                )
+                                continue
 
                         batch_modules.append(module)
                     except Exception as e:
@@ -284,6 +335,69 @@ def _is_module_excluded(module_id: str, excluded_modules: list[str]) -> bool:
         True if the module should be excluded, False otherwise
     """
     return module_id in excluded_modules
+
+
+async def _get_stable_module_details(
+    module: ModuleInfo, terraform_client: TerraformClient, logger
+) -> ModuleInfo | None:
+    """
+    Get complete module details for the latest stable version.
+
+    This function fetches all available versions for a module, finds the latest
+    stable version, then fetches complete details for that version.
+
+    Args:
+        module: Module information with namespace, name, and provider
+        terraform_client: TerraformClient to fetch module information
+        logger: Logger instance for logging
+
+    Returns:
+        ModuleInfo with complete details for stable version, or None if no stable versions exist
+    """
+    try:
+        # Fetch all versions for this module
+        versions = await terraform_client.get_module_versions(
+            namespace=module.namespace,
+            name=module.name,
+            provider=module.provider,
+        )
+
+        # Find the latest stable version
+        stable_version = get_latest_stable_version(versions)
+
+        if not stable_version:
+            logger.info(
+                "No stable versions found for module, excluding from results",
+                module_id=module.id,
+                latest_version=module.version,
+            )
+            return None
+
+        logger.info(
+            "Found stable version for module with pre-release latest",
+            module_id=module.id,
+            pre_release_version=module.version,
+            stable_version=stable_version,
+        )
+
+        # Fetch complete details for the stable version
+        module_data = await terraform_client.get_module_details(
+            namespace=module.namespace,
+            name=module.name,
+            provider=module.provider,
+            version=stable_version,
+        )
+
+        # Transform the module data into ModuleInfo
+        return _transform_module_data(module_data)
+
+    except Exception as e:
+        logger.warning(
+            "Failed to fetch stable module details, excluding from results",
+            module_id=module.id,
+            error=str(e),
+        )
+        return None
 
 
 async def _is_repository_valid(

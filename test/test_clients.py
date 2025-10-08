@@ -101,13 +101,18 @@ class TestTerraformClient:
     @pytest.mark.asyncio
     async def test_get_module_versions(self, terraform_client, mock_cache):
         """Test getting module versions."""
-        # Setup
+        # Setup - use correct nested API response structure
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "modules": [
-                {"version": "1.0.0"},
-                {"version": "1.1.0"},
-                {"version": "1.2.0"},
+                {
+                    "source": "hashicorp/consul/aws",
+                    "versions": [
+                        {"version": "1.0.0"},
+                        {"version": "1.1.0"},
+                        {"version": "1.2.0"},
+                    ],
+                }
             ]
         }
         mock_response.raise_for_status = MagicMock()
@@ -121,6 +126,43 @@ class TestTerraformClient:
 
         # Verify
         assert result == ["1.0.0", "1.1.0", "1.2.0"]
+        terraform_client.client.get.assert_called_once_with(
+            "/modules/hashicorp/consul/aws/versions"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_module_versions_filters_prereleases(
+        self, terraform_client, mock_cache
+    ):
+        """Test that pre-release versions are filtered out."""
+        # Setup - use correct nested API response structure with pre-releases
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "modules": [
+                {
+                    "source": "hashicorp/consul/aws",
+                    "versions": [
+                        {"version": "1.2.0"},
+                        {"version": "1.2.0-beta0"},
+                        {"version": "1.1.0"},
+                        {"version": "1.1.0-rc1"},
+                        {"version": "1.0.0"},
+                        {"version": "1.0.0-alpha"},
+                    ],
+                }
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_response.status_code = 200
+        terraform_client.client.get = AsyncMock(return_value=mock_response)
+
+        # Execute
+        result = await terraform_client.get_module_versions(
+            "hashicorp", "consul", "aws"
+        )
+
+        # Verify - only stable versions are returned
+        assert result == ["1.2.0", "1.1.0", "1.0.0"]
         terraform_client.client.get.assert_called_once_with(
             "/modules/hashicorp/consul/aws/versions"
         )

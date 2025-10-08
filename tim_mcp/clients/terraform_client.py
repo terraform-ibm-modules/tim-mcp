@@ -20,6 +20,7 @@ from ..config import Config, get_terraform_registry_headers
 from ..exceptions import RateLimitError, TerraformRegistryError
 from ..logging import get_logger, log_api_request, log_cache_operation
 from ..utils.cache import Cache
+from ..utils.version import filter_stable_versions
 
 
 class TerraformClient:
@@ -304,10 +305,17 @@ class TerraformClient:
             response.raise_for_status()
             data = response.json()
 
-            # Extract versions
-            versions = [
-                v.get("version") for v in data.get("modules", []) if v.get("version")
+            # Extract versions from nested structure
+            # API returns: { "modules": [ { "versions": [ { "version": "1.0.0" }, ... ] } ] }
+            all_versions = [
+                v.get("version")
+                for module in data.get("modules", [])
+                for v in module.get("versions", [])
+                if v.get("version")
             ]
+
+            # Filter to only stable versions (exclude pre-release versions)
+            versions = filter_stable_versions(all_versions)
 
             # Log successful request
             log_api_request(
@@ -318,6 +326,7 @@ class TerraformClient:
                 duration_ms,
                 module_id=f"{namespace}/{name}/{provider}",
                 version_count=len(versions),
+                filtered_count=len(all_versions) - len(versions),
             )
 
             # Cache the result
@@ -398,6 +407,15 @@ class TerraformClient:
             response.raise_for_status()
             data = response.json()
 
+            # Filter versions list to only stable versions if present
+            if "versions" in data and isinstance(data["versions"], list):
+                all_versions = data["versions"]
+                stable_versions = filter_stable_versions(all_versions)
+                data["versions"] = stable_versions
+                filtered_count = len(all_versions) - len(stable_versions)
+            else:
+                filtered_count = 0
+
             # Log successful request
             log_api_request(
                 self.logger,
@@ -406,6 +424,7 @@ class TerraformClient:
                 response.status_code,
                 duration_ms,
                 provider_id=f"{namespace}/{name}",
+                filtered_count=filtered_count,
             )
 
             # Cache the result
@@ -594,6 +613,15 @@ class TerraformClient:
             response.raise_for_status()
             data = response.json()
 
+            # Filter versions list to only stable versions if present
+            if "versions" in data and isinstance(data["versions"], list):
+                all_versions = data["versions"]
+                stable_versions = filter_stable_versions(all_versions)
+                data["versions"] = stable_versions
+                filtered_count = len(all_versions) - len(stable_versions)
+            else:
+                filtered_count = 0
+
             # Log successful request
             log_api_request(
                 self.logger,
@@ -603,6 +631,7 @@ class TerraformClient:
                 duration_ms,
                 provider_id=f"{namespace}/{name}",
                 version=version,
+                filtered_count=filtered_count,
             )
 
             # Cache the result

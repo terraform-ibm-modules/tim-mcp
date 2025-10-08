@@ -12,6 +12,7 @@ from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..exceptions import TIMError
 from ..types import ProviderInfo
+from ..utils.version import get_latest_stable_version, is_stable_version
 
 
 def _parse_provider_id(provider_id: str) -> tuple[str, str] | None:
@@ -81,12 +82,67 @@ async def _fetch_provider(
             published_at_str = published_at_str[:-1] + "+00:00"
         published_at = datetime.fromisoformat(published_at_str)
 
+        # Extract version
+        version = provider_data["version"]
+
+        # Check if version is pre-release
+        if not is_stable_version(version):
+            logger.info(
+                "Provider has pre-release version, fetching stable version",
+                provider_id=f"{namespace}/{name}",
+                pre_release_version=version,
+            )
+
+            # Fetch detailed provider info to get versions list
+            try:
+                details = await terraform_client.get_provider_details(
+                    namespace=namespace, name=name
+                )
+                versions = details.get("versions", [])
+                stable_version = get_latest_stable_version(versions)
+
+                if not stable_version:
+                    logger.info(
+                        "No stable versions found for provider, excluding",
+                        provider_id=f"{namespace}/{name}",
+                    )
+                    return None
+
+                logger.info(
+                    "Found stable version for provider",
+                    provider_id=f"{namespace}/{name}",
+                    stable_version=stable_version,
+                )
+
+                # Fetch complete details for the stable version
+                stable_details = await terraform_client.get_provider_details(
+                    namespace=namespace, name=name, version=stable_version
+                )
+
+                # Update all fields from stable version details
+                provider_data = stable_details
+                version = stable_version
+
+                # Parse published_at from stable version
+                published_at_str = provider_data.get("published_at", "")
+                if published_at_str.endswith("Z"):
+                    published_at_str = published_at_str[:-1] + "+00:00"
+                published_at = datetime.fromisoformat(published_at_str)
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch stable provider details, excluding",
+                    provider_id=f"{namespace}/{name}",
+                    error=str(e),
+                )
+                return None
+
         # Create ProviderInfo object
         return ProviderInfo(
             id=provider_data["id"],
             namespace=provider_data["namespace"],
             name=provider_data["name"],
-            version=provider_data["version"],
+            version=version,
             description=provider_data.get("description", ""),
             source_url=provider_data["source"],
             downloads=provider_data.get("downloads", 0),
