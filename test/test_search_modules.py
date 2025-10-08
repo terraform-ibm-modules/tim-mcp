@@ -141,15 +141,14 @@ class TestSearchModulesImpl:
         self, config, mock_terraform_client, sample_registry_response, expected_response
     ):
         """Test successful module search with basic query."""
-        # Setup - return the response only on first call, empty on subsequent calls
+        # Setup - provide responses for counting phase and validation phase
         mock_terraform_client.search_modules.side_effect = [
-            sample_registry_response,  # First call returns modules
-            {
-                "modules": [],
-                "meta": {"limit": 50, "offset": 50, "total_count": 23},
-            },  # Second call returns empty
+            sample_registry_response,  # Counting phase: counts 2, no next_offset, stops
+            sample_registry_response,  # Validation phase: gets 2, hits limit of 2, stops
         ]
-        request = ModuleSearchRequest(query="vpc")
+        request = ModuleSearchRequest(
+            query="vpc", limit=2
+        )  # Request only 2 to match available
 
         # Create a mock GitHub client
         mock_github_client = self._create_mock_github_client()
@@ -168,30 +167,33 @@ class TestSearchModulesImpl:
             result = await search_modules_impl(request, config)
 
             # Verify
-            assert result == expected_response
-            # Check that search was called twice due to batching
+            assert result.query == expected_response.query
+            assert result.total_found == 2  # Counted 2 modules total
+            assert len(result.modules) == 2  # Got 2 modules as requested
+            assert result.modules == expected_response.modules
+            # Check that search was called 2 times (1 for counting, 1 for validation)
             assert mock_terraform_client.search_modules.call_count == 2
-            mock_terraform_client.search_modules.assert_any_call(
-                query="vpc",
-                namespace="terraform-ibm-modules",
-                limit=50,  # batch_size is 50
-                offset=0,
-            )
 
     @pytest.mark.asyncio
     async def test_successful_search_with_limit(
         self, config, mock_terraform_client, sample_registry_response
     ):
         """Test successful module search with custom limit."""
-        # Setup - return modules in batches
+        # Setup - return modules in batches for counting then validation
+        # Need to add next_offset to meta to enable pagination
+        response_with_next = {
+            **sample_registry_response,
+            "meta": {**sample_registry_response["meta"], "next_offset": 2},
+        }
         mock_terraform_client.search_modules.side_effect = [
-            sample_registry_response,  # First batch
-            sample_registry_response,  # Second batch
-            sample_registry_response,  # Third batch
-            {
-                "modules": [],
-                "meta": {"limit": 50, "offset": 150, "total_count": 23},
-            },  # Empty
+            # Counting phase (limit=100) - count all 6 modules across 3 batches
+            response_with_next,  # First batch (2 modules), has next_offset
+            response_with_next,  # Second batch (2 modules), has next_offset
+            sample_registry_response,  # Third batch (2 modules), no next_offset, stops
+            # Validation phase (limit=50) - get 5 modules (3 batches)
+            response_with_next,  # First batch (2 modules), has next_offset
+            response_with_next,  # Second batch (2 modules), has next_offset
+            sample_registry_response,  # Third batch (2 modules), no next_offset, stops at 6
         ]
         request = ModuleSearchRequest(query="vpc", limit=5)
 
@@ -212,10 +214,8 @@ class TestSearchModulesImpl:
 
             # Verify
             assert result.query == "vpc"
-            assert result.total_found == 23
+            assert result.total_found == 6  # Counted 6 modules (3 batches * 2)
             assert len(result.modules) == 5  # Should get 5 modules as requested
-            # Should be called multiple times due to batching
-            assert mock_terraform_client.search_modules.call_count >= 3
 
     @pytest.mark.asyncio
     async def test_empty_search_results(self, config, mock_terraform_client):
@@ -359,10 +359,12 @@ class TestSearchModulesImpl:
             "meta": {"limit": 10, "offset": 0, "total_count": 2},
         }
         mock_terraform_client.search_modules.side_effect = [
-            invalid_datetime_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+            invalid_datetime_response,  # Counting phase
+            invalid_datetime_response,  # Validation phase
         ]
-        request = ModuleSearchRequest(query="vpc")
+        request = ModuleSearchRequest(
+            query="vpc", limit=1
+        )  # Only 1 valid module available
 
         mock_github_client = self._create_mock_github_client()
 
@@ -447,10 +449,10 @@ class TestSearchModulesImpl:
             "meta": {"limit": 10, "offset": 0, "total_count": 1},
         }
         mock_terraform_client.search_modules.side_effect = [
-            api_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+            api_response,  # Counting phase
+            api_response,  # Validation phase
         ]
-        request = ModuleSearchRequest(query="test")
+        request = ModuleSearchRequest(query="test", limit=1)  # Only 1 module available
 
         mock_github_client = AsyncMock()
         with (
@@ -566,11 +568,17 @@ class TestSearchModulesImpl:
             "meta": {"limit": 10, "offset": 0, "total_count": 3},
         }
 
+        # Need to provide multiple batches to get 5 valid modules (excluding bad-module)
+        response_with_next = {
+            **response_with_excluded,
+            "meta": {**response_with_excluded["meta"], "next_offset": 3},
+        }
         mock_terraform_client.search_modules.side_effect = [
-            response_with_excluded,
-            response_with_excluded,  # May need more batches
-            response_with_excluded,
-            {"modules": [], "meta": {"limit": 50, "offset": 150, "total_count": 3}},
+            response_with_excluded,  # Counting phase: 3 modules total
+            # Validation phase: need multiple batches to get 5 valid (2 valid per batch)
+            response_with_next,  # First batch: 2 valid
+            response_with_next,  # Second batch: 2 valid
+            response_with_excluded,  # Third batch: 2 valid, total 6, stops at 5
         ]
         request = ModuleSearchRequest(query="modules")
 
@@ -679,10 +687,10 @@ class TestSearchModulesImpl:
         }
 
         mock_terraform_client.search_modules.side_effect = [
-            unsorted_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 3}},
+            unsorted_response,  # Counting phase
+            unsorted_response,  # Validation phase
         ]
-        request = ModuleSearchRequest(query="modules")
+        request = ModuleSearchRequest(query="modules", limit=3)  # 3 modules available
 
         mock_github_client = AsyncMock()
         with (
@@ -757,8 +765,8 @@ class TestSearchModulesImpl:
         }
 
         mock_terraform_client.search_modules.side_effect = [
-            unsorted_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 3}},
+            unsorted_response,  # Counting phase
+            unsorted_response,  # Validation phase
         ]
         # Request only top 2 results
         request = ModuleSearchRequest(query="modules", limit=2)
@@ -822,10 +830,10 @@ class TestSearchModulesImpl:
         }
 
         mock_terraform_client.search_modules.side_effect = [
-            same_downloads_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+            same_downloads_response,  # Counting phase
+            same_downloads_response,  # Validation phase
         ]
-        request = ModuleSearchRequest(query="modules")
+        request = ModuleSearchRequest(query="modules", limit=2)  # 2 modules available
 
         mock_github_client = AsyncMock()
         with (
@@ -846,6 +854,187 @@ class TestSearchModulesImpl:
             assert len(result.modules) == 2
             # Both modules should have same download count
             assert all(module.downloads == 1000 for module in result.modules)
+
+    @pytest.mark.asyncio
+    async def test_pre_release_version_resolution(self, mock_terraform_client, config):
+        """Test that pre-release versions are resolved to latest stable version."""
+        # Setup - API returns module with pre-release version
+        prerelease_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/db2-cloud/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "db2-cloud",
+                    "provider": "ibm",
+                    "version": "2.0.1-draft-addons",  # Pre-release
+                    "description": "Provision a fully managed database",
+                    "source": "https://github.com/terraform-ibm-modules/terraform-ibm-db2-cloud",
+                    "downloads": 133,
+                    "verified": False,
+                    "published_at": "2025-06-13T14:26:41.000Z",
+                }
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 1},
+        }
+
+        # Mock to return stable versions in chronological order
+        mock_terraform_client.search_modules.side_effect = [
+            prerelease_response,  # Counting phase
+            prerelease_response,  # Validation phase
+        ]
+        # Versions in chronological order (oldest first, as returned by API)
+        mock_terraform_client.get_module_versions.return_value = [
+            "1.9.0",
+            "2.0.0",
+            "2.0.1-draft-addons",
+        ]
+        # Mock get_module_details to return complete module data for stable version
+        mock_terraform_client.get_module_details.return_value = {
+            "id": "terraform-ibm-modules/db2-cloud/ibm/2.0.0",
+            "namespace": "terraform-ibm-modules",
+            "name": "db2-cloud",
+            "provider": "ibm",
+            "version": "2.0.0",
+            "description": "Provision a fully managed database (stable version)",
+            "source": "https://github.com/terraform-ibm-modules/terraform-ibm-db2-cloud",
+            "downloads": 150,
+            "verified": False,
+            "published_at": "2025-05-01T10:00:00.000Z",
+        }
+
+        request = ModuleSearchRequest(query="database", limit=1)  # 1 module available
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = AsyncMock()
+            mock_is_valid.return_value = True
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify - complete module details fetched for latest stable version
+            assert len(result.modules) == 1
+            assert result.modules[0].version == "2.0.0"  # Latest stable
+            assert (
+                result.modules[0].description
+                == "Provision a fully managed database (stable version)"
+            )
+            assert result.modules[0].downloads == 150  # From stable version details
+            mock_terraform_client.get_module_versions.assert_called_once_with(
+                namespace="terraform-ibm-modules",
+                name="db2-cloud",
+                provider="ibm",
+            )
+            mock_terraform_client.get_module_details.assert_called_once_with(
+                namespace="terraform-ibm-modules",
+                name="db2-cloud",
+                provider="ibm",
+                version="2.0.0",
+            )
+
+    @pytest.mark.asyncio
+    async def test_module_with_only_prerelease_versions_excluded(
+        self, mock_terraform_client, config
+    ):
+        """Test that modules with only pre-release versions are excluded."""
+        # Setup - API returns module with pre-release version
+        prerelease_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/test-module/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "test-module",
+                    "provider": "ibm",
+                    "version": "1.0.0-beta1",  # Pre-release
+                    "description": "Test module",
+                    "source": "https://github.com/terraform-ibm-modules/test-module",
+                    "downloads": 10,
+                    "verified": False,
+                    "published_at": "2025-01-01T00:00:00.000Z",
+                }
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 1},
+        }
+
+        # Mock get_module_versions to return only pre-release versions
+        mock_terraform_client.search_modules.side_effect = [
+            prerelease_response,  # Counting phase
+            prerelease_response,  # Validation phase batch 1: module gets filtered out (no stable versions)
+            {"modules": [], "meta": {}},  # Validation phase batch 2: no more modules
+        ]
+        mock_terraform_client.get_module_versions.return_value = [
+            "1.0.0-beta1",
+            "1.0.0-alpha",
+        ]
+
+        request = ModuleSearchRequest(
+            query="test", limit=1
+        )  # Expect 0 modules (all pre-release filtered out)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = AsyncMock()
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify - module should be excluded (no stable versions)
+            assert len(result.modules) == 0
+            mock_terraform_client.get_module_versions.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stable_version_unchanged(self, mock_terraform_client, config):
+        """Test that modules with stable versions are not modified."""
+        # Setup - API returns module with stable version
+        stable_response = {
+            "modules": [
+                {
+                    "id": "terraform-ibm-modules/vpc/ibm",
+                    "namespace": "terraform-ibm-modules",
+                    "name": "vpc",
+                    "provider": "ibm",
+                    "version": "5.1.0",  # Stable
+                    "description": "VPC module",
+                    "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
+                    "downloads": 53004,
+                    "verified": False,
+                    "published_at": "2025-09-02T08:33:15.000Z",
+                }
+            ],
+            "meta": {"limit": 100, "offset": 0, "total_count": 1},
+        }
+
+        mock_terraform_client.search_modules.side_effect = [
+            stable_response,  # Counting phase
+            stable_response,  # Validation phase
+        ]
+
+        request = ModuleSearchRequest(query="vpc", limit=1)  # 1 module available
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = AsyncMock()
+            mock_is_valid.return_value = True
+
+            # Execute
+            result = await search_modules_impl(request, config)
+
+            # Verify - version should remain unchanged
+            assert len(result.modules) == 1
+            assert result.modules[0].version == "5.1.0"
+            # get_module_versions should NOT be called for stable versions
+            mock_terraform_client.get_module_versions.assert_not_called()
 
 
 class TestRepositoryFiltering:
@@ -923,8 +1112,8 @@ class TestRepositoryFiltering:
         """Test that valid repositories pass filtering."""
         # Setup
         mock_terraform_client.search_modules.side_effect = [
-            sample_registry_response,
-            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 23}},
+            sample_registry_response,  # Counting phase
+            sample_registry_response,  # Validation phase
         ]
 
         # Mock GitHub client to return valid repository info
@@ -971,11 +1160,10 @@ class TestRepositoryFiltering:
         sample_registry_response,
     ):
         """Test that archived repositories are filtered out."""
-        # Setup
+        # Setup - vpc is archived, only security-group should pass
         mock_terraform_client.search_modules.side_effect = [
-            sample_registry_response,
-            sample_registry_response,  # Need more to get enough valid
-            {"modules": [], "meta": {"limit": 50, "offset": 100, "total_count": 23}},
+            sample_registry_response,  # Counting phase: 2 modules
+            sample_registry_response,  # Validation phase: 2 modules, but only 1 passes filtering
         ]
 
         def mock_parse_url(url):
@@ -1004,7 +1192,9 @@ class TestRepositoryFiltering:
             side_effect=mock_get_repo_info
         )
 
-        request = ModuleSearchRequest(query="vpc", limit=5)
+        request = ModuleSearchRequest(
+            query="vpc", limit=1
+        )  # Only 1 valid module available
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -1017,7 +1207,7 @@ class TestRepositoryFiltering:
             result = await search_modules_impl(request, config)
 
             # Verify - only non-archived repo should be in results (security-group)
-            assert len(result.modules) == 2
+            assert len(result.modules) == 1
             assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
 
     @pytest.mark.asyncio
@@ -1029,11 +1219,10 @@ class TestRepositoryFiltering:
         sample_registry_response,
     ):
         """Test that repositories without required topics are filtered out."""
-        # Setup
+        # Setup - vpc missing required topic, only security-group should pass
         mock_terraform_client.search_modules.side_effect = [
-            sample_registry_response,
-            sample_registry_response,  # Need more to get enough valid
-            {"modules": [], "meta": {"limit": 50, "offset": 100, "total_count": 23}},
+            sample_registry_response,  # Counting phase: 2 modules
+            sample_registry_response,  # Validation phase: 2 modules, but only 1 passes filtering
         ]
 
         def mock_parse_url(url):
@@ -1062,7 +1251,9 @@ class TestRepositoryFiltering:
             side_effect=mock_get_repo_info
         )
 
-        request = ModuleSearchRequest(query="vpc", limit=5)
+        request = ModuleSearchRequest(
+            query="vpc", limit=1
+        )  # Only 1 valid module available
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -1075,7 +1266,7 @@ class TestRepositoryFiltering:
             result = await search_modules_impl(request, config)
 
             # Verify - only repo with required topics should be in results
-            assert len(result.modules) == 2
+            assert len(result.modules) == 1
             assert result.modules[0].id == "terraform-ibm-modules/security-group/ibm"
 
 

@@ -19,9 +19,12 @@ from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
     GetContentRequest,
+    GetProviderResourceDetailsRequest,
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
+    ProviderDetailsRequest,
+    SearchProviderResourcesRequest,
 )
 
 # Global configuration and logger
@@ -507,6 +510,439 @@ async def get_content(
             error=str(e),
         )
         logger.exception("Unexpected error in get_content")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def list_providers(filter: str | None = None) -> str:
+    """
+    List all allowlisted Terraform providers with optional filtering.
+
+    This tool provides a reliable way to discover all available providers since the
+    Terraform Registry search API has limitations. All allowlisted providers are fetched
+    and returned, with optional client-side filtering.
+
+    FILTERING:
+    - Optional case-insensitive keyword filter
+    - Matches against provider namespace, name, or description
+    - Examples: "ibm", "kubernetes", "random"
+
+    RESULTS:
+    - All providers are sorted by download count (most popular first)
+    - Each provider includes version, downloads, tier, and source information
+    - Providers are fetched in parallel for fast response
+
+    Args:
+        filter: Optional keyword to filter providers (e.g., "ibm", "kubernetes", "random")
+
+    Returns:
+        JSON formatted list of providers with comprehensive metadata
+    """
+    start_time = time.time()
+
+    try:
+        # Import here to avoid circular imports
+        from .tools.list_providers import list_providers_impl
+
+        # Execute list
+        providers = await list_providers_impl(filter, config)
+
+        # Convert to JSON
+        providers_json = [p.model_dump() for p in providers]
+        result = json.dumps(
+            {
+                "filter": filter,
+                "total_found": len(providers),
+                "providers": providers_json,
+            },
+            indent=2,
+            default=str,
+        )
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_providers",
+            {"filter": filter},
+            duration_ms,
+            success=True,
+        )
+
+        return result
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_providers",
+            {"filter": filter},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_providers",
+            {"filter": filter},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in list_providers")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def get_provider_details(provider_id: str) -> str:
+    """
+    Get comprehensive provider information from Terraform Registry for allowlisted providers.
+
+    PRIMARY PROVIDER:
+    - ibm-cloud/ibm - Primary provider for IBM Cloud resources
+
+    ADDITIONAL ALLOWLISTED PROVIDERS:
+    - HashiCorp utility providers (time, null, local, kubernetes, random, helm, external)
+    - Mastercard/restapi - REST API provider for filling IBM Cloud provider gaps
+
+    PROVIDER USAGE PRIORITIES:
+    1. PRIMARY: Use IBM Cloud provider (ibm-cloud/ibm) for IBM Cloud resources
+    2. SECONDARY: Use Mastercard/restapi provider ONLY to fill functionality gaps in IBM Cloud provider
+    3. TERTIARY: Use HashiCorp utility providers for cross-platform needs (time, random, null, etc.)
+    4. Use providers to stitch together TIM modules where necessary
+
+    IMPORTANT: The restapi provider is supplementary - use it sparingly and only when IBM Cloud
+    provider lacks specific functionality. Always prefer TIM modules and IBM Cloud provider first.
+
+    PROVIDER INFORMATION INCLUDES:
+    - Provider description and tier (official, partner, community)
+    - Latest version and complete version history
+    - Download statistics and publication date
+    - Source repository and documentation links
+    - Ready-to-use Terraform configuration examples
+
+    Args:
+        provider_id: Provider identifier (e.g., "ibm-cloud/ibm", "hashicorp/random", "Mastercard/restapi")
+
+    Returns:
+        Plain text with markdown formatted provider details including versions and usage examples
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = ProviderDetailsRequest(provider_id=provider_id)
+
+        # Import here to avoid circular imports
+        from .tools.get_provider_details import get_provider_details_impl
+
+        # Execute details retrieval
+        response = await get_provider_details_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_details",
+            {"provider_id": provider_id},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_provider_details")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def search_provider_resources(
+    query: str,
+    provider_id: str = "IBM-Cloud/ibm",
+    category: str | None = None,
+    subcategory: str | None = None,
+    limit: int = 20,
+) -> str:
+    """
+    Search provider resources and data sources with intelligent filtering.
+
+    This tool searches through Terraform provider documentation to find relevant
+    resources and data sources, with multi-field matching and relevance scoring.
+
+    SEARCH STRATEGY:
+    - Use specific keywords (e.g., "vpc", "security group", "iam")
+    - Results are ranked by relevance (exact matches first)
+    - Returns metadata only (use get_provider_resource_details for full docs)
+
+    FILTERING:
+    - category: Filter by "resources" or "data-sources", or None for both
+    - subcategory: Filter by subcategory (e.g., "VPC", "IAM")
+
+    USE CASES:
+    - Find resources before getting full documentation
+    - Discover available services for a provider
+    - Filter by category to find specific resource types
+
+    Args:
+        query: Search keyword (e.g., "vpc", "security group", "iam")
+        provider_id: Provider identifier (default: "IBM-Cloud/ibm")
+        category: Optional category filter ("resources", "data-sources", or None)
+        subcategory: Optional subcategory filter (e.g., "VPC", "IAM")
+        limit: Maximum results to return (default: 20, max: 50)
+
+    Returns:
+        JSON formatted search results with relevance scores and metadata
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = SearchProviderResourcesRequest(
+            query=query,
+            provider_id=provider_id,
+            category=category,
+            subcategory=subcategory,
+            limit=limit,
+        )
+
+        # Import here to avoid circular imports
+        from .tools.search_provider_resources import search_provider_resources_impl
+
+        # Execute search
+        response = await search_provider_resources_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_provider_resources",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_provider_resources",
+            {
+                "query": query,
+                "provider_id": provider_id,
+                "category": category,
+                "subcategory": subcategory,
+                "limit": limit,
+            },
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_provider_resources",
+            {
+                "query": query,
+                "provider_id": provider_id,
+                "category": category,
+                "subcategory": subcategory,
+                "limit": limit,
+            },
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "search_provider_resources",
+            {
+                "query": query,
+                "provider_id": provider_id,
+                "category": category,
+                "subcategory": subcategory,
+                "limit": limit,
+            },
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in search_provider_resources")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def get_provider_resource_details(
+    provider_doc_id: str,
+    format: str = "full",
+) -> str:
+    """
+    Get detailed documentation for a specific provider resource or data source.
+
+    This tool retrieves comprehensive documentation including arguments, attributes,
+    examples, and related resources. You must call search_provider_resources first
+    to obtain the provider_doc_id.
+
+    RESPONSE FORMATS:
+    - "full": Complete documentation with arguments, attributes, examples, and original markdown
+    - "examples": Just the code examples (compact, good for quick reference)
+    - "schema": Just the arguments and attributes (compact schema reference)
+
+    WHAT THIS PROVIDES:
+    - Structured arguments with types, requirements, and descriptions
+    - Output attributes with types and descriptions
+    - Extracted code examples with titles
+    - Related resources for discovering connected services
+    - Full markdown documentation (in "full" format)
+
+    WORKFLOW:
+    1. Call search_provider_resources to find resources
+    2. Use the provider_doc_id from search results
+    3. Choose format based on your needs:
+       - Use "schema" for quick reference
+       - Use "examples" for code samples
+       - Use "full" for complete documentation
+
+    Args:
+        provider_doc_id: Provider document ID from search_provider_resources
+        format: Response format - "full", "examples", or "schema" (default: "full")
+
+    Returns:
+        JSON formatted resource details in the requested format
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = GetProviderResourceDetailsRequest(
+            provider_doc_id=provider_doc_id,
+            format=format,
+        )
+
+        # Import here to avoid circular imports
+        from .tools.get_provider_resource_details import (
+            get_provider_resource_details_impl,
+        )
+
+        # Execute details retrieval
+        response = await get_provider_resource_details_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_resource_details",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        # Return different fields based on format
+        if format == "examples":
+            # Return only examples
+            examples_response = {
+                "provider_doc_id": response.provider_doc_id,
+                "slug": response.slug,
+                "title": response.title,
+                "category": response.category,
+                "examples": [ex.model_dump() for ex in response.examples],
+                "example_count": len(response.examples),
+            }
+            return json.dumps(examples_response, indent=2, default=str)
+        elif format == "schema":
+            # Return only schema (arguments and attributes)
+            schema_response = {
+                "provider_doc_id": response.provider_doc_id,
+                "slug": response.slug,
+                "title": response.title,
+                "category": response.category,
+                "subcategory": response.subcategory,
+                "arguments": [arg.model_dump() for arg in response.arguments],
+                "attributes": [attr.model_dump() for attr in response.attributes],
+                "documentation_url": response.documentation_url,
+            }
+            return json.dumps(schema_response, indent=2, default=str)
+        else:
+            # Return full response
+            return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_resource_details",
+            {"provider_doc_id": provider_doc_id, "format": format},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_resource_details",
+            {"provider_doc_id": provider_doc_id, "format": format},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_provider_resource_details",
+            {"provider_doc_id": provider_doc_id, "format": format},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_provider_resource_details")
         raise TIMError(f"Unexpected error: {e}") from e
 
 

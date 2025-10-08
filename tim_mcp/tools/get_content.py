@@ -62,7 +62,7 @@ async def _get_content_with_client(
     # Parse module ID to extract version if included
     namespace, name, provider, version = parse_module_id_with_version(request.module_id)
     base_module_id = f"{namespace}/{name}/{provider}"
-    
+
     # Extract repository information
     owner, repo = github_client._extract_repo_from_module_id(base_module_id)
 
