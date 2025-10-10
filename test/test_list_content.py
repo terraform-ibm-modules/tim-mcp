@@ -11,7 +11,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from tim_mcp.config import Config
-from tim_mcp.exceptions import GitHubError, ModuleNotFoundError, RateLimitError, ValidationError
+from tim_mcp.exceptions import (
+    GitHubError,
+    ModuleNotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 from tim_mcp.tools.list_content import list_content_impl
 from tim_mcp.types import ListContentRequest
 
@@ -118,9 +123,7 @@ class TestListContentImpl:
     ):
         """Test successful content listing with version latest."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.resolve_version.return_value = "main"
@@ -188,9 +191,7 @@ class TestListContentImpl:
     ):
         """Test content listing with specific version tag."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm/v5.1.0"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm/v5.1.0")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.resolve_version.return_value = "v5.1.0"
@@ -222,9 +223,7 @@ class TestListContentImpl:
     async def test_list_content_module_not_found(self, mock_config, mock_github_client):
         """Test error handling when module repository is not found."""
         # Setup
-        request = ListContentRequest(
-            module_id="nonexistent/module/ibm"
-        )
+        request = ListContentRequest(module_id="nonexistent/module/ibm")
 
         mock_github_client.get_repository_info.side_effect = ModuleNotFoundError(
             "nonexistent/terraform-ibm-module",
@@ -246,9 +245,7 @@ class TestListContentImpl:
     async def test_list_content_github_api_error(self, mock_config, mock_github_client):
         """Test error handling for GitHub API errors."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         mock_github_client.get_repository_info.side_effect = GitHubError(
             "HTTP error getting repository info: 500 Server Error",
@@ -272,9 +269,7 @@ class TestListContentImpl:
     async def test_list_content_rate_limit_error(self, mock_config, mock_github_client):
         """Test error handling for GitHub rate limit errors."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         mock_github_client.get_repository_tree.side_effect = RateLimitError(
             "GitHub rate limit exceeded", reset_time=1234567890, api_name="GitHub"
@@ -315,9 +310,7 @@ class TestListContentImpl:
     ):
         """Test content listing for empty repository."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/empty/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/empty/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.resolve_version.return_value = "main"
@@ -347,9 +340,7 @@ class TestListContentImpl:
     ):
         """Test README parsing with fallback when content is not available."""
         # Setup
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/vpc/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.get_repository_tree.return_value = sample_tree_response
@@ -405,9 +396,7 @@ class TestListContentImpl:
             {"path": ".github", "type": "tree", "mode": "040000"},
         ]
 
-        request = ListContentRequest(
-            module_id="terraform-ibm-modules/test/ibm"
-        )
+        request = ListContentRequest(module_id="terraform-ibm-modules/test/ibm")
 
         mock_github_client.get_repository_info.return_value = sample_repo_info
         mock_github_client.get_repository_tree.return_value = diverse_tree
