@@ -73,6 +73,7 @@ The goal is to provide a structured and efficient way for an AI to gather the ne
 - **Module Details**: Get structured information about a module's interface.
 - **Repository Exploration**: List the contents of a module's repository, including examples and submodules.
 - **Content Retrieval**: Fetch specific files from a module's repository.
+- **White Paper Resource**: Access the IBM Cloud Terraform Best Practices white paper in clean markdown format.
 - **AI-Assisted Workflows**: The tools are designed to be used in sequence to support a typical AI-assisted coding workflow.
 
 ### Important Notes

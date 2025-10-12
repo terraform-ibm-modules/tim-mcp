@@ -26,12 +26,11 @@ def test_whitepaper_markdown_format():
     
     # Check for basic markdown structure
     assert content.startswith("# "), "Whitepaper should start with a main heading"
-    # PyPDF2 extraction doesn't preserve markdown formatting, so we don't check for ## or **
     
     # Check for expected content
     assert "Terraform" in content, "Whitepaper should mention Terraform"
     assert "IBM Cloud" in content, "Whitepaper should mention IBM Cloud"
-    assert "white-paper.pdf" in content, "Whitepaper should reference the original PDF"
+    assert "Best Practices" in content, "Whitepaper should mention best practices"
 
 
 def test_instructions_still_load():
