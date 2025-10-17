@@ -1153,19 +1153,18 @@ class TestGetContentTool:
         assert "# main.tf content" in result
 
     @pytest.mark.asyncio
-    async def test_get_content_source_replacement(
-        self, config, mock_github_client
-    ):
+    async def test_get_content_source_replacement(self, config, mock_github_client):
         """Test that source = '../../' is replaced with module ID and version."""
         # Setup
         request = GetContentRequest(
             module_id="terraform-ibm-modules/vpc/ibm",
             path="examples/basic",
-            include_files=["main.tf"]
+            include_files=["main.tf"],
         )
 
         mock_github_client._extract_repo_from_module_id.return_value = (
-            "terraform-ibm-modules", "terraform-ibm-vpc"
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc",
         )
         mock_github_client.resolve_version.return_value = "v1.2.3"
 
@@ -1175,7 +1174,7 @@ class TestGetContentTool:
                 "name": "main.tf",
                 "path": "examples/basic/main.tf",
                 "type": "file",
-                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf"
+                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf",
             }
         ]
 
@@ -1187,7 +1186,7 @@ class TestGetContentTool:
                 "content": "encoded_content",
                 "encoding": "base64",
                 "size": 200,
-                "decoded_content": '''module "vpc" {
+                "decoded_content": """module "vpc" {
   source = "../../"
   vpc_name = var.vpc_name
   resource_group_id = var.resource_group_id
@@ -1196,7 +1195,7 @@ class TestGetContentTool:
 module "other" {
   source = "../.."
   other_param = "value"
-}'''
+}""",
             }
 
         mock_github_client.get_file_content.side_effect = mock_get_file_content
@@ -1207,7 +1206,7 @@ module "other" {
                 "name": "main.tf",
                 "path": "examples/basic/main.tf",
                 "type": "file",
-                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf"
+                "download_url": "https://api.github.com/repos/terraform-ibm-modules/terraform-ibm-vpc/contents/examples/basic/main.tf",
             }
         ]
 
@@ -1217,7 +1216,7 @@ module "other" {
         # Verify source replacement occurred
         assert 'source = "terraform-ibm-modules/vpc/ibm"' in result
         assert 'version = "1.2.3"' in result
-        
+
         # Verify original ../../ patterns are gone
         assert 'source = "../../"' not in result
         assert 'source = "../.."' not in result

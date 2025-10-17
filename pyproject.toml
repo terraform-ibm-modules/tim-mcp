@@ -9,14 +9,14 @@ name = "tim-mcp"
 dynamic = ["version"]
 description = "Terraform IBM Modules MCP"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "==3.14.0"
 dependencies = [
     "httpx==0.28.1",
-    "fastmcp==2.12.3",
-    "pydantic>=2.11.7",
-    "tenacity==9.0.0",
-    "structlog==24.4.0",
-    "click>=8.0.0",
+    "fastmcp==2.12.5",
+    "pydantic==2.11.9",
+    "tenacity==9.1.2",
+    "structlog==25.4.0",
+    "click==8.3.0",
 ]
 
 [project.scripts]
@@ -25,11 +25,11 @@ tim-mcp = "tim_mcp.main:cli"
 [project.optional-dependencies]
 dev = [
     "pytest==8.4.2",
-    "pytest-asyncio==0.24.0",
-    "pytest-mock==3.14.0",
-    "vcrpy==6.0.2",
-    "ruff==0.8.4",
-    "hypothesis>=6.100.0",
+    "pytest-asyncio==1.2.0",
+    "pytest-mock==3.15.1",
+    "vcrpy==7.0.0",
+    "ruff==0.14.1",
+    "hypothesis==6.140.2",
 ]
 
 [tool.ruff]
@@ -66,8 +66,8 @@ python_functions = "test_*"
 
 [dependency-groups]
 dev = [
-    "pytest-asyncio>=0.24.0",
-    "ruff>=0.8.4",
+    "pytest-asyncio==0.24.0",
+    "ruff==0.8.4",
 ]
 
 [tool.hatch.build]
