@@ -195,9 +195,9 @@ class TerraformClient:
             start_time = time.time()
 
             try:
-                # Use namespace as the query term (workaround for API not supporting namespace-only filtering)
-                params = {"q": namespace, "limit": limit, "offset": offset}
-                response = await self.client.get("/modules/search", params=params)
+                # Use the namespace parameter to filter modules
+                params = {"namespace": namespace, "limit": limit, "offset": offset}
+                response = await self.client.get("/modules", params=params)
                 duration_ms = (time.time() - start_time) * 1000
 
                 # Handle rate limiting
