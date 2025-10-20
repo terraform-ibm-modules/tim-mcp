@@ -110,13 +110,13 @@ def get_module_version(module_id: str) -> str:
 def transform_version_for_github(version: str) -> str:
     """
     Transform version for GitHub tag lookup.
-    
+
     TIM modules use "v" prefixed versions in GitHub tags (e.g., "v1.2.3").
     This function adds the "v" prefix if not present and not "latest".
-    
+
     Args:
         version: Version string (e.g., "1.2.3", "v1.2.3", "latest")
-        
+
     Returns:
         Version string with "v" prefix for GitHub lookup (e.g., "v1.2.3", "latest")
     """
