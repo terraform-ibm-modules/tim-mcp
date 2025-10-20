@@ -126,3 +126,5 @@ dmypy.json
 
 # local testing
 test_output/
+
+keywords.yml
