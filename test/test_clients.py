@@ -462,9 +462,9 @@ class TestGitHubClient:
         # All .tf files should match
         tf_files = [f for f in test_files if f.endswith(".tf")]
         for tf_file in tf_files:
-            assert github_client.match_file_patterns(
-                tf_file, include_pattern, None
-            ), f"{tf_file} should match pattern {include_pattern}"
+            assert github_client.match_file_patterns(tf_file, include_pattern, None), (
+                f"{tf_file} should match pattern {include_pattern}"
+            )
 
         # Non-.tf files should NOT match
         non_tf_files = [f for f in test_files if not f.endswith(".tf")]
