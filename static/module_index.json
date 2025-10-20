@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-20T21:30:50.244304+00:00",
+  "generated_at": "2025-10-20T21:42:15.472120+00:00",
   "total_modules": 66,
   "namespace": "terraform-ibm-modules",
   "filter_criteria": {
@@ -350,7 +350,7 @@
       "published_at": "2025-10-17T06:42:23.579051Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-workspace",
       "submodules": [],
-      "readme_excerpt": "- Creates an IBM Power Virtual Server (PowerVS) workspace. - Creates an SSH key. - Optionally imports up to three custom images from Cloud Object Storage. - Optionally create one or two or three private subnets. - Optionally create one public subnet. - Optionally attach the PowerVS workspace to transit gateway."
+      "readme_excerpt": "This root module automates and provisions a IBM Power Virtual Server Workspace with following components: Creates an IBM Power Virtual Server (PowerVS) workspace., Creates an SSH key., Optionally imports up to three custom images from Cloud Object Storage., Optionally create one or two or three private subnets., Optionally create one public subnet., and more"
     },
     {
       "id": "terraform-ibm-modules/vpe-gateway/ibm/4.7.11",
@@ -476,7 +476,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-instance/tree/main/modules/pi-instance"
         }
       ],
-      "readme_excerpt": "- Creates an IBM Power Virtual Server Instance. - Attaches **existing private subnets** to the instance. - Optionally creates volumes and attaches it to the instance. - Optionally attaches existing volume ids to the instance. - Optional instance initialization for **ibm provided subscription linux images only** ( configures proxy settings, creates filesystems, connects to network management services like DNS, NTP and NFS) using ansible galaxy collection roles [ibm.power_linux_sap collection](https://galaxy.ansible.com/ui/repo/published/ibm/power_linux_sap/). Tested with RHEL8.4, RHEL 8.6, RHEL8.8, RHEL9.2, RHEL9.4, SLES15-SP4, SLES15-SP5, SLES15-SP6 images."
+      "readme_excerpt": "This root module automates and provisions an IBM Power Virtual Server instance with following components: Creates an IBM Power Virtual Server Instance., Attaches **existing private subnets** to the instance., Optionally creates volumes and attaches it to the instance., Optionally attaches existing volume ids to the instance."
     },
     {
       "id": "terraform-ibm-modules/iam-account-settings/ibm/2.12.7",
@@ -740,7 +740,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure/tree/main/modules/powervs-vpc-landing-zone"
         }
       ],
-      "readme_excerpt": "Three solutions are offered:"
+      "readme_excerpt": "This repository contains deployable architecture solutions that help provision VPC landing zones, PowerVS workspaces, and interconnect them. The solutions are available in the IBM Cloud Catalog and can also be deployed without the catalog, except for the second solution below."
     },
     {
       "id": "terraform-ibm-modules/icd-redis/ibm/2.2.43",

@@ -304,10 +304,16 @@ async def generate_module_index():
                         ):
                             continue
 
-                        # Special handling for "## Summary" sections
+                        # Remove "## Summary" header if present (keep the content)
                         if para.startswith("## Summary"):
-                            # The description is likely in the next paragraph
-                            continue
+                            # Remove the header line but keep the rest of the paragraph
+                            para_lines = para.split("\n", 1)
+                            if len(para_lines) > 1:
+                                para = para_lines[1].strip()
+                                para_lower = para.lower()
+                            else:
+                                # Only the header, skip this paragraph
+                                continue
 
                         if any(
                             phrase in para_lower
@@ -315,6 +321,7 @@ async def generate_module_index():
                                 "this module",
                                 "use this module",
                                 "this solution",
+                                "this repository",
                                 "this root module",
                                 "terraform module",
                                 "a module for",
