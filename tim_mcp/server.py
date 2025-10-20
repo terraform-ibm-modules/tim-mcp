@@ -21,6 +21,7 @@ from .types import (
     GetContentRequest,
     ListContentRequest,
     ModuleDetailsRequest,
+    ModuleListResponse,
     ModuleSearchRequest,
 )
 
@@ -211,6 +212,83 @@ async def search_modules(
             error=str(e),
         )
         logger.exception("Unexpected error in search_modules")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def list_modules() -> str:
+    """
+    List ALL terraform-ibm-modules with categorization for comprehensive context.
+
+    This tool provides a complete index of all ~90 IBM Terraform modules in a single response,
+    making it ideal for:
+    - Getting a full overview of available modules across all categories
+    - Understanding the complete module ecosystem at once
+    - LLM context enrichment with comprehensive module information
+    - Finding modules by category (networking, security, compute, storage, etc.)
+
+    CATEGORIES:
+    - networking: VPC, subnets, load balancers, DNS, VPN, Transit Gateway
+    - security: Security & Compliance, Secrets Manager, Key Protect, IAM
+    - compute: Virtual servers, instances, Code Engine
+    - containers: Kubernetes, OpenShift, Container Registry
+    - storage: Cloud Object Storage, Block Storage, File Storage
+    - database: PostgreSQL, MongoDB, Redis, Cloudant, Databases for ICD
+    - observability: Monitoring, Logging, Activity Tracker, Event Notifications
+    - devops: CI/CD, Toolchains, Schematics, Projects
+    - integration: Event Streams, Kafka, MQ, API Connect
+    - ai-ml: Watson services, WatsonX
+    - management: Resource groups, tagging, catalog
+    - other: Modules that don't fit other categories
+
+    Returns:
+        JSON formatted list of ALL modules with module_id, name, description, category,
+        latest_version, and downloads - ordered by download count (most popular first)
+    """
+    start_time = time.time()
+
+    try:
+        # Import here to avoid circular imports
+        from .tools.list_modules import list_modules_impl
+
+        # Execute module listing
+        response = await list_modules_impl(config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_modules",
+            {},
+            duration_ms,
+            success=True,
+            module_count=response.total_count,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_modules",
+            {},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "list_modules",
+            {},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in list_modules")
         raise TIMError(f"Unexpected error: {e}") from e
 
 

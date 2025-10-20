@@ -41,6 +41,26 @@ class ModuleSearchResponse(BaseModel):
     modules: list[ModuleInfo] = Field(..., description="Module results")
 
 
+class ModuleListItem(BaseModel):
+    """Module list item with category and key information."""
+
+    module_id: str = Field(..., description="Full module identifier")
+    name: str = Field(..., description="Module name")
+    description: str = Field(..., description="Module description")
+    category: str = Field(..., description="Module category (e.g., networking, security, compute)")
+    latest_version: str = Field(..., description="Latest version")
+    downloads: int = Field(..., ge=0, description="Download count")
+    source_url: HttpUrl = Field(..., description="Source repository URL")
+    published_at: datetime = Field(..., description="Publication date")
+
+
+class ModuleListResponse(BaseModel):
+    """Response model for listing all modules."""
+
+    total_count: int = Field(..., ge=0, description="Total modules returned")
+    modules: list[ModuleListItem] = Field(..., description="All modules ordered by downloads")
+
+
 class ModuleDetailsRequest(BaseModel):
     """Request model for module details."""
 
