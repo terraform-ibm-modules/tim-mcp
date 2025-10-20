@@ -298,7 +298,6 @@ async def list_modules() -> str:
 
 
 @mcp.tool()
-@mcp.tool()
 async def get_module_details(module_id: str) -> str:
     """
     Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
