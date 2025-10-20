@@ -23,22 +23,50 @@ from tim_mcp.config import load_config
 from tim_mcp.utils.cache import Cache
 
 # Category mappings (same as in list_modules.py)
+# NOTE: Categories are checked in order, so more specific categories should come first
 CATEGORY_KEYWORDS = {
-    "networking": [
-        "vpc",
-        "subnet",
-        "network",
-        "load-balancer",
-        "alb",
-        "nlb",
-        "dns",
-        "transit",
-        "cis",
-        "internet-services",
-        "vpn",
-        "site-to-site",
+    "ai-ml": ["watsonx-", "watson-", "machine-learning", "ml-", "data-science"],
+    "database": [
+        "icd-mongodb",
+        "icd-postgresql",
+        "icd-redis",
+        "icd-mysql",
+        "icd-elasticsearch",
+        "icd-rabbitmq",
+        "cloudant",
+        "icd",
+        "database",
+        "postgres",
+        "mysql",
+        "mongodb",
+        "redis",
+        "elasticsearch",
+        "rabbitmq",
+    ],
+    "observability": [
+        "cloud-logs",
+        "cloud-monitoring",
+        "monitoring-agent",
+        "logs-agent",
+        "event-notifications",
+        "observability",
+        "activity-tracker",
+        "sysdig",
+        "logdna",
+        "metrics",
+        "notifications",
+    ],
+    "management": [
+        "app-configuration",
+        "catalog-management",
+        "resource-group",
+        "account-infrastructure",
+        "enterprise",
+        "project",
+        "catalog",
     ],
     "security": [
+        "secrets-manager",
         "secrets",
         "kms",
         "key-protect",
@@ -47,61 +75,50 @@ CATEGORY_KEYWORDS = {
         "cbr",
         "context-based-restrictions",
         "iam",
-        "access",
         "appid",
         "authentication",
         "authorization",
+        "scc",
+        "workload-protection",
+        "external-secrets-operator",
     ],
-    "compute": ["instance", "virtual-server", "vsi", "bare-metal", "server", "power"],
     "containers": [
         "kubernetes",
         "iks",
         "openshift",
-        "container",
-        "cluster",
+        "container-registry",
         "code-engine",
+        "cluster",
         "serverless",
     ],
-    "storage": ["object-storage", "storage", "volume", "block", "cos"],
-    "database": [
-        "database",
-        "postgres",
-        "mysql",
-        "mongodb",
-        "redis",
-        "icd",
-        "cloudant",
-        "elasticsearch",
-        "rabbitmq",
+    "networking": [
+        "security-group",
+        "vpc",
+        "subnet",
+        "vpe-gateway",
+        "private-path",
+        "load-balancer",
+        "alb",
+        "nlb",
+        "dns",
+        "transit-gateway",
+        "cis",
+        "internet-services",
+        "vpn",
+        "site-to-site",
     ],
-    "observability": [
-        "observability",
-        "monitoring",
-        "logging",
-        "activity-tracker",
-        "sysdig",
-        "logdna",
-        "metrics",
-        "event-notifications",
-        "notifications",
-        "cloud-logs",
-        "cloud-monitoring",
-        "monitoring-agent",
-        "logs-agent",
+    "storage": ["cos", "object-storage", "storage", "volume", "block"],
+    "compute": [
+        "dedicated-host",
+        "bare-metal",
+        "powervs",
+        "instance",
+        "virtual-server",
+        "vsi",
+        "server",
     ],
-    "devops": ["toolchain", "pipeline", "ci-cd", "devops", "schematics"],
     "integration": ["event-streams", "mq", "app-connect", "integration", "messaging"],
-    "ai-ml": ["watson", "ai", "machine-learning", "ml", "data-science"],
-    "management": [
-        "resource-group",
-        "account",
-        "enterprise",
-        "project",
-        "management",
-        "app-configuration",
-        "configuration",
-        "catalog",
-    ],
+    "devops": ["toolchain", "pipeline", "ci-cd", "devops", "schematics"],
 }
 
 
@@ -114,6 +131,38 @@ def categorize_module(module_name: str, description: str) -> str:
             return category
 
     return "other"
+
+
+def clean_excerpt(text: str) -> str:
+    """Clean up README excerpt by removing unicode symbols and normalizing whitespace."""
+    if not text:
+        return text
+
+    # Replace common unicode symbols
+    text = text.replace("\u00ae", "")  # ® (registered trademark)
+    text = text.replace("\u2122", "")  # ™ (trademark)
+    text = text.replace("\u00a9", "")  # © (copyright)
+    text = text.replace("\u00a0", " ")  # non-breaking space
+    text = text.replace("&reg;", "")
+    text = text.replace("&trade;", "")
+    text = text.replace("&copy;", "")
+
+    # Normalize whitespace - replace multiple spaces/newlines with single space
+    # But preserve intentional paragraph breaks (double newline)
+    import re
+
+    # First preserve double newlines as a placeholder
+    text = text.replace("\n\n", "<<<PARAGRAPH>>>")
+    # Remove other newlines and tabs
+    text = text.replace("\n", " ").replace("\t", " ")
+    # Restore paragraph breaks
+    text = text.replace("<<<PARAGRAPH>>>", "\n\n")
+    # Collapse multiple spaces
+    text = re.sub(r" +", " ", text)
+    # Clean up spaces around paragraph breaks
+    text = re.sub(r" *\n\n *", "\n\n", text)
+
+    return text.strip()
 
 
 async def generate_module_index():
@@ -222,22 +271,139 @@ async def generate_module_index():
                     )
                     content = readme_data.get("decoded_content", "")
 
-                    # Extract first meaningful paragraph (skip title and badges)
+                    # Extract meaningful description paragraph
+                    # Strategy: Look for descriptive paragraphs, avoiding boilerplate
                     paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+
+                    # First pass: Look for paragraphs containing descriptive phrases
                     for para in paragraphs:
-                        # Skip markdown headers (start with #)
-                        if para.startswith("#"):
+                        # Skip code blocks
+                        if para.startswith("```"):
                             continue
-                        # Skip badge lines (contain [![)
-                        if "[![" in para or para.startswith("[!["):
+                        # Skip badges
+                        if "[![" in para[:50]:
                             continue
-                        # Skip common metadata patterns
-                        if para.startswith("<!--") or para.startswith("##"):
+                        # Skip markdown tables
+                        if para.startswith("|") or "|---" in para[:100]:
                             continue
-                        # Found first real paragraph - use it
-                        if para and len(para) > 50:  # Ensure it's substantial
-                            readme_excerpt = para
-                            break
+
+                        # Check if paragraph contains descriptive phrases (case-insensitive)
+                        para_lower = para.lower()
+
+                        # Skip permissions/requirements boilerplate
+                        if any(
+                            skip in para_lower
+                            for skip in [
+                                "you need the following permissions",
+                                "you can report issues",
+                                "required iam access",
+                                "## required",
+                                "uncomment the following",
+                            ]
+                        ):
+                            continue
+
+                        # Special handling for "## Summary" sections
+                        if para.startswith("## Summary"):
+                            # The description is likely in the next paragraph
+                            continue
+
+                        if any(
+                            phrase in para_lower
+                            for phrase in [
+                                "this module",
+                                "use this module",
+                                "this solution",
+                                "this root module",
+                                "terraform module",
+                                "a module for",
+                            ]
+                        ):
+                            # Extract the descriptive text, removing HTML comments and headers
+                            lines = para.split("\n")
+                            description_lines = []
+                            in_html_comment = False
+
+                            for line in lines:
+                                stripped = line.strip()
+
+                                # Track HTML comment state
+                                if "<!--" in stripped:
+                                    in_html_comment = True
+                                if "-->" in stripped:
+                                    in_html_comment = False
+                                    continue  # Skip the closing comment line
+
+                                # Skip if we're inside a comment
+                                if in_html_comment:
+                                    continue
+
+                                # Skip section headers
+                                if stripped.startswith("#"):
+                                    continue
+
+                                # Skip documentation meta-lines (only if they start the line)
+                                if stripped.lower().startswith("for information, see"):
+                                    continue
+
+                                # Skip placeholder/template text
+                                if (
+                                    "use real values" in stripped.lower()
+                                    or "var.<var_name>" in stripped.lower()
+                                ):
+                                    continue
+
+                                # Skip standalone URLs
+                                if stripped.startswith(
+                                    "http://"
+                                ) or stripped.startswith("https://"):
+                                    continue
+
+                                # Add non-comment, non-header lines
+                                if stripped:
+                                    description_lines.append(stripped)
+
+                            # Join lines and use as excerpt
+                            if description_lines:
+                                readme_excerpt = "\n".join(description_lines)
+                                if len(readme_excerpt) > 50:
+                                    break
+
+                    # Second pass: If nothing found, get first meaningful paragraph
+                    if not readme_excerpt:
+                        for para in paragraphs:
+                            # Skip code blocks
+                            if para.startswith("```"):
+                                continue
+                            # Skip markdown headers
+                            if para.startswith("#"):
+                                continue
+                            # Skip badges and HTML comments
+                            if "[![" in para or para.startswith("<!--"):
+                                continue
+                            # Skip markdown tables
+                            if para.startswith("|") or "|---" in para[:100]:
+                                continue
+                            # Skip permissions/requirements/support
+                            if any(
+                                skip in para.lower()
+                                for skip in [
+                                    "you need the following permissions",
+                                    "you can report issues",
+                                    "required iam access",
+                                    "prerequisites",
+                                    "uncomment the following",
+                                ]
+                            ):
+                                continue
+                            # Found first real paragraph - use it
+                            if para and len(para) > 50:
+                                readme_excerpt = para
+                                break
+
+                    # Clean up the excerpt
+                    readme_excerpt = clean_excerpt(readme_excerpt)
+
             except Exception as e:
                 print(f"Warning: Could not fetch README for {module_id}: {e}")
 
