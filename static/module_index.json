@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-20T21:15:08.334311+00:00",
+  "generated_at": "2025-10-20T21:30:50.244304+00:00",
   "total_modules": 66,
   "namespace": "terraform-ibm-modules",
   "filter_criteria": {
@@ -95,7 +95,7 @@
       "published_at": "2025-09-08T07:59:13.539858Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-kms-key-ring",
       "submodules": [],
-      "readme_excerpt": "This module creates a key ring to help organize keys in a KMS instance. KMS can be Key Protect or Hyper Protect Crypto Services(HPCS) instance. For more information, about key management rings, see [creating key rings in Key Protect](https://cloud.ibm.com/docs/key-protect?topic=key-protect-grouping-keys#create-key-ring-api) and [managing key rings in HPCS](https://cloud.ibm.com/docs/hs-crypto?topic=hs-crypto-managing-key-rings&interface=ui)."
+      "readme_excerpt": "This module creates a key ring to help organize keys in a KMS instance. KMS can be Key Protect or Hyper Protect Crypto Services(HPCS) instance."
     },
     {
       "id": "terraform-ibm-modules/key-protect/ibm/2.10.16",
@@ -106,7 +106,7 @@
       "published_at": "2025-10-18T08:19:28.858417Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-key-protect",
       "submodules": [],
-      "readme_excerpt": "This module supports:"
+      "readme_excerpt": "This module supports: Creating a Key Protect instance, Enabling a rotation policy for the instance, Enabling a dual authorization policy for the instance, Enabling a metrics policy for the instance, Enabling a key create and import access policy for the instance"
     },
     {
       "id": "terraform-ibm-modules/kms-all-inclusive/ibm/5.4.3",
@@ -117,7 +117,7 @@
       "published_at": "2025-10-18T15:10:46.268997Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-kms-all-inclusive",
       "submodules": [],
-      "readme_excerpt": "This module combines the following key management service (KMS) modules to create a full end-to-end key infrastructure:"
+      "readme_excerpt": "This module combines the following key management service (KMS) modules to create a full end-to-end key infrastructure: Key Protect module, KMS Key module, KMS Key Ring module"
     },
     {
       "id": "terraform-ibm-modules/secrets-manager-secret-group/ibm/1.3.15",
@@ -161,7 +161,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vpc/tree/main/modules/workload-vpc"
         }
       ],
-      "readme_excerpt": "This module creates the following IBM Cloud Virtual Private Cloud (VPC) network components:"
+      "readme_excerpt": "This module creates the following IBM Cloud Virtual Private Cloud (VPC) network components: VPC, Public gateways, Subnets, Network ACLs, VPN gateways, and more"
     },
     {
       "id": "terraform-ibm-modules/secrets-manager-secret/ibm/1.9.1",
@@ -211,7 +211,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi/tree/main/modules/fscloud"
         }
       ],
-      "readme_excerpt": "This module creates Virtual Server Instances (VSI) across multiple subnets with any number of block storage volumes that are connected by any number of load balancers. ![vsi-module](https://raw.githubusercontent.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi/main/.docs/vsi-lb.png)"
+      "readme_excerpt": "This module creates Virtual Server Instances (VSI) across multiple subnets with any number of block storage volumes that are connected by any number of load balancers."
     },
     {
       "id": "terraform-ibm-modules/secrets-manager/ibm/2.11.0",
@@ -250,7 +250,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-access-group/tree/main/modules/access-management"
         }
       ],
-      "readme_excerpt": "This module is used to create an acess group, adding members to access group, defining the acces group policy and adding dynamic rules to access group. Access groups can be used to define a set of permissions that you want to grant to a group of users. * [terraform-ibm-iam-access-group](#terraform-ibm-iam-access-group) * [Submodules](./modules) * [access-management](./modules/access-management) * [Examples](./examples) * [Access Management example](./examples/access-management) * [Basic example](./examples/basic) * [Contributing](#contributing)"
+      "readme_excerpt": "This module is used to create an acess group, adding members to access group, defining the acces group policy and adding dynamic rules to access group. Access groups can be used to define a set of permissions that you want to grant to a group of users. terraform-ibm-iam-access-group, Submodules, access-management, Examples, Access Management example, and more"
     },
     {
       "id": "terraform-ibm-modules/secrets-manager-private-cert-engine/ibm/1.10.1",
@@ -278,7 +278,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-observability-agents/tree/main/modules/logs-agent"
         }
       ],
-      "readme_excerpt": ":warning: **Deprecated**: This module has been deprecated in favour of the following 2 modules: - [terraform-ibm-monitoring-agent](https://github.com/terraform-ibm-modules/terraform-ibm-monitoring-agent) - [terraform-ibm-logs-agent](https://github.com/terraform-ibm-modules/terraform-ibm-logs-agent)"
+      "readme_excerpt": ":warning: **Deprecated**: This module has been deprecated in favour of the following 2 modules: terraform-ibm-monitoring-agent, terraform-ibm-logs-agent"
     },
     {
       "id": "terraform-ibm-modules/secrets-manager-private-cert/ibm/1.7.0",
@@ -498,7 +498,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-account-settings/tree/main/modules/experimental"
         }
       ],
-      "readme_excerpt": "This module configures standard IAM account settings with the recommended values, in which the default values are aligned with FSCloud requirements, and exports the values as outputs."
+      "readme_excerpt": "This module configures standard IAM account settings with the recommended values, in which the default values are"
     },
     {
       "id": "terraform-ibm-modules/cloud-logs/ibm/1.9.2",
@@ -740,7 +740,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure/tree/main/modules/powervs-vpc-landing-zone"
         }
       ],
-      "readme_excerpt": "Three solutions are offered: 1. [Standard Landscape](https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure/tree/main/solutions/standard) - Creates a VPC and Power Virtual Server workspace, interconnects them, and configures OS network management services (SQUID proxy, NTP, NFS, and DNS services) using Ansible Galaxy collection roles [ibm.power_linux_sap collection](https://galaxy.ansible.com/ui/repo/published/ibm/power_linux_sap/). 2. [Quickstart (Standard Landscape plus VSI)](https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure/tree/main/solutions/standard-plus-vsi) - Creates a VPC and a Power Virtual Server workspace, interconnects them, and configures operating network management services (SQUID proxy, NTP, NFS, and DNS services) using Ansible Galaxy collection roles [ibm.power_linux_sap collection](https://galaxy.ansible.com/ui/repo/published/ibm/power_linux_sap/). - Additionally creates a Power Virtual Server Instance of a selected t-shirt size. Network management services, filesystems and SCC Workload protection agents are configured for AIX and Linux instances. - This solution is typically utilized for **PoCs, demos, and quick onboarding** to PowerVS Infrastructure. 3. [Quickstart OpenShift](https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure/tree/main/solutions/standard-openshift) - Creates a VPC and a Power Virtual Server workspace and then deploys an OpenShift Cluster in them by using the [RedHat IPI Installer](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html-single/installing_on_ibm_power_virtual_server/index) for IBM PowerVS. - The number of PowerVS Master and Worker nodes and their compute configuration is fully customizable. - Optionally creates IBM Cloud Monitoring and a SCC Workload protection instances. - This solution is typically utilized for **PoCs, demos, and quick onboarding** of OpenShift on PowerVS Infrastructure."
+      "readme_excerpt": "Three solutions are offered:"
     },
     {
       "id": "terraform-ibm-modules/icd-redis/ibm/2.2.43",
@@ -838,7 +838,7 @@
       "published_at": "2025-10-13T12:21:56.371739Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-logs-agent",
       "submodules": [],
-      "readme_excerpt": "This module deploys the following logs agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster:"
+      "readme_excerpt": "This module deploys the following logs agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster: Logs agent"
     },
     {
       "id": "terraform-ibm-modules/monitoring-agent/ibm/1.11.0",
@@ -849,7 +849,7 @@
       "published_at": "2025-10-17T15:03:23.950166Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-monitoring-agent",
       "submodules": [],
-      "readme_excerpt": "This module supports the provisioning of an agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster. The agent can be configured for: - Metrics monitoring with [IBM Cloud Monitoring](https://cloud.ibm.com/docs/monitoring?topic=monitoring-getting-started) - Security and compliance with [IBM Cloud Security and Compliance Center Workload Protection](https://cloud.ibm.com/docs/workload-protection?topic=workload-protection-getting-started)"
+      "readme_excerpt": "This module supports the provisioning of an agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster. The agent can be configured for: Metrics monitoring with IBM Cloud Monitoring"
     },
     {
       "id": "terraform-ibm-modules/watsonx-ai/ibm/2.8.9",
@@ -876,7 +876,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-ai/tree/main/modules/storage_delegation"
         }
       ],
-      "readme_excerpt": "This module supports the following:"
+      "readme_excerpt": "This module supports the following: Provisions the following services, `watsonx.ai Studio` (formerly known as `Watson Studio`), `watsonx.ai Runtime` (formerly known as `Watson Machine Learning`), Creates a starter `watsonx.ai` project."
     },
     {
       "id": "terraform-ibm-modules/icd-mongodb/ibm/3.4.14",
@@ -1037,7 +1037,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-catalog-management/tree/main/modules/vpe-catalog-object"
         }
       ],
-      "readme_excerpt": "Use real values instead of \"var.<var_name>\" or other placeholder values unless real values don't help users know what to change. -->"
+      "readme_excerpt": "Automation to manage an IBM Cloud catalog."
     },
     {
       "id": "terraform-ibm-modules/site-to-site-vpn/ibm/3.0.0",
@@ -1087,7 +1087,7 @@
       "published_at": "2025-10-18T20:39:21.26547Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-data",
       "submodules": [],
-      "readme_excerpt": "This module supports provisioning the following:"
+      "readme_excerpt": "This module supports provisioning the following: Provisioning watsonx.data instance with a selectable service plan"
     },
     {
       "id": "terraform-ibm-modules/watsonx-orchestrate/ibm/1.10.9",
@@ -1169,7 +1169,7 @@
       "published_at": "2025-10-01T14:22:59.012323Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-account-infrastructure-base",
       "submodules": [],
-      "readme_excerpt": "This module is a general base layer module for setting up a newly provisioned account with a default provision of:"
+      "readme_excerpt": "This module is a general base layer module for setting up a newly provisioned account with a default provision of: Base Resource Group, IAM Account Settings, Trusted Profile + Access Group for Projects, CBR Rules + Zones"
     },
     {
       "id": "terraform-ibm-modules/watsonx-discovery/ibm/1.10.7",

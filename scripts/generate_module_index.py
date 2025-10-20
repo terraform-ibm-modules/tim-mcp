@@ -10,6 +10,7 @@ Run this script at build time to update the module index.
 
 import asyncio
 import json
+import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -276,7 +277,7 @@ async def generate_module_index():
                     paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
                     # First pass: Look for paragraphs containing descriptive phrases
-                    for para in paragraphs:
+                    for i, para in enumerate(paragraphs):
                         # Skip code blocks
                         if para.startswith("```"):
                             continue
@@ -322,7 +323,9 @@ async def generate_module_index():
                             # Extract the descriptive text, removing HTML comments and headers
                             lines = para.split("\n")
                             description_lines = []
+                            bullet_items = []
                             in_html_comment = False
+                            intro_text = ""
 
                             for line in lines:
                                 stripped = line.strip()
@@ -359,13 +362,86 @@ async def generate_module_index():
                                 ) or stripped.startswith("https://"):
                                     continue
 
-                                # Add non-comment, non-header lines
-                                if stripped:
-                                    description_lines.append(stripped)
+                                # Check if this is a bullet item
+                                if stripped and (
+                                    stripped.startswith("-") or stripped.startswith("*")
+                                ):
+                                    # Extract bullet item text
+                                    item = stripped.lstrip("-*").strip()
+                                    # Remove markdown links but keep the link text
+                                    item = re.sub(
+                                        r"\[([^\]]+)\]\([^\)]+\)", r"\1", item
+                                    )
+                                    # Extract just the first part before colon
+                                    if ":" in item:
+                                        item = item.split(":")[0].strip()
+                                    if len(item) > 0 and len(item) < 80:
+                                        bullet_items.append(item)
+                                elif stripped:
+                                    # This is intro text before bullets
+                                    if not intro_text:
+                                        intro_text = stripped
+                                    else:
+                                        description_lines.append(stripped)
 
-                            # Join lines and use as excerpt
-                            if description_lines:
-                                readme_excerpt = "\n".join(description_lines)
+                            # Build the excerpt
+                            if intro_text or description_lines:
+                                # Start with intro text if we have it
+                                if intro_text:
+                                    readme_excerpt = intro_text
+                                    # If we have bullet items from this paragraph, add them
+                                    if bullet_items:
+                                        items_to_add = bullet_items[:5]
+                                        readme_excerpt += " " + ", ".join(items_to_add)
+                                        if len(bullet_items) > 5:
+                                            readme_excerpt += ", and more"
+                                else:
+                                    readme_excerpt = "\n".join(description_lines)
+
+                                # Also check if the next paragraph is a bullet list
+                                # If the excerpt ends with ":" and next para has bullets, append them
+                                if readme_excerpt.rstrip().endswith(
+                                    ":"
+                                ) and i + 1 < len(paragraphs):
+                                    next_para = paragraphs[i + 1]
+                                    # Check if next paragraph is a bullet list
+                                    if next_para.strip().startswith(
+                                        "-"
+                                    ) or next_para.strip().startswith("*"):
+                                        next_bullet_items = []
+                                        for bullet_line in next_para.split("\n"):
+                                            bullet_line = bullet_line.strip()
+                                            if bullet_line.startswith(
+                                                "-"
+                                            ) or bullet_line.startswith("*"):
+                                                # Remove the bullet marker and leading/trailing whitespace
+                                                item = bullet_line.lstrip("-*").strip()
+
+                                                # Remove markdown links but keep the link text
+                                                # Pattern: [text](url) -> text
+                                                item = re.sub(
+                                                    r"\[([^\]]+)\]\([^\)]+\)",
+                                                    r"\1",
+                                                    item,
+                                                )
+
+                                                # Extract just the first sentence/clause before colon or period
+                                                if ":" in item:
+                                                    item = item.split(":")[0].strip()
+                                                # Limit length to avoid overly long descriptions
+                                                if len(item) > 0 and len(item) < 80:
+                                                    next_bullet_items.append(item)
+
+                                        # Add bullet items as comma-separated list
+                                        if next_bullet_items:
+                                            # Limit to first 5 items to keep excerpt reasonable
+                                            items_to_add = next_bullet_items[:5]
+                                            readme_excerpt += " " + ", ".join(
+                                                items_to_add
+                                            )
+                                            if len(next_bullet_items) > 5:
+                                                readme_excerpt += ", and more"
+
                                 if len(readme_excerpt) > 50:
                                     break
 
@@ -378,8 +454,8 @@ async def generate_module_index():
                             # Skip markdown headers
                             if para.startswith("#"):
                                 continue
-                            # Skip badges and HTML comments
-                            if "[![" in para or para.startswith("<!--"):
+                            # Skip badges and HTML comments (anywhere in paragraph)
+                            if "[![" in para or "<!--" in para:
                                 continue
                             # Skip markdown tables
                             if para.startswith("|") or "|---" in para[:100]:
@@ -397,7 +473,7 @@ async def generate_module_index():
                             ):
                                 continue
                             # Found first real paragraph - use it
-                            if para and len(para) > 50:
+                            if para and len(para) > 30:
                                 readme_excerpt = para
                                 break
 
