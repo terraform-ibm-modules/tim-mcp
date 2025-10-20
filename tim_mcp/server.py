@@ -215,88 +215,6 @@ async def search_modules(
 
 
 @mcp.tool()
-async def list_modules() -> str:
-    """
-    List ALL terraform-ibm-modules with categorization and submodules for comprehensive context.
-
-    This tool provides a complete index of all ~90 IBM Terraform modules in a single response,
-    making it ideal for:
-    - Getting a full overview of available modules across all categories
-    - Understanding the complete module ecosystem at once
-    - LLM context enrichment with comprehensive module information
-    - Finding modules by category (networking, security, compute, storage, etc.)
-    - Discovering available submodules within each module
-
-    CATEGORIES:
-    - networking: VPC, subnets, load balancers, DNS, VPN, Transit Gateway
-    - security: Security & Compliance, Secrets Manager, Key Protect, IAM
-    - compute: Virtual servers, instances, Code Engine
-    - containers: Kubernetes, OpenShift, Container Registry
-    - storage: Cloud Object Storage, Block Storage, File Storage
-    - database: PostgreSQL, MongoDB, Redis, Cloudant, Databases for ICD
-    - observability: Monitoring, Logging, Activity Tracker, Event Notifications
-    - devops: CI/CD, Toolchains, Schematics, Projects
-    - integration: Event Streams, Kafka, MQ, API Connect
-    - ai-ml: Watson services, WatsonX
-    - management: Resource groups, tagging, catalog
-    - other: Modules that don't fit other categories
-
-    SUBMODULES:
-    Each module entry includes a list of available submodules (if any) with their paths and names.
-    Submodules are reusable components that provide specific functionality within a module.
-
-    Returns:
-        JSON formatted list of ALL modules with module_id, name, description, category,
-        submodules (path and name), latest_version, and downloads - ordered by download count
-    """
-    start_time = time.time()
-
-    try:
-        # Import here to avoid circular imports
-        from .tools.list_modules import list_modules_impl
-
-        # Execute module listing
-        response = await list_modules_impl(config)
-
-        # Log successful execution
-        duration_ms = (time.time() - start_time) * 1000
-        log_tool_execution(
-            logger,
-            "list_modules",
-            {},
-            duration_ms,
-            success=True,
-            module_count=response.total_count,
-        )
-
-        return response.model_dump_json(indent=2)
-
-    except TIMError:
-        duration_ms = (time.time() - start_time) * 1000
-        log_tool_execution(
-            logger,
-            "list_modules",
-            {},
-            duration_ms,
-            success=False,
-        )
-        raise
-
-    except Exception as e:
-        duration_ms = (time.time() - start_time) * 1000
-        log_tool_execution(
-            logger,
-            "list_modules",
-            {},
-            duration_ms,
-            success=False,
-            error=str(e),
-        )
-        logger.exception("Unexpected error in list_modules")
-        raise TIMError(f"Unexpected error: {e}") from e
-
-
-@mcp.tool()
 async def get_module_details(module_id: str) -> str:
     """
     Get structured module metadata from Terraform Registry - for understanding module interface when writing NEW terraform.
@@ -599,6 +517,44 @@ async def terraform_whitepaper():
         Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
     )
     return whitepaper_path.read_text(encoding="utf-8")
+
+
+@mcp.resource("file://module-index")
+async def module_index():
+    """
+    IBM Terraform Modules Index - A comprehensive list of all IBM Terraform modules.
+
+    This resource provides a curated index of IBM Terraform modules from the
+    terraform-ibm-modules namespace, including:
+    - Module ID, name, namespace, and provider
+    - Description and category
+    - Download count (modules are sorted by popularity)
+    - Published date
+    - Source URL on GitHub
+
+    The index is filtered to include only:
+    - Modules published in the last 3 months
+    - Modules from the terraform-ibm-modules GitHub organization
+
+    Use this resource to get an overview of available modules for context enrichment.
+    For detailed module information (inputs, outputs, etc.), use the get_module_details tool.
+    """
+    module_index_path = Path(__file__).parent.parent / "static" / "module_index.json"
+
+    if not module_index_path.exists():
+        logger.warning("Module index not found, returning empty index")
+        return json.dumps(
+            {
+                "generated_at": None,
+                "total_modules": 0,
+                "namespace": "terraform-ibm-modules",
+                "modules": [],
+                "note": "Index not yet generated. Run scripts/generate_module_index.py",
+            },
+            indent=2,
+        )
+
+    return module_index_path.read_text(encoding="utf-8")
 
 
 def main(transport_config=None):
