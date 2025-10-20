@@ -1389,6 +1389,7 @@ dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
     { name = "pydantic" },
+    { name = "pyyaml" },
     { name = "structlog" },
     { name = "tenacity" },
 ]
@@ -1419,6 +1420,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==0.24.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = "==3.14.0" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.8.4" },
     { name = "structlog", specifier = "==24.4.0" },
     { name = "tenacity", specifier = "==9.0.0" },
