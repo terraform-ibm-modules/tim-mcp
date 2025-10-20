@@ -17,6 +17,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from tim_mcp.clients.github_client import GitHubClient
 from tim_mcp.clients.terraform_client import TerraformClient
 from tim_mcp.config import load_config
 from tim_mcp.utils.cache import Cache
@@ -82,7 +83,10 @@ async def generate_module_index():
     config = load_config()
     cache = Cache(ttl=0)  # Disable cache for fresh data
 
-    async with TerraformClient(config, cache) as tf_client:
+    async with (
+        TerraformClient(config, cache) as tf_client,
+        GitHubClient(config, cache) as gh_client,
+    ):
         # Fetch all modules from terraform-ibm-modules namespace
         namespace = config.allowed_namespaces[0]  # Use first allowed namespace
         print(f"Fetching modules from namespace: {namespace}")
@@ -165,7 +169,38 @@ async def generate_module_index():
             except Exception as e:
                 print(f"Warning: Could not fetch submodules for {module_id}: {e}")
 
-            # Build module entry with submodules
+            # Fetch README excerpt
+            readme_excerpt = ""
+            try:
+                # Parse owner/repo from source URL
+                owner_repo = gh_client.parse_github_url(source)
+                if owner_repo:
+                    owner, repo = owner_repo
+                    readme_data = await gh_client.get_file_content(
+                        owner, repo, "README.md"
+                    )
+                    content = readme_data.get("decoded_content", "")
+
+                    # Extract first meaningful paragraph (skip title and badges)
+                    paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+                    for para in paragraphs:
+                        # Skip markdown headers (start with #)
+                        if para.startswith("#"):
+                            continue
+                        # Skip badge lines (contain [![)
+                        if "[![" in para or para.startswith("[!["):
+                            continue
+                        # Skip common metadata patterns
+                        if para.startswith("<!--") or para.startswith("##"):
+                            continue
+                        # Found first real paragraph - use it
+                        if para and len(para) > 50:  # Ensure it's substantial
+                            readme_excerpt = para
+                            break
+            except Exception as e:
+                print(f"Warning: Could not fetch README for {module_id}: {e}")
+
+            # Build module entry with submodules and readme_excerpt
             module_entry = {
                 "id": module_id,
                 "name": name,
@@ -175,6 +210,7 @@ async def generate_module_index():
                 "published_at": published_at,
                 "source_url": source,
                 "submodules": submodules,
+                "readme_excerpt": readme_excerpt,
             }
 
             filtered_modules.append(module_entry)
