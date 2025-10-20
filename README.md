@@ -17,7 +17,7 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
   - [Cursor](#cursor)
   - [IBM Bob](#ibm-bob)
   - [Claude Code](#claude-code)
-- [Configuration Details](#configuration-details)
+- [Version Pinning](#version-pinning)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
 - [Using TIM-MCP](#using-tim-mcp)
@@ -198,26 +198,8 @@ claude mcp list
 claude mcp remove tim-mcp
 ```
 
-**Config File Method:**
-- Edit `~/.claude.json` for global configuration
-- Create/edit `.mcp.json` in your project directory for project-specific configuration
 
-## Configuration Details
-
-### Field Breakdown
-| Field         | Required | Description                           |
-|:------------- |:---------|:--------------------------------------|
-| `command`     | Yes      | Executable (uvx)                      |
-| `args`        | Yes      | Array of arguments for server         |
-| `env`         | No       | Environment variables                 |
-
-### GitHub Token
-- **Purpose:** Authenticates requests to GitHub API
-- **Benefits:** Increases rate limit from 60 to 5,000 requests/hour
-- **Required:** No, but strongly recommended for regular use
-- **Permissions:** Only public repository access needed (no private permissions)
-
-### Version Pinning (Recommended for Production)
+## Version Pinning
 
 For production use, pin to a specific version to ensure consistent behavior:
 
