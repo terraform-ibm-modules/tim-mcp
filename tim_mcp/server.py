@@ -218,7 +218,7 @@ async def search_modules(
 @mcp.tool()
 async def list_modules() -> str:
     """
-    List ALL terraform-ibm-modules with categorization for comprehensive context.
+    List ALL terraform-ibm-modules with categorization and submodules for comprehensive context.
 
     This tool provides a complete index of all ~90 IBM Terraform modules in a single response,
     making it ideal for:
@@ -226,6 +226,7 @@ async def list_modules() -> str:
     - Understanding the complete module ecosystem at once
     - LLM context enrichment with comprehensive module information
     - Finding modules by category (networking, security, compute, storage, etc.)
+    - Discovering available submodules within each module
 
     CATEGORIES:
     - networking: VPC, subnets, load balancers, DNS, VPN, Transit Gateway
@@ -241,9 +242,13 @@ async def list_modules() -> str:
     - management: Resource groups, tagging, catalog
     - other: Modules that don't fit other categories
 
+    SUBMODULES:
+    Each module entry includes a list of available submodules (if any) with their paths and names.
+    Submodules are reusable components that provide specific functionality within a module.
+
     Returns:
         JSON formatted list of ALL modules with module_id, name, description, category,
-        latest_version, and downloads - ordered by download count (most popular first)
+        submodules (path and name), latest_version, and downloads - ordered by download count
     """
     start_time = time.time()
 
@@ -292,6 +297,7 @@ async def list_modules() -> str:
         raise TIMError(f"Unexpected error: {e}") from e
 
 
+@mcp.tool()
 @mcp.tool()
 async def get_module_details(module_id: str) -> str:
     """

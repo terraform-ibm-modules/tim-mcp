@@ -11,7 +11,7 @@ from ..clients.github_client import GitHubClient
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..exceptions import TIMError
-from ..types import ModuleListItem, ModuleListResponse
+from ..types import ModuleListItem, ModuleListResponse, SubmoduleSummary
 
 # Required topics that must be present in the GitHub repository
 REQUIRED_TOPICS = ["core-team"]
@@ -273,12 +273,13 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
                     # Categorize the module
                     category = _categorize_module(name, description)
 
-                    # Create ModuleListItem
+                    # Create ModuleListItem (without submodules for now)
                     module_item = ModuleListItem(
                         module_id=module_id,
                         name=name,
                         description=description,
                         category=category,
+                        submodules=[],  # Will be populated in batch later
                         latest_version=version,
                         downloads=downloads if isinstance(downloads, int) else 0,
                         source_url=source_url,
@@ -297,8 +298,53 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
             validated_modules.sort(key=lambda m: m.downloads, reverse=True)
 
             logger.info(
-                f"Successfully processed {len(validated_modules)} validated modules"
+                f"Successfully processed {len(validated_modules)} validated modules, fetching submodules..."
             )
+
+            # Fetch submodules for all modules in batch
+            for module_item in validated_modules:
+                try:
+                    # Parse module_id to get namespace, name, provider
+                    parts = module_item.module_id.split("/")
+                    if len(parts) >= 3:
+                        namespace_part = parts[0]
+                        name_part = parts[1]
+                        provider_part = parts[2]
+                        
+                        # Get module details to fetch submodules (using latest version)
+                        module_details = await terraform_client.get_module_details(
+                            namespace_part, name_part, provider_part, "latest"
+                        )
+                        
+                        if module_details:
+                            submodules_data = module_details.get("submodules", [])
+                            submodules = []
+                            for submodule_data in submodules_data:
+                                submodule_path = submodule_data.get("path", "")
+                                submodule_name = submodule_data.get("name", "")
+                                # Construct GitHub source URL for the submodule directory
+                                # Example: https://github.com/terraform-ibm-modules/terraform-ibm-cbr/tree/main/modules/cbr-zone-module
+                                source_base = str(module_item.source_url).rstrip("/")
+                                submodule_source_url = f"{source_base}/tree/main/{submodule_path}"
+                                
+                                submodules.append(
+                                    SubmoduleSummary(
+                                        path=submodule_path,
+                                        name=submodule_name,
+                                        source_url=submodule_source_url
+                                    )
+                                )
+                            # Sort submodules by name for consistent ordering
+                            submodules.sort(key=lambda s: s.name)
+                            # Update the module item with submodules
+                            module_item.submodules = submodules
+                            if submodules:
+                                logger.debug(f"Found {len(submodules)} submodules for {module_item.module_id}")
+                except Exception as e:
+                    logger.warning(f"Could not fetch submodules for {module_item.module_id}: {e}")
+                    # Continue without submodules rather than failing
+
+            logger.info(f"Completed submodule fetching for all modules")
 
             # Create and return the response
             return ModuleListResponse(
