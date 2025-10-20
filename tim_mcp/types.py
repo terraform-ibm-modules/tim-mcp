@@ -46,7 +46,9 @@ class SubmoduleSummary(BaseModel):
 
     path: str = Field(..., description="Submodule path within the repository")
     name: str = Field(..., description="Submodule name")
-    source_url: str = Field(..., description="GitHub source URL for the submodule directory")
+    source_url: str = Field(
+        ..., description="GitHub source URL for the submodule directory"
+    )
 
 
 class ModuleListItem(BaseModel):
@@ -55,8 +57,12 @@ class ModuleListItem(BaseModel):
     module_id: str = Field(..., description="Full module identifier")
     name: str = Field(..., description="Module name")
     description: str = Field(..., description="Module description")
-    category: str = Field(..., description="Module category (e.g., networking, security, compute)")
-    submodules: list[SubmoduleSummary] = Field(default_factory=list, description="Available submodules")
+    category: str = Field(
+        ..., description="Module category (e.g., networking, security, compute)"
+    )
+    submodules: list[SubmoduleSummary] = Field(
+        default_factory=list, description="Available submodules"
+    )
     latest_version: str = Field(..., description="Latest version")
     downloads: int = Field(..., ge=0, description="Download count")
     source_url: HttpUrl = Field(..., description="Source repository URL")
@@ -67,7 +73,9 @@ class ModuleListResponse(BaseModel):
     """Response model for listing all modules."""
 
     total_count: int = Field(..., ge=0, description="Total modules returned")
-    modules: list[ModuleListItem] = Field(..., description="All modules ordered by downloads")
+    modules: list[ModuleListItem] = Field(
+        ..., description="All modules ordered by downloads"
+    )
 
 
 class ModuleDetailsRequest(BaseModel):
@@ -169,14 +177,20 @@ class SubmoduleInfo(BaseModel):
     path: str = Field(..., description="Submodule path within the repository")
     name: str = Field(..., description="Submodule name")
     readme: str | None = Field(None, description="Submodule README content")
-    inputs: list[ModuleInput] = Field(default_factory=list, description="Submodule inputs")
-    outputs: list[ModuleOutput] = Field(default_factory=list, description="Submodule outputs")
+    inputs: list[ModuleInput] = Field(
+        default_factory=list, description="Submodule inputs"
+    )
+    outputs: list[ModuleOutput] = Field(
+        default_factory=list, description="Submodule outputs"
+    )
 
 
 class ListSubmodulesRequest(BaseModel):
     """Request model for listing submodules."""
 
-    module_id: str = Field(..., description="Full module identifier (e.g., terraform-ibm-modules/cbr/ibm)")
+    module_id: str = Field(
+        ..., description="Full module identifier (e.g., terraform-ibm-modules/cbr/ibm)"
+    )
 
 
 class ListSubmodulesResponse(BaseModel):

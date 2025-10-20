@@ -187,7 +187,11 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
     logger = get_logger(__name__)
 
     # Use the configured namespace
-    namespace = config.allowed_namespaces[0] if config.allowed_namespaces else "terraform-ibm-modules"
+    namespace = (
+        config.allowed_namespaces[0]
+        if config.allowed_namespaces
+        else "terraform-ibm-modules"
+    )
 
     logger.info(f"Fetching all modules from namespace: {namespace}")
 
@@ -249,7 +253,9 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
                     owner, repo_name = repo_info
 
                     # Get repository information
-                    repo_data = await github_client.get_repository_info(owner, repo_name)
+                    repo_data = await github_client.get_repository_info(
+                        owner, repo_name
+                    )
 
                     # Check if repository is archived
                     if repo_data.get("archived", False):
@@ -310,12 +316,12 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
                         namespace_part = parts[0]
                         name_part = parts[1]
                         provider_part = parts[2]
-                        
+
                         # Get module details to fetch submodules (using latest version)
                         module_details = await terraform_client.get_module_details(
                             namespace_part, name_part, provider_part, "latest"
                         )
-                        
+
                         if module_details:
                             submodules_data = module_details.get("submodules", [])
                             submodules = []
@@ -325,13 +331,15 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
                                 # Construct GitHub source URL for the submodule directory
                                 # Example: https://github.com/terraform-ibm-modules/terraform-ibm-cbr/tree/main/modules/cbr-zone-module
                                 source_base = str(module_item.source_url).rstrip("/")
-                                submodule_source_url = f"{source_base}/tree/main/{submodule_path}"
-                                
+                                submodule_source_url = (
+                                    f"{source_base}/tree/main/{submodule_path}"
+                                )
+
                                 submodules.append(
                                     SubmoduleSummary(
                                         path=submodule_path,
                                         name=submodule_name,
-                                        source_url=submodule_source_url
+                                        source_url=submodule_source_url,
                                     )
                                 )
                             # Sort submodules by name for consistent ordering
@@ -339,12 +347,16 @@ async def list_modules_impl(config: Config) -> ModuleListResponse:
                             # Update the module item with submodules
                             module_item.submodules = submodules
                             if submodules:
-                                logger.debug(f"Found {len(submodules)} submodules for {module_item.module_id}")
+                                logger.debug(
+                                    f"Found {len(submodules)} submodules for {module_item.module_id}"
+                                )
                 except Exception as e:
-                    logger.warning(f"Could not fetch submodules for {module_item.module_id}: {e}")
+                    logger.warning(
+                        f"Could not fetch submodules for {module_item.module_id}: {e}"
+                    )
                     # Continue without submodules rather than failing
 
-            logger.info(f"Completed submodule fetching for all modules")
+            logger.info("Completed submodule fetching for all modules")
 
             # Create and return the response
             return ModuleListResponse(

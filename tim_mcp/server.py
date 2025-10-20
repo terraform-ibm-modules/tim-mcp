@@ -21,7 +21,6 @@ from .types import (
     GetContentRequest,
     ListContentRequest,
     ModuleDetailsRequest,
-    ModuleListResponse,
     ModuleSearchRequest,
 )
 
@@ -596,7 +595,9 @@ async def get_content(
 @mcp.resource("file://terraform-whitepaper")
 async def terraform_whitepaper():
     """IBM Cloud Terraform Best Practices white paper in markdown format."""
-    whitepaper_path = Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+    whitepaper_path = (
+        Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+    )
     return whitepaper_path.read_text(encoding="utf-8")
 
 
