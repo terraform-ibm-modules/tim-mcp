@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-21T10:48:57.029569+00:00",
+  "generated_at": "2025-10-21T10:54:16.465654+00:00",
   "total_modules": 66,
   "namespace": "terraform-ibm-modules",
   "filter_criteria": {
@@ -537,7 +537,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cloud-monitoring/tree/main/modules/metrics_routing"
         }
       ],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module supports configuring an IBM Cloud Monitoring instance, metrics routing target, routes and settings."
     },
     {
       "id": "terraform-ibm-modules/code-engine/ibm/4.6.6",
@@ -684,7 +684,7 @@
       "published_at": "2025-10-19T19:47:12.597024Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-activity-tracker",
       "submodules": [],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module supports configuring an IBM Cloud Activity Tracker event routing target, routes and settings."
     },
     {
       "id": "terraform-ibm-modules/bare-metal-vpc/ibm/1.3.0",
@@ -838,7 +838,7 @@
       "published_at": "2025-10-13T12:21:56.371739Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-logs-agent",
       "submodules": [],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module deploys the following logs agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster: Logs agent"
     },
     {
       "id": "terraform-ibm-modules/monitoring-agent/ibm/1.11.1",
@@ -849,7 +849,7 @@
       "published_at": "2025-10-20T23:09:26.271573Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-monitoring-agent",
       "submodules": [],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module supports the provisioning of an agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster. The agent can be configured for: Metrics monitoring with IBM Cloud Monitoring"
     },
     {
       "id": "terraform-ibm-modules/watsonx-ai/ibm/2.9.0",
@@ -1003,7 +1003,7 @@
       "published_at": "2025-10-18T03:23:04.476466Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-custom-credentials-engine",
       "submodules": [],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module configures a custom credentials engine for a Secrets Manager instance. For more information about enabling Secrets Manager for custom credentials engine, see [Preparing to create custom credentials engine](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-custom-credentials-prepare)."
     },
     {
       "id": "terraform-ibm-modules/hpcs/ibm/1.7.0",
@@ -1037,7 +1037,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-catalog-management/tree/main/modules/vpe-catalog-object"
         }
       ],
-      "readme_excerpt": ""
+      "readme_excerpt": "Automation to manage an IBM Cloud catalog."
     },
     {
       "id": "terraform-ibm-modules/site-to-site-vpn/ibm/3.0.0",
@@ -1059,7 +1059,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-site-to-site-vpn/tree/main/modules/vpn_routing"
         }
       ],
-      "readme_excerpt": ""
+      "readme_excerpt": "This module automates the provisioning of a site-to-site VPN. For more information, see [About site-to-site VPN](https://cloud.ibm.com/docs/vpc?topic=vpc-using-vpn) in the IBM Cloud docs."
     },
     {
       "id": "terraform-ibm-modules/appid/ibm/1.4.13",
@@ -1098,7 +1098,7 @@
       "published_at": "2025-10-18T11:21:50.955249Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-orchestrate",
       "submodules": [],
-      "readme_excerpt": ""
+      "readme_excerpt": "The IBM watsonx Orchestrate Terraform module is designed to automate the deployment and configuration of the IBM watsonx Orchestrate, a multi-tenant and cloud-native solution that is deployed as a managed software as a service (SaaS) or that you can install on premises.For more information visit [here](https://www.ibm.com/docs/en/watsonx/watson-orchestrate/current)"
     },
     {
       "id": "terraform-ibm-modules/watsonx-assistant/ibm/1.4.8",

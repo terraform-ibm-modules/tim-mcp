@@ -10,6 +10,7 @@ Run this script at build time to update the module index.
 
 import asyncio
 import json
+import os
 import re
 import sys
 from datetime import UTC, datetime, timedelta
@@ -605,8 +606,20 @@ async def generate_module_index():
     
     The output file is written to the static directory with the name defined
     in OUTPUT_FILENAME.
+    
+    Raises:
+        EnvironmentError: If GITHUB_TOKEN environment variable is not set
     """
     print("Starting module index generation...")
+    
+    # Check for GitHub token to fail fast with a clear error message
+    # Skip this check in test environments
+    is_test = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
+    if not os.environ.get("GITHUB_TOKEN") and not is_test:
+        raise EnvironmentError(
+            "GITHUB_TOKEN environment variable is not set. "
+            "This is required to access GitHub API and avoid 403 errors."
+        )
 
     # Initialize clients
     config = load_config()
