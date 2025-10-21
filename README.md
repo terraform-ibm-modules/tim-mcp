@@ -167,7 +167,7 @@ Cursor IDE supports MCP servers through configuration files.
 
 ### IBM Bob
 
-IBM Bob supports MCP servers through configuration files.
+[IBM Bob](https://www.ibm.com/products/bob) supports MCP servers through configuration files.
 
 1. **Create/edit** one of these files:
    - `.bob/mcp.json` in your project directory
