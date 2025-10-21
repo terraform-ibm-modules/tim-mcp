@@ -513,8 +513,48 @@ async def get_content(
 @mcp.resource("file://terraform-whitepaper")
 async def terraform_whitepaper():
     """IBM Cloud Terraform Best Practices white paper in markdown format."""
-    whitepaper_path = Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+    whitepaper_path = (
+        Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+    )
     return whitepaper_path.read_text(encoding="utf-8")
+
+
+@mcp.resource("file://module-index")
+async def module_index():
+    """
+    IBM Terraform Modules Index - A comprehensive list of all IBM Terraform modules.
+
+    This resource provides a curated index of IBM Terraform modules from the
+    terraform-ibm-modules namespace, including:
+    - Module ID, name, namespace, and provider
+    - Description and category
+    - Download count (modules are sorted by popularity)
+    - Published date
+    - Source URL on GitHub
+
+    The index is filtered to include only:
+    - Modules published in the last 3 months
+    - Modules from the terraform-ibm-modules GitHub organization
+
+    Use this resource to get an overview of available modules for context enrichment.
+    For detailed module information (inputs, outputs, etc.), use the get_module_details tool.
+    """
+    module_index_path = Path(__file__).parent.parent / "static" / "module_index.json"
+
+    if not module_index_path.exists():
+        logger.warning("Module index not found, returning empty index")
+        return json.dumps(
+            {
+                "generated_at": None,
+                "total_modules": 0,
+                "namespace": "terraform-ibm-modules",
+                "modules": [],
+                "note": "Index not yet generated. Run scripts/generate_module_index.py",
+            },
+            indent=2,
+        )
+
+    return module_index_path.read_text(encoding="utf-8")
 
 
 def main(transport_config=None):

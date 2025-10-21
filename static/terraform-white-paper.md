@@ -628,7 +628,7 @@ Review the following usage and features for Terragrunt to keep configurations DR
 
 An [IBM Cloud project](/docs/secure-enterprise?topic=secure-enterprise-understanding-projects) allows users to effectively run IaC solutions that are broken down into smaller, manageable configurations by IaC developers. Each configuration is mapped to a dedicated Schematics workspace and its own state configuration file, facilitating streamlined execution and management of modular solutions.
 
-While IBM Cloud projects makes it easier to manage and run modular solutions, it does not provide tools to break down an existing monolithic configuration into smaller components. Instead, developers are responsible for creating and structuring each component of the solution before it is managed through IBM Cloud Project. 
+While IBM Cloud projects makes it easier to manage and run modular solutions, it does not provide tools to break down an existing monolithic configuration into smaller components. Instead, developers are responsible for creating and structuring each component of the solution before it is managed through IBM Cloud Project.
 By structuring solutions into smaller configurations, the size of state files is minimized, leading to faster execution times for Terraform operations. The separation of configurations into dedicated Schematics workspaces also reduces the blast radius of potential issues or errors, making it easier to manage risks associated with infrastructure changes.
 
 If a team implements a large-scale IaC solution, rather than creating a single monolith configuration, design it into smaller configurations for each layer. For example:
@@ -1406,7 +1406,7 @@ To enable KMS integration in Schematics, follow the steps that are outlined in [
 **Control access to unencrypted data**: Encrypting data is not enough; you must also control who can access the unencrypted data, including the state file. Schematics integrates with [IBM Cloud&reg; Identity and Access Management (Cloud Identity and Access Management)](/docs/account?topic=account-iamoverview) to control access. Further details on the Schematics roles can be found at [Managing user access](/docs/schematics?topic=schematics-access).
 
 Be cautious when you grant the Reader service role on Schematics resources, as it can lead to elevation of privilege problems. Although Reader is the lowest level of permission in Schematics, users with this role can access to workspaces, including the state file, which might contain sensitive information like API Keys. Users with the Reader service role might use the command `ibmcloud schematics state pull --id WORKSPACE_ID --template TEMPLATE_ID` to download locally the full Terraform state file. This information can then be used to access other resources, potentially leading to an elevation of privilege problem.
-   
+
 ### Document compliance claims for deployable architectures
 
 Deployable architecture authors play a critical role in helping ensure transparency by documenting the compliance claims associated with their solutions. Documenting the compliance claims involves declaring the security and compliance controls that the infrastructure created by the automation meets. Providing clear documentation of these claims empowers consumers of the deployable architecture to assess its suitability for their environments and regulatory requirements.
