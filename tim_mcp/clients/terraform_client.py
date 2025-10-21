@@ -158,6 +158,127 @@ class TerraformClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    async def list_all_modules(
+        self,
+        namespace: str,
+    ) -> list[dict[str, Any]]:
+        """
+        List all modules in a namespace by fetching all pages.
+
+        Args:
+            namespace: Namespace to list modules from
+
+        Returns:
+            List of all modules in the namespace
+
+        Raises:
+            TerraformRegistryError: If the API request fails
+            RateLimitError: If rate limited
+        """
+        # Build cache key
+        cache_key = f"list_all_modules_{namespace}"
+
+        # Check cache first (with shorter TTL since this is comprehensive)
+        cached = self.cache.get(cache_key)
+        if cached:
+            log_cache_operation(self.logger, "get", cache_key, hit=True)
+            return cached
+
+        log_cache_operation(self.logger, "get", cache_key, hit=False)
+
+        all_modules = []
+        offset = 0
+        limit = 100  # Max per page
+        max_pages = 20  # Safety limit to prevent infinite loops
+
+        for page in range(max_pages):
+            start_time = time.time()
+
+            try:
+                # Use the namespace parameter to filter modules
+                params = {"namespace": namespace, "limit": limit, "offset": offset}
+                response = await self.client.get("/modules", params=params)
+                duration_ms = (time.time() - start_time) * 1000
+
+                # Handle rate limiting
+                if response.status_code == 429:
+                    reset_time = response.headers.get("X-RateLimit-Reset")
+                    raise RateLimitError(
+                        "Terraform Registry rate limit exceeded",
+                        reset_time=int(reset_time) if reset_time else None,
+                        api_name="Terraform Registry",
+                    )
+
+                response.raise_for_status()
+                data = response.json()
+
+                modules = data.get("modules", [])
+                if not modules:
+                    # No more modules
+                    break
+
+                all_modules.extend(modules)
+
+                # Log progress
+                log_api_request(
+                    self.logger,
+                    "GET",
+                    str(response.url),
+                    response.status_code,
+                    duration_ms,
+                    namespace=namespace,
+                    page=page + 1,
+                    modules_in_page=len(modules),
+                    total_so_far=len(all_modules),
+                )
+
+                # Continue to next page if we got a full page
+                # (total_count in meta is currently buggy and returns 0, so we rely on empty results)
+                if len(modules) < limit:
+                    # Got less than a full page, we're done
+                    break
+
+                offset += limit
+
+            except httpx.HTTPStatusError as e:
+                duration_ms = (time.time() - start_time) * 1000
+                log_api_request(
+                    self.logger,
+                    "GET",
+                    str(e.request.url),
+                    e.response.status_code,
+                    duration_ms,
+                    error=str(e),
+                )
+                raise TerraformRegistryError(
+                    f"HTTP error listing modules: {e}",
+                    status_code=e.response.status_code,
+                    response_body=e.response.text,
+                ) from e
+
+            except httpx.RequestError as e:
+                duration_ms = (time.time() - start_time) * 1000
+                self.logger.error("Request error listing modules", error=str(e))
+                raise TerraformRegistryError(
+                    f"Request error listing modules: {e}"
+                ) from e
+
+        # Cache the complete result
+        self.cache.set(cache_key, all_modules)
+        log_cache_operation(self.logger, "set", cache_key)
+
+        self.logger.info(
+            f"Successfully fetched all modules from namespace {namespace}",
+            total_modules=len(all_modules),
+        )
+
+        return all_modules
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
     async def get_module_details(
         self, namespace: str, name: str, provider: str, version: str = "latest"
     ) -> dict[str, Any]:

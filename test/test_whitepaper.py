@@ -1,6 +1,5 @@
 """Test for the get_terraform_whitepaper tool."""
 
-import pytest
 from pathlib import Path
 
 # Import the specific tool function from server, not the decorator
@@ -12,21 +11,23 @@ def test_whitepaper_file_exists():
     # Check development path
     dev_path = Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
     assert dev_path.exists(), f"Whitepaper file not found at {dev_path}"
-    
+
     # Check that it's readable and has content
     content = dev_path.read_text(encoding="utf-8")
     assert len(content) > 0, "Whitepaper file is empty"
-    assert "IBM Cloud Terraform Best Practices" in content, "Whitepaper content doesn't contain expected title"
+    assert "IBM Cloud Terraform Best Practices" in content, (
+        "Whitepaper content doesn't contain expected title"
+    )
 
 
 def test_whitepaper_markdown_format():
     """Test that the whitepaper content is properly formatted markdown."""
     dev_path = Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
     content = dev_path.read_text(encoding="utf-8")
-    
+
     # Check for basic markdown structure
     assert content.startswith("# "), "Whitepaper should start with a main heading"
-    
+
     # Check for expected content
     assert "Terraform" in content, "Whitepaper should mention Terraform"
     assert "IBM Cloud" in content, "Whitepaper should mention IBM Cloud"
