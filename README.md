@@ -5,20 +5,108 @@
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#)
 
-A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices. See the [Overview](#overview) for further details on rational.
+A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices.
 
-This server acts as a bridge, enabling AI models and other tools to intelligently discover and utilize the extensive documentation, examples, and implementation patterns bundled with the [TIM modules](https://github.com/terraform-ibm-modules). It is designed to support AI-assisted coding workflows for creating IBM Cloud infrastructure.
+## Table of Contents
+- [Overview](#overview)
+- [Why TIM-MCP?](#why-tim-mcp)
+- [Prerequisites](#prerequisites)
+- [Installation Instructions](#installation-instructions)
+  - [Claude Desktop](#claude-desktop)
+  - [VS Code](#vs-code)
+  - [Cursor](#cursor)
+  - [IBM Bob](#ibm-bob)
+  - [Claude Code](#claude-code)
+- [Version Pinning](#version-pinning)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
+- [Using TIM-MCP](#using-tim-mcp)
+- [Additional Resources](#additional-resources)
+- [For Developers](#for-developers)
+- [Contributing](#contributing)
 
-## Quick Start
+## Overview
 
-Get started with TIM-MCP in Claude Desktop in under 2 minutes:
+The TIM-MCP server acts as a bridge between AI models and the Terraform IBM Modules ecosystem, enabling intelligent discovery and utilization of IBM Cloud infrastructure resources.
 
-1. **Install uv** (if not already installed):
+### Key Features
+
+- **Module Search**: Find relevant modules in the Terraform Registry with quality-based ranking
+- **Module Details**: Get structured information about inputs, outputs, and dependencies
+- **Repository Exploration**: Navigate examples, submodules, and implementation patterns
+- **Content Retrieval**: Access documentation, example code, and other repository files
+- **White Paper Resource**: Access the IBM Cloud Terraform Best Practices white paper
+- **AI-Assisted Workflows**: Tools designed to support infrastructure code generation
+
+### Important Notes
+
+⚠️ **Experimental Status**: This MCP server and the solutions it helps generate are experimental. Generated configurations should always be reviewed by skilled practitioners before use in any environment.
+
+⚠️ **Human Review Required**: Even when the tools and workflows mature, human expertise will remain essential for reviewing outputs, making final adjustments, and ensuring configurations meet specific requirements.
+
+## Why TIM-MCP?
+
+TIM-MCP guides foundation models (FMs) to produce better IBM Cloud infrastructure solutions by:
+
+### Steering models toward best practices
+Without TIM-MCP, foundation models might generate generic or outdated Terraform code. TIM-MCP steers models toward IBM-validated patterns and current best practices by providing direct access to curated modules, preventing common anti-patterns and ensuring alignment with IBM Cloud architecture recommendations.
+
+### Providing contextual guardrails
+TIM-MCP acts as a guardrail system, helping models navigate the complex IBM Cloud ecosystem. It provides structured access to module interfaces, dependencies, and implementation patterns, reducing the likelihood of hallucinated parameters or incompatible resource combinations.
+
+### Enhancing precision with real-time module data
+Foundation models may have limited or outdated knowledge of IBM Cloud Terraform modules. TIM-MCP provides real-time access to module details, ensuring AI assistants generate code with accurate input variables, correct resource configurations, and proper module versioning.
+
+### Unlocking distributed knowledge
+By connecting models to documentation and examples spread across many repositories, TIM-MCP helps foundation models leverage the collective expertise embedded in the TIM ecosystem, resulting in more accurate and production-ready infrastructure code.
+
+## Prerequisites
+
+Before configuring TIM-MCP, ensure you have the following installed:
+
+1. **uv Package Manager** (required for running the MCP server)
+   
+   **macOS/Linux:**
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
+   
+   **Windows:**
+   ```powershell
+   winget install --id=astral-sh.uv -e
+   ```
+   
+   Verify installation:
+   ```bash
+   uv --version
+   ```
 
-2. **Add to Claude Desktop** - Copy this configuration to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+2. **GitHub Personal Access Token** (optional but recommended)
+   
+   A GitHub token helps avoid API rate limits when accessing TIM repositories:
+   - Without token: 60 requests/hour
+   - With token: 5,000 requests/hour
+   
+   To create a token:
+   - Go to: **GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+   - Create a token with:
+     - **Repository access:** "Public repositories only"
+     - **Permissions:** No private access scopes needed
+     - **Expiration:** Set to 90 days or longer
+
+## Installation Instructions
+
+### Claude Desktop
+
+Claude Desktop is a standalone application that supports MCP servers through a JSON configuration file.
+
+1. **Install uv** (if not already installed) - see Prerequisites section
+
+2. **Add TIM-MCP Configuration**:
+   - **macOS:** Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows:** Edit `%APPDATA%\Claude\claude_desktop_config.json`
+
+   **Basic Configuration:**
    ```json
    {
      "mcpServers": {
@@ -34,7 +122,7 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
    }
    ```
 
-   **Optional: Add GitHub Token** (recommended to avoid rate limits):
+   **With GitHub Token** (recommended to avoid rate limits):
    ```json
    {
      "mcpServers": {
@@ -51,185 +139,70 @@ Get started with TIM-MCP in Claude Desktop in under 2 minutes:
    }
    ```
 
-3. **Restart Claude Desktop** and look for the 🔨 icon to confirm MCP tools are loaded.
+3. **Restart Claude Desktop** and look for the 🔨 icon to confirm MCP tools are loaded
 
 4. **Test it**: Ask Claude "What IBM Cloud VPC modules are available?"
 
-## Overview
+### VS Code
 
-This MCP server provides tools for AI models to navigate the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM modules are bundled with extensive documentation, working examples, and architectural patterns, but these resources are distributed across many GitHub repositories.
+Visual Studio Code supports MCP servers through extension and configuration files.
 
-This server exposes a set of tools that allow an AI assistant to:
-- **Discover** relevant modules from the [Terraform Registry](https://registry.terraform.io/namespaces/terraform-ibm-modules).
-- **Inspect** module details, including inputs, outputs, and dependencies.
-- **Explore** the contents of a module's repository, such as examples and submodules.
-- **Retrieve** specific file contents, like example code or documentation.
+1. **Install the MCP extension** for VS Code if not already installed
 
-The goal is to provide a structured and efficient way for an AI to gather the necessary context to generate accurate and high-quality Infrastructure as Code solutions for IBM Cloud.
+2. **Configure TIM-MCP** using one of these methods:
+   - Create/edit `.vscode/mcp.json` in your project directory
+   - Use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P) and select "MCP: Add Server"
 
-### Key Features
+3. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
 
-- **Module Search**: Find modules in the Terraform Registry with quality-based ranking.
-- **Module Details**: Get structured information about a module's interface.
-- **Repository Exploration**: List the contents of a module's repository, including examples and submodules.
-- **Content Retrieval**: Fetch specific files from a module's repository.
-- **White Paper Resource**: Access the IBM Cloud Terraform Best Practices white paper in clean markdown format.
-- **AI-Assisted Workflows**: The tools are designed to be used in sequence to support a typical AI-assisted coding workflow.
+### Cursor
 
-### Important Notes
+Cursor IDE supports MCP servers through configuration files.
 
-⚠️ **Experimental Status**: This MCP server and the solutions it helps generate are experimental. Generated configurations should always be reviewed by skilled practitioners before use in any environment.
+1. **Create/edit** one of these files:
+   - `.cursor/mcp.json` in your project directory
+   - `~/.cursor/mcp.json` for global configuration
 
-⚠️ **Human Review Required**: Even when the tools and workflows mature, human expertise will remain essential for reviewing outputs, making final adjustments, and ensuring configurations meet specific requirements.
+2. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
 
-## Development Installation
+### IBM Bob
 
-For developers who want to contribute to TIM-MCP or run it locally for development purposes:
+[IBM Bob](https://www.ibm.com/products/bob) supports MCP servers through configuration files.
 
+1. **Create/edit** one of these files:
+   - `.bob/mcp.json` in your project directory
+   - `~/.bob/mcp.json` for global configuration
+
+2. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
+
+### Claude Code
+
+Claude Code supports configuration via CLI or config file.
+
+**CLI Method:**
 ```bash
-# Clone the repository
-git clone https://github.com/terraform-ibm-modules/tim-mcp.git
-cd tim-mcp
+# Navigate to your project directory first
+cd /path/to/your/project
 
-# Install development dependencies
-uv sync
+# Add the MCP server with GitHub token
+claude mcp add tim-mcp --env GITHUB_TOKEN=your_github_token_here \
+  -- uvx --from git+https://github.com/terraform-ibm-modules/tim-mcp.git tim-mcp
 
-# Run tests
-uv run pytest
+# Or without GitHub token (may hit rate limits)
+claude mcp add tim-mcp -- uvx --from git+https://github.com/terraform-ibm-modules/tim-mcp.git tim-mcp
 
-# Run the server locally (STDIO mode - default)
-uv run tim-mcp
+# List configured MCP servers
+claude mcp list
 
-# Launch the MCP inspector
-npx @modelcontextprotocol/inspector uv run tim-mcp
+# Remove if needed
+claude mcp remove tim-mcp
 ```
 
-**Requirements:**
-- Python 3.11 or higher
-- [uv](https://docs.astral.sh/uv/) package manager
 
-> **Note:** For most users, we recommend using the Quick Start guide above rather than installing locally. The Quick Start method automatically handles dependencies and is easier to maintain.
+## Version Pinning
 
-## Transport Modes
+For production use, pin to a specific version to ensure consistent behavior:
 
-TIM-MCP supports two transport modes for different deployment scenarios:
-
-### STDIO Mode (Default)
-
-STDIO is the default transport mode, perfect for MCP clients like Claude Desktop that spawn server processes on-demand.
-
-```bash
-# STDIO mode (default)
-tim-mcp
-
-# Explicit STDIO mode (same as default)
-tim-mcp --log-level DEBUG
-```
-
-### HTTP Mode
-
-HTTP mode runs the server as a stateless web service, ideal for network deployments and multiple concurrent clients. The server runs in stateless mode, which means no session IDs are required and each request is handled independently.
-
-```bash
-# HTTP mode with defaults (127.0.0.1:8000)
-tim-mcp --http
-
-# HTTP mode with custom port
-tim-mcp --http --port 8080
-
-# HTTP mode with custom host and port
-tim-mcp --http --host 0.0.0.0 --port 9000
-
-# HTTP mode with debug logging
-tim-mcp --http --log-level DEBUG
-```
-
-**HTTP Server URLs:**
-- Server runs at: `http://host:port/`
-- MCP endpoint: `http://host:port/mcp`
-
-**Stateless Operation:**
-- No session IDs required for HTTP requests
-- Each request is processed independently
-- Ideal for load balancing and horizontal scaling
-- Simplified client implementation
-
-**Production HTTPS:**
-For production deployments requiring HTTPS, use nginx as a reverse proxy:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-
-    # SSL configuration
-    ssl_certificate /path/to/your/cert.pem;
-    ssl_certificate_key /path/to/your/key.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-### Environment Variables
-
-- `GITHUB_TOKEN` (optional): GitHub personal access token
-  - **When to use:** Recommended for frequent usage to avoid GitHub API rate limits
-  - **Not required for:** Basic functionality - the server works fine without it for light usage
-  - **Permissions needed:** None (read-only access to public repositories)
-  - **Create token at:** https://github.com/settings/tokens
-- `TIM_ALLOWED_NAMESPACES`: Comma-separated list of allowed module namespaces (default: `terraform-ibm-modules`)
-- `TIM_EXCLUDED_MODULES`: Comma-separated list of module IDs to exclude from search results
-
-## MCP Configuration
-
-TIM-MCP can be configured as an MCP server for use with Claude Desktop or other MCP clients. Choose the configuration method that best fits your needs:
-
-### Option 1: Remote Configuration (Recommended for Users)
-
-This method downloads and runs TIM-MCP directly from the GitHub repository without requiring local installation.
-
-**Basic Configuration** (recommended):
-```json
-{
-  "mcpServers": {
-    "tim-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
-        "tim-mcp"
-      ]
-    }
-  }
-}
-```
-
-**With GitHub Token** (recommended for frequent usage to avoid rate limits):
-```json
-{
-  "mcpServers": {
-    "tim-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
-        "tim-mcp"
-      ],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
-    }
-  }
-}
-```
-
-**Pinned Version** (recommended for production - replace `vX.X.X` with desired version):
 ```json
 {
   "mcpServers": {
@@ -240,118 +213,75 @@ This method downloads and runs TIM-MCP directly from the GitHub repository witho
         "git+https://github.com/terraform-ibm-modules/tim-mcp.git@vX.X.X",
         "tim-mcp"
       ],
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
+      "env": { "GITHUB_TOKEN": "your_github_token_here" }
     }
   }
 }
 ```
 
-> **Note:** Check the [releases page](https://github.com/terraform-ibm-modules/tim-mcp/releases) for the latest version tag. Pinning to a specific version ensures consistent behavior and prevents unexpected changes from updates.
-
-**Requirements:**
-- [uv](https://docs.astral.sh/uv/) package manager installed on your system
-- GitHub token (optional but recommended to avoid rate limits)
-
-### Option 2: Local Development Configuration
-
-This method is ideal for development and testing, using your local clone of the repository.
-
-#### For Claude Desktop
-
-**Basic Configuration:**
-```json
-{
-  "mcpServers": {
-    "tim-terraform": {
-      "command": "uv",
-      "args": [
-        "run",
-        "tim-mcp"
-      ],
-      "cwd": "/path/to/your/tim-mcp"
-    }
-  }
-}
-```
-
-**With GitHub Token** (recommended for heavy usage):
-```json
-{
-  "mcpServers": {
-    "tim-terraform": {
-      "command": "uv",
-      "args": [
-        "run",
-        "tim-mcp"
-      ],
-      "cwd": "/path/to/your/tim-mcp",
-      "env": {
-        "GITHUB_TOKEN": "your_github_token_here"
-      }
-    }
-  }
-}
-```
-
-**Setup steps:**
-1. Clone the repository: `git clone https://github.com/terraform-ibm-modules/tim-mcp.git`
-2. Navigate to the directory: `cd tim-mcp`
-3. Install dependencies: `uv sync`
-4. Update the `cwd` path in the configuration above to match your local repository path
-5. Add the configuration to your Claude Desktop settings
-
-#### For Claude Code
-
-For local development with Claude Code:
-
-```bash
-# Navigate to your tim-mcp directory first
-cd /path/to/your/tim-mcp
-
-# Add the local MCP server with GitHub token
-claude mcp add tim-mcp --env GITHUB_TOKEN=your_github_token_here \
-  -- uv run tim-mcp
-
-# Or without GitHub token (may hit rate limits)
-claude mcp add tim-mcp -- uv run tim-mcp
-
-# List configured MCP servers
-claude mcp list
-
-# Remove if needed
-claude mcp remove tim-mcp
-```
-
-**Important:** Run these commands from within your local tim-mcp repository directory, as Claude Code will use the current working directory when executing the MCP server.
-
+> **Note:** Check the [releases page](https://github.com/terraform-ibm-modules/tim-mcp/releases) for the latest version tag.
 
 ## Verification
 
-After configuration, restart Claude Desktop completely. You should see a hammer icon (🔨) in the bottom left of the input box, indicating that MCP tools are available.
+After configuration:
 
-Test the connection by asking Claude: "What IBM Cloud Terraform modules are available for VPC?"
+1. **Restart** your IDE or Claude Desktop completely
+2. **Check** for the hammer icon (🔨) in the input box, indicating MCP tools are available
+3. **Test** by asking: "What IBM Cloud Terraform modules are available for VPC?"
 
 ## Troubleshooting
 
+### Common Issues and Solutions
+
 **Server not starting:**
 - Ensure `uv` is installed and available in your PATH
-- Check that Python 3.11+ is available
-- Verify the repository path is correct for local configuration
-
-**No tools appearing in Claude:**
-- Restart Claude Desktop completely (quit and reopen)
-- Check the Claude Desktop logs for error messages
 - Verify your MCP configuration JSON syntax is valid
+
+**No tools appearing:**
+- Restart your IDE or Claude Desktop completely
+- Check logs for error messages
 
 **Rate limiting errors:**
 - Add a `GITHUB_TOKEN` environment variable with a valid GitHub personal access token
-- The token needs no special permissions for public repositories
+- The token needs only public repository access permissions
 
-**Import errors:**
-- For local development, ensure you've run `uv sync` to install dependencies
-- Check that the `cwd` path points to your local tim-mcp directory
+**Token Authentication Fails:**
+1. Verify token is valid and not expired
+2. Check token has public repository access
+3. Ensure token is in quotes in JSON
+4. Test token manually:
+```bash
+curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
+```
+
+## Using TIM-MCP
+
+Once configured, your AI assistant can help you build IBM Cloud infrastructure from simple to complex deployments. Ask for help with scenarios like:
+
+### Getting Started with IBM Cloud
+- "I am new to IBM Cloud. Help me create a simple and cheap OpenShift cluster and access the console"
+- "I want to create a simple basic virtual server on IBM Cloud and SSH to it"
+
+### Building Enterprise Infrastructure
+- "Design a VPC + OpenShift: Create a complete container platform with networking, including multi-zone VPC, subnets, OpenShift/ROKS cluster, and load balancers"
+- "Design a Secure Landing Zone: Implement enterprise-grade security with network isolation, encryption key management, private endpoints, and security groups"
+- "Design a Multi-Zone HA Database: Design resilient database infrastructure across 3+ availability zones with automated failover, backup strategies, and disaster recovery"
+
+### Quick Solutions
+- "Design a Quick POC Setup: Rapidly deploy a minimal viable environment with compute instances, basic networking, and essential services for testing"
+- "Design a FS-Validated Architecture: Deploy compliant infrastructure meeting Financial Services requirements with HPCS encryption, audit logging, and regulatory controls"
+- "Design a Hub-Spoke Network: Create an enterprise network architecture with centralized connectivity, network segmentation, and secure VPC interconnection"
+
+## Additional Resources
+
+- **TIM-MCP Repository:** https://github.com/terraform-ibm-modules/tim-mcp
+- **Model Context Protocol Docs:** https://modelcontextprotocol.io
+- **GitHub API Rate Limit Docs:** https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+- **Terraform Registry (IBM Modules):** https://registry.terraform.io/namespaces/terraform-ibm-modules
+
+## For Developers
+
+If you're interested in contributing to TIM-MCP or modifying the server itself, please see the [Development Guide](DEVELOPMENT.md) for detailed instructions on development setup, transport modes, and advanced configuration options.
 
 ## Contributing
 
