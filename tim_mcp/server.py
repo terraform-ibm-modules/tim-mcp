@@ -7,6 +7,7 @@ for Terraform IBM Modules discovery and implementation support.
 
 import json
 import time
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -30,31 +31,46 @@ configure_logging(config)
 logger = get_logger(__name__)
 
 
-def _load_instructions() -> str:
-    """Load instructions from the static instructions file."""
+def _find_static_file(filename: str) -> Path:
+    """
+    Find a file in the static directory, checking both packaged and development locations.
+    
+    Args:
+        filename: Name of the file to find in the static directory
+        
+    Returns:
+        Path object to the found file
+        
+    Raises:
+        FileNotFoundError: If the file cannot be found in either location
+    """
     # First try the packaged location (when installed via pip/uvx)
-    packaged_path = Path(__file__).parent / "static" / "instructions.md"
+    packaged_path = Path(__file__).parent / "static" / filename
     # Then try the development location (when running from source)
-    dev_path = Path(__file__).parent.parent / "static" / "instructions.md"
-
-    for instructions_path in [packaged_path, dev_path]:
-        if instructions_path.exists():
-            try:
-                return instructions_path.read_text(encoding="utf-8")
-            except Exception as e:
-                logger.error(
-                    f"Error reading instructions file at {instructions_path}: {e}"
-                )
-                continue
-
+    dev_path = Path(__file__).parent.parent / "static" / filename
+    
+    for file_path in [packaged_path, dev_path]:
+        if file_path.exists():
+            return file_path
+            
     # If neither path works, provide helpful error message
-    logger.error(f"Instructions file not found at {packaged_path} or {dev_path}")
+    logger.error(f"File not found at {packaged_path} or {dev_path}")
     raise FileNotFoundError(
-        f"Required instructions file not found. Searched locations:\n"
+        f"Required file '{filename}' not found. Searched locations:\n"
         f"  - {packaged_path} (packaged installation)\n"
         f"  - {dev_path} (development installation)\n"
-        f"Please ensure the instructions.md file exists in the static directory."
+        f"Please ensure the file exists in the static directory."
     )
+
+
+def _load_instructions() -> str:
+    """Load instructions from the static instructions file."""
+    try:
+        instructions_path = _find_static_file("instructions.md")
+        return instructions_path.read_text(encoding="utf-8")
+    except Exception as e:
+        logger.error(f"Error reading instructions file: {e}")
+        raise
 
 
 # Initialize FastMCP server
@@ -513,39 +529,28 @@ async def get_content(
 @mcp.resource(
     uri="whitepaper://terraform-best-practices-on-ibm-cloud",
     name="IBM Terraform Whitepaper",
-    description="IBM Cloud Terraform Best Practices white paper in markdown format.",
+    description=textwrap.dedent("""
+    A concise guide to best practices for designing, coding, securing, and operating Terraform Infrastructure as Code solutions on IBM Cloud. 
+    Focuses on modularity, deployable architectures, security governance, and operational workflows.
+    """),
     mime_type="text/markdown",
     tags={"documentation", "best-practices", "terraform"},
     meta={
         "version": "1.0",
         "team": "IBM Cloud",
         "update_frequency": "monthly",
-        "file_size_bytes": (Path(__file__).parent.parent / "static" / "terraform-white-paper.md").stat().st_size
+        "file_size_bytes": _find_static_file("terraform-white-paper.md").stat().st_size
     }
 )
 async def terraform_whitepaper():
-    """IBM Cloud Terraform Best Practices white paper in markdown format."""
-    whitepaper_path = (
-        Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
-    )
+    whitepaper_path = _find_static_file("terraform-white-paper.md")
     return whitepaper_path.read_text(encoding="utf-8")
 
 
 @mcp.resource(
     uri="catalog://terraform-ibm-modules-index",
     name="IBM Terraform Modules Index",
-    description="An compact list of all recommended IBM Terraform modules from the terraform-ibm-modules (TIM) namespace.",
-    mime_type="application/json",
-    tags={"index", "modules", "terraform"},
-    meta={
-        "version": "1.0",
-        "team": "IBM Cloud",
-        "update_frequency": "weekly",
-        "file_size_bytes": (Path(__file__).parent.parent / "static" / "module_index.json").stat().st_size if (Path(__file__).parent.parent / "static" / "module_index.json").exists() else 0
-    }
-)
-async def module_index():
-    """
+    description=textwrap.dedent("""
     IBM Terraform Modules Index - A comprehensive list of all IBM Terraform modules.
 
     This resource provides a curated index of IBM Terraform modules from the
@@ -562,10 +567,21 @@ async def module_index():
 
     Use this resource to get an overview of available modules for context enrichment.
     For detailed module information (inputs, outputs, etc.), use the get_module_details tool.
-    """
-    module_index_path = Path(__file__).parent.parent / "static" / "module_index.json"
-
-    if not module_index_path.exists():
+    """),
+    mime_type="application/json",
+    tags={"index", "modules", "terraform"},
+    meta={
+        "version": "1.0",
+        "team": "IBM Cloud",
+        "update_frequency": "weekly",
+        "file_size_bytes": _find_static_file("module_index.json").stat().st_size
+    }
+)
+async def module_index():
+    try:
+        module_index_path = _find_static_file("module_index.json")
+        return module_index_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
         logger.warning("Module index not found, returning empty index")
         return json.dumps(
             {
@@ -577,8 +593,6 @@ async def module_index():
             },
             indent=2,
         )
-
-    return module_index_path.read_text(encoding="utf-8")
 
 
 def main(transport_config=None):
