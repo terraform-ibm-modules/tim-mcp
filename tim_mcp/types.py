@@ -46,6 +46,9 @@ class SubmoduleSummary(BaseModel):
 
     path: str = Field(..., description="Submodule path within the repository")
     name: str = Field(..., description="Submodule name")
+    description: str = Field(
+        default="", description="Submodule description extracted from README"
+    )
     source_url: str = Field(
         ..., description="GitHub source URL for the submodule directory"
     )

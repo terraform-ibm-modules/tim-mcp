@@ -213,25 +213,156 @@ def parse_iso_date(date_str: str) -> Optional[datetime]:
         return None
 
 
+async def fetch_submodule_description(
+    gh_client: GitHubClient,
+    owner: str,
+    repo: str,
+    submodule_path: str
+) -> str:
+    """
+    Extract a brief description from a submodule's README.
+    
+    Args:
+        gh_client: GitHubClient instance
+        owner: Repository owner
+        repo: Repository name
+        submodule_path: Path to the submodule directory
+        
+    Returns:
+        Brief description extracted from the submodule's README
+    """
+    try:
+        # Try to fetch the submodule's README
+        readme_path = f"{submodule_path}/README.md"
+        readme_data = await gh_client.get_file_content(owner, repo, readme_path)
+        content = readme_data.get("decoded_content", "")
+        
+        if not content:
+            return ""
+        
+        # Extract first meaningful paragraph (simple extraction)
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+        
+        for para in paragraphs:
+            # Skip headers
+            if para.startswith("#"):
+                continue
+            
+            # Skip code blocks
+            if para.startswith("```"):
+                continue
+                
+            # Skip badges
+            if "[![" in para[:50]:
+                continue
+                
+            # Skip markdown tables
+            if para.startswith("|") or "|---" in para[:100]:
+                continue
+            
+            # Skip HTML comments
+            if para.startswith("<!--"):
+                continue
+            
+            # Found a meaningful paragraph
+            # Clean it up: remove inline markdown links and normalize whitespace
+            clean_para = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", para)
+            # Normalize whitespace (replace multiple spaces/newlines with single space)
+            clean_para = " ".join(clean_para.split())
+            
+            # Check if this paragraph ends with a colon (e.g., "following:")
+            # and is followed by a bullet list
+            if clean_para.rstrip().endswith(":"):
+                # Find the next paragraph which should be the bullet list
+                para_idx = paragraphs.index(para)
+                if para_idx + 1 < len(paragraphs):
+                    next_para = paragraphs[para_idx + 1]
+                    # Extract bullet items
+                    bullet_items = []
+                    for line in next_para.split("\n"):
+                        line = line.strip()
+                        if line.startswith("-") or line.startswith("*"):
+                            # Remove bullet marker and clean
+                            item = line.lstrip("-*").strip()
+                            # Remove markdown links
+                            item = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", item)
+                            # Take just the first part before any explanation
+                            if ":" in item:
+                                item = item.split(":")[0].strip()
+                            # Remove any extra whitespace and newlines
+                            item = " ".join(item.split())
+                            # Remove any nested bullets or extra formatting
+                            if item and len(item) < 80:
+                                bullet_items.append(item)
+                    
+                    if bullet_items:
+                        # Combine the intro text with comma-separated list and add "etc" at the end
+                        items_str = ", ".join(bullet_items[:5])
+                        if len(bullet_items) > 5:
+                            items_str += " etc"
+                        else:
+                            items_str += " etc"
+                        # Clean the intro text to remove newlines
+                        intro_clean = " ".join(clean_para.rstrip(":").split())
+                        description = intro_clean + ": " + items_str
+                        # Limit total length, truncating at word boundary
+                        if len(description) > 1200:
+                            # Find last space before the 1197 char limit
+                            truncated = description[:1197]
+                            last_space = truncated.rfind(' ')
+                            if last_space > 0:
+                                description = description[:last_space] + "..."
+                            else:
+                                description = description[:1197] + "..."
+                        return description
+            
+            # Take first sentence or limit to ~150 chars
+            sentences = clean_para.split(". ")
+            if sentences:
+                description = sentences[0]
+                if not description.endswith("."):
+                    description += "."
+                
+                # Limit length, truncating at word boundary
+                if len(description) > 1200:
+                    # Find last space before the 1197 char limit
+                    truncated = description[:1197]
+                    last_space = truncated.rfind(' ')
+                    if last_space > 0:
+                        description = description[:last_space] + "..."
+                    else:
+                        description = description[:1197] + "..."
+                    
+                return description
+        
+        return ""
+        
+    except Exception as e:
+        # Silently fail - it's okay if we can't get a description
+        return ""
+
+
 async def fetch_submodules(
     tf_client: TerraformClient,
+    gh_client: GitHubClient,
     namespace: str,
     name: str,
     provider: str,
     source: str
 ) -> List[Dict[str, str]]:
     """
-    Fetch submodules for a Terraform module.
+    Fetch submodules for a Terraform module with descriptions.
     
     Args:
         tf_client: TerraformClient instance
+        gh_client: GitHubClient instance
         namespace: Module namespace
         name: Module name
         provider: Module provider
         source: Module source URL
         
     Returns:
-        List of submodule dictionaries with path, name, and source_url
+        List of submodule dictionaries with path, name, source_url, and description
     """
     submodules = []
     try:
@@ -239,9 +370,19 @@ async def fetch_submodules(
             namespace, name, provider, "latest"
         )
 
+        # Parse owner/repo from source URL for README fetching
+        owner_repo = gh_client.parse_github_url(source)
+        if not owner_repo:
+            print(f"Warning: Could not parse GitHub URL: {source}")
+            owner, repo = None, None
+        else:
+            owner, repo = owner_repo
+
         # Extract submodules
         raw_submodules = module_details.get("submodules", [])
-        for submodule in raw_submodules:
+        
+        # Fetch all submodule descriptions in parallel
+        async def fetch_single_submodule(submodule):
             submodule_path = submodule.get("path", "")
             submodule_name = submodule_path.split("/")[-1] if submodule_path else ""
 
@@ -251,12 +392,29 @@ async def fetch_submodules(
                 if submodule_path
                 else source
             )
+            
+            # Fetch description from submodule's README
+            description = ""
+            if owner and repo and submodule_path:
+                description = await fetch_submodule_description(
+                    gh_client, owner, repo, submodule_path
+                )
 
-            submodules.append({
+            return {
                 "path": submodule_path,
                 "name": submodule_name,
+                "description": description,
                 "source_url": submodule_source_url,
-            })
+            }
+        
+        # Fetch all submodules in parallel
+        submodules = await asyncio.gather(
+            *[fetch_single_submodule(sub) for sub in raw_submodules],
+            return_exceptions=True
+        )
+        
+        # Filter out any exceptions
+        submodules = [sub for sub in submodules if isinstance(sub, dict)]
 
         # Sort submodules by name
         submodules.sort(key=lambda x: x["name"])
@@ -572,7 +730,7 @@ async def process_module(
 
     # Fetch submodules for this module
     print(f"Fetching submodules for {module_id}...")
-    submodules = await fetch_submodules(tf_client, namespace, name, provider, source)
+    submodules = await fetch_submodules(tf_client, gh_client, namespace, name, provider, source)
 
     # Fetch README excerpt
     readme_excerpt = await extract_readme_excerpt(gh_client, source)
@@ -638,12 +796,28 @@ async def generate_module_index():
         # Calculate cutoff date (3 months ago)
         cutoff_date = datetime.now(UTC) - timedelta(days=MODULE_AGE_THRESHOLD_DAYS)
 
-        # Process modules
+        # Process modules in parallel (with concurrency limit to avoid overwhelming the API)
+        print("Processing modules in parallel...")
+        
+        # Process in batches to avoid overwhelming the API
+        batch_size = 10
         filtered_modules = []
-        for module in all_modules:
-            processed_module = await process_module(module, tf_client, gh_client, cutoff_date)
-            if processed_module:
-                filtered_modules.append(processed_module)
+        
+        for i in range(0, len(all_modules), batch_size):
+            batch = all_modules[i:i + batch_size]
+            batch_results = await asyncio.gather(
+                *[process_module(module, tf_client, gh_client, cutoff_date) for module in batch],
+                return_exceptions=True
+            )
+            
+            # Filter out None results and exceptions
+            filtered_modules.extend([
+                result for result in batch_results 
+                if result is not None and not isinstance(result, Exception)
+            ])
+            
+            # Print progress
+            print(f"Processed {min(i + batch_size, len(all_modules))}/{len(all_modules)} modules...")
 
         # Sort by downloads (descending)
         filtered_modules.sort(key=lambda x: x["downloads"], reverse=True)
