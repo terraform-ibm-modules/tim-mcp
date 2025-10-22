@@ -510,7 +510,19 @@ async def get_content(
         raise TIMError(f"Unexpected error: {e}") from e
 
 
-@mcp.resource("file://terraform-whitepaper")
+@mcp.resource(
+    uri="whitepaper://terraform-best-practices-on-ibm-cloud",
+    name="IBM Terraform Whitepaper",
+    description="IBM Cloud Terraform Best Practices white paper in markdown format.",
+    mime_type="text/markdown",
+    tags={"documentation", "best-practices", "terraform"},
+    meta={
+        "version": "1.0",
+        "team": "IBM Cloud",
+        "update_frequency": "monthly",
+        "file_size_bytes": (Path(__file__).parent.parent / "static" / "terraform-white-paper.md").stat().st_size
+    }
+)
 async def terraform_whitepaper():
     """IBM Cloud Terraform Best Practices white paper in markdown format."""
     whitepaper_path = (
@@ -519,7 +531,19 @@ async def terraform_whitepaper():
     return whitepaper_path.read_text(encoding="utf-8")
 
 
-@mcp.resource("file://module-index")
+@mcp.resource(
+    uri="catalog://terraform-ibm-modules-index",
+    name="IBM Terraform Modules Index",
+    description="An compact list of all recommended IBM Terraform modules from the terraform-ibm-modules (TIM) namespace.",
+    mime_type="application/json",
+    tags={"index", "modules", "terraform"},
+    meta={
+        "version": "1.0",
+        "team": "IBM Cloud",
+        "update_frequency": "weekly",
+        "file_size_bytes": (Path(__file__).parent.parent / "static" / "module_index.json").stat().st_size if (Path(__file__).parent.parent / "static" / "module_index.json").exists() else 0
+    }
+)
 async def module_index():
     """
     IBM Terraform Modules Index - A comprehensive list of all IBM Terraform modules.

@@ -153,7 +153,7 @@ Visual Studio Code supports MCP servers through extension and configuration file
    - Create/edit `.vscode/mcp.json` in your project directory
    - Use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P) and select "MCP: Add Server"
 
-3. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
+3. **Add the configuration** using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
 
 ### Cursor
 
@@ -163,21 +163,27 @@ Cursor IDE supports MCP servers through configuration files.
    - `.cursor/mcp.json` in your project directory
    - `~/.cursor/mcp.json` for global configuration
 
-2. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
+2. **Add the configuration** using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
 
 ### IBM Bob
 
 [IBM Bob](https://www.ibm.com/products/bob) supports MCP servers through configuration files.
 
-1. **Create/edit** one of these files:
-   - `.bob/mcp.json` in your project directory
-   - `~/.bob/mcp.json` for global configuration
+#### Configuring MCP Servers in Bob
 
-2. **Add the configuration** using the same JSON format as shown in the Claude Desktop section
+MCP server configurations can be managed at two levels:
+
+- **Project-level Configuration**: Create the file `.bob/mcp.json` within your project directory, and then **add the configuration** using the JSON format shown in the [Claude Desktop](#claude-desktop) section
+- **Global Configuration**: Stored in the `mcp_settings.json` file, accessible via VS Code settings. These settings apply across all your workspaces unless overridden by a project-level configuration.
+  1. Click the icon in the top navigation of the Bob pane.
+  2. Scroll to the bottom of the MCP settings view.
+  3. Click **Edit Global MCP**: Opens the global `mcp_settings.json` file.
+  4. Add the configuration using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
+
 
 ### Claude Code
 
-Claude Code supports configuration via CLI or config file.
+Claude Code supports configuration via CLI or config file. The configuration format is similar to the [Claude Desktop](#claude-desktop) section.
 
 **CLI Method:**
 ```bash
@@ -201,7 +207,7 @@ claude mcp remove tim-mcp
 
 ## Version Pinning
 
-For production use, pin to a specific version to ensure consistent behavior:
+For production use, pin to a specific version to ensure consistent behavior (using the same format as in the [Claude Desktop](#claude-desktop) section):
 
 ```json
 {
