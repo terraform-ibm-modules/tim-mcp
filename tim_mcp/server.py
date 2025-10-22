@@ -524,12 +524,12 @@ async def get_content(
         "version": "1.0",
         "team": "IBM Cloud",
         "update_frequency": "monthly",
-        "file_size_bytes": (Path(__file__).parent.parent / "static" / "terraform-white-paper.md").stat().st_size
+        "file_size_bytes": (Path(__file__).resolve().parent.parent / "static" / "terraform-white-paper.md").stat().st_size
     }
 )
 async def terraform_whitepaper():
     whitepaper_path = (
-        Path(__file__).parent.parent / "static" / "terraform-white-paper.md"
+        Path(__file__).resolve().parent.parent / "static" / "terraform-white-paper.md"
     )
     return whitepaper_path.read_text(encoding="utf-8")
 
@@ -561,11 +561,11 @@ async def terraform_whitepaper():
         "version": "1.0",
         "team": "IBM Cloud",
         "update_frequency": "weekly",
-        "file_size_bytes": (Path(__file__).parent.parent / "static" / "module_index.json").stat().st_size if (Path(__file__).parent.parent / "static" / "module_index.json").exists() else 0
+        "file_size_bytes": (Path(__file__).resolve().parent.parent / "static" / "module_index.json").stat().st_size if (Path(__file__).parent.parent / "static" / "module_index.json").exists() else 0
     }
 )
 async def module_index():
-    module_index_path = Path(__file__).parent.parent / "static" / "module_index.json"
+    module_index_path = Path(__file__).resolve().parent.parent / "static" / "module_index.json"
 
     if not module_index_path.exists():
         logger.warning("Module index not found, returning empty index")
