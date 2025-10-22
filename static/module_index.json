@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-10-22T13:21:08.752493+00:00",
+  "generated_at": "2025-10-22T14:57:32.112129+00:00",
   "total_modules": 65,
   "namespace": "terraform-ibm-modules",
   "filter_criteria": {
@@ -676,7 +676,7 @@
       "published_at": "2025-10-20T08:22:36.80955Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-app-configuration",
       "submodules": [],
-      "readme_excerpt": "# Terraform IBM App Configuration"
+      "readme_excerpt": "Create an App Configuration instance and optionally allows for multiple App Configuration Collections to be created."
     },
     {
       "id": "terraform-ibm-modules/icd-mysql/ibm/2.1.28",
@@ -752,7 +752,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-bare-metal-vpc/tree/main/modules/baremetal"
         }
       ],
-      "readme_excerpt": "# Bare Metal Server for VPC module"
+      "readme_excerpt": "The IBM Cloud Bare Metal Server Deployment Module provisions IBM Cloud Bare Metal Servers for VPC in a flexible and scalable manner. It supports deploying single or multiple servers, dynamically distributing them across one or more subnets while ensuring each instance is uniquely named."
     },
     {
       "id": "terraform-ibm-modules/event-streams/ibm/4.2.0",
@@ -1006,7 +1006,7 @@
       "published_at": "2025-10-18T11:24:53.714733Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-private-path",
       "submodules": [],
-      "readme_excerpt": "# IBM Cloud Private Path module"
+      "readme_excerpt": "The Private Path solution solves security, privacy and complexity problems. Through Private Path, providers can deliver their services over the IBM Cloud private network backbone, ensuring secure and private interactions for consumers. Providers can offer their services to IBM Cloud customers over Private Path using the IBM Cloud infrastructure. Private Path components are used when connecting to IBM Cloud services, and can now be used for third-party applications and services. [Learn more](https://cloud.ibm.com/docs/private-path?topic=private-path-overview)"
     },
     {
       "id": "terraform-ibm-modules/cloudant/ibm/1.4.28",
@@ -1198,7 +1198,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-enterprise/tree/main/modules/enterprise_hierarchy"
         }
       ],
-      "readme_excerpt": "# IBM Enterprise Account module"
+      "readme_excerpt": "This is a collection of sub modules and which will take tree based enterprise inputs and create child accounts and account-groups in an enterprise * [dynamic_values](submodules/dynamic_values) * [enterprise_hierarchy](submodules/enterprise_hierarchy)"
     },
     {
       "id": "terraform-ibm-modules/account-infrastructure-base/ibm/3.1.1",

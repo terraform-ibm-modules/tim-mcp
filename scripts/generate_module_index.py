@@ -243,7 +243,19 @@ async def fetch_submodule_description(
         # Extract first meaningful paragraph (simple extraction)
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         
+        in_html_comment = False
         for para in paragraphs:
+            # Track HTML comment state
+            if "<!--" in para:
+                in_html_comment = True
+            if "-->" in para:
+                in_html_comment = False
+                continue  # Skip the closing comment line
+            
+            # Skip if we're inside a comment
+            if in_html_comment:
+                continue
+            
             # Skip headers
             if para.startswith("#"):
                 continue
@@ -258,10 +270,6 @@ async def fetch_submodule_description(
                 
             # Skip markdown tables
             if para.startswith("|") or "|---" in para[:100]:
-                continue
-            
-            # Skip HTML comments
-            if para.startswith("<!--"):
                 continue
             
             # Found a meaningful paragraph
@@ -661,8 +669,21 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
 
         # Second pass: If nothing found, get first meaningful paragraph
         if not readme_excerpt:
+            in_html_comment = False
             for para in paragraphs:
-                if should_skip_paragraph(para) or "<!--" in para:
+                # Track HTML comment state
+                if "<!--" in para:
+                    in_html_comment = True
+                if "-->" in para:
+                    in_html_comment = False
+                    continue  # Skip the closing comment line
+                
+                # Skip if we're inside a comment
+                if in_html_comment:
+                    continue
+                
+                # Skip headers, code blocks, badges, and HTML comments
+                if should_skip_paragraph(para) or para.startswith("#"):
                     continue
                     
                 # Found first real paragraph - use it

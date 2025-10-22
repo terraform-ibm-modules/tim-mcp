@@ -713,6 +713,44 @@ normalized to a single line.
         assert "\n" not in result
         assert "multiple lines" in result or "multiplelines" in result.replace(" ", "")
 
+    @pytest.mark.asyncio
+    async def test_fetch_submodule_description_skips_html_comments_in_fallback(self):
+        """Test that HTML comments are skipped even in second pass fallback."""
+        mock_gh_client = MagicMock()
+        
+        # Simulate README structure like vpc-private-path module:
+        # Title, then multi-line HTML comment with text, then actual description
+        readme_content = """# IBM Cloud Private Path module
+
+<!--
+Add a description of modules in this repo.
+Expand on the repo short description in the .github/settings.yml file.
+
+For information, see "Module names and descriptions" at
+https://terraform-ibm-modules.github.io/documentation/#/implementation-guidelines?id=module-names-and-descriptions
+-->
+
+The Private Path solution solves security, privacy and complexity problems.
+
+## More content
+"""
+        
+        mock_gh_client.get_file_content = AsyncMock(return_value={
+            "decoded_content": readme_content
+        })
+        
+        result = await fetch_submodule_description(
+            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-vpc-private-path", "modules/test"
+        )
+        
+        assert result != ""
+        # Should extract actual description, not HTML comment content
+        assert "Private Path solution" in result
+        assert "For information, see" not in result  # This was in HTML comment
+        assert "module names and descriptions" not in result  # Also in HTML comment
+        # Should not extract the header
+        assert not result.startswith("# IBM Cloud Private Path")
+
 
 class TestParallelProcessing:
     """Tests for parallel processing functionality."""
