@@ -7,6 +7,7 @@ for Terraform IBM Modules discovery and implementation support.
 
 import json
 import time
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -513,10 +514,10 @@ async def get_content(
 @mcp.resource(
     uri="whitepaper://terraform-best-practices-on-ibm-cloud",
     name="IBM Terraform Whitepaper",
-    description="""
+    description=textwrap.dedent("""
     A concise guide to best practices for designing, coding, securing, and operating Terraform Infrastructure as Code solutions on IBM Cloud. 
     Focuses on modularity, deployable architectures, security governance, and operational workflows.
-    """,
+    """),
     mime_type="text/markdown",
     tags={"documentation", "best-practices", "terraform"},
     meta={
@@ -536,7 +537,7 @@ async def terraform_whitepaper():
 @mcp.resource(
     uri="catalog://terraform-ibm-modules-index",
     name="IBM Terraform Modules Index",
-    description="""
+    description=textwrap.dedent("""
     IBM Terraform Modules Index - A comprehensive list of all IBM Terraform modules.
 
     This resource provides a curated index of IBM Terraform modules from the
@@ -553,7 +554,7 @@ async def terraform_whitepaper():
 
     Use this resource to get an overview of available modules for context enrichment.
     For detailed module information (inputs, outputs, etc.), use the get_module_details tool.
-    """,
+    """),
     mime_type="application/json",
     tags={"index", "modules", "terraform"},
     meta={
