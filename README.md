@@ -173,7 +173,7 @@ Cursor IDE supports MCP servers through configuration files.
 
 MCP server configurations can be managed at two levels:
 
-- **Project-level Configuration**: Create `.bob/mcp.json` file within your project directory, and then **add the configuration** using the same JSON format as shown in the Claude Desktop section
+- **Project-level Configuration**: Create the file `.bob/mcp.json` within your project directory, and then **add the configuration** using the JSON format shown in the [Claude Desktop](#claude-desktop) section
 - **Global Configuration**: Stored in the `mcp_settings.json` file, accessible via VS Code settings. These settings apply across all your workspaces unless overridden by a project-level configuration.
   1. Click the icon in the top navigation of the Bob pane.
   2. Scroll to the bottom of the MCP settings view.
