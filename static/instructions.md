@@ -15,13 +15,14 @@ This MCP server is designed to help you leverage Terraform IBM Modules (TIM) to 
 
 ## Purpose of this MCP Server
 
-The main purpose of this MCP server is to help generate terraform-based compositions of modules. It provides tools to:
+The main purpose of this MCP server is to help generate terraform-based compositions of modules. It provides tools and resources to:
 
-1. Search for relevant Terraform IBM Modules
-2. Discover available examples and repository structure
-3. Get detailed information about modules, including inputs, outputs, and examples
-4. Access example code and specific files to understand how to use and combine modules
-5. Generate complete, working Terraform configurations
+1. Browse the module index for a high-level overview of available modules
+2. Search for specific Terraform IBM Modules when needed
+3. Discover available examples and repository structure
+4. Get detailed information about modules, including inputs, outputs, and examples
+5. Access example code and specific files to understand how to use and combine modules
+6. Generate complete, working Terraform configurations
 
 ## Architectural Best Practices
 
@@ -44,10 +45,11 @@ The server supports two distinct workflows based on user intent:
 
 Keywords to detect this intent: "example", "sample", "deploy", "show me", "simple"
 
-1. **`search_modules`** → Find relevant modules
-2. **`get_module_details`** → Understand module capabilities using module ID from search results
-3. **`list_content`** → Check what examples are available for the module
-4. **`get_content`** → Fetch example Terraform files (main.tf, provider.tf, version.tf)
+1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
+2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
+3. Use **`get_module_details`** to understand module capabilities using module ID from the index or search results
+4. Use **`list_content`** to check what examples are available for the module
+5. Use **`get_content`** to fetch example Terraform files (main.tf, provider.tf, version.tf)
 
 The example files provide valuable insights:
 - **Main configuration file**: Shows how to use and combine the module with others
@@ -62,14 +64,22 @@ Note: File names may vary (e.g., main.tf, provider.tf, version.tf, variables.tf,
 
 Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop"
 
-1. **`search_modules`** → Find relevant modules
-2. **`get_module_details`** → Understand inputs/outputs/interface using module ID from search results
-3. **`list_content`** → Explore available examples and structure
-4. **`get_content`** → Fetch example files to understand usage patterns and provider setup
+1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
+2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
+3. Use **`get_module_details`** to understand inputs/outputs/interface using module ID from the index or search results
+4. Use **`list_content`** to explore available examples and structure
+5. Use **`get_content`** to fetch example files to understand usage patterns and provider setup
 
-## Tool Usage Tips
+## Resource and Tool Usage Tips
+
+### Module Index Resource
+- Start with the module index resource (`catalog://terraform-ibm-modules-index`) to get a broad, high-level picture of available modules
+- Use the index to understand the overall ecosystem of available modules before diving into specific searches
+- The index provides a comprehensive overview that can help identify the most relevant modules for your needs
+- Only proceed to search if the index doesn't provide enough specific information
 
 ### Search Strategy
+- Use search only when you need more specific results than what the index provides
 - Use specific terms rather than generic ones (e.g., "vpc" better than "network")
 - Be specific in requests to minimize context usage and API calls
 - Consider download counts as indicators of module quality and maintenance
@@ -88,11 +98,12 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 ## Optimization Principles
 
-1. **Be specific in requests** to minimize context usage and API calls
-2. **Start with narrow scope** (specific files/paths), broaden only if needed
-3. **Exclude test files by default**: `[".*test.*", ".*\\.tftest$", ".*_test\\..*"]`
-4. **For examples, prefer single targeted example** over fetching all examples
-5. **Avoid multiple searches** unless comparing approaches
+1. **Start with the module index resource** to get a comprehensive overview before specific searches
+2. **Be specific in requests** to minimize context usage and API calls
+3. **Start with narrow scope** (specific files/paths), broaden only if needed
+4. **Exclude test files by default**: `[".*test.*", ".*\\.tftest$", ".*_test\\..*"]`
+5. **For examples, prefer single targeted example** over fetching all examples
+6. **Avoid multiple searches** unless comparing approaches
 
 ## Example Workflows
 
@@ -103,8 +114,8 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 **Workflow:**
 ```
-1. search_modules("vpc")
-   # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0 (among others)
+1. Check catalog://terraform-ibm-modules-index
+   # Browse the index to identify relevant VPC modules
 2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Understand module capabilities, inputs, outputs
 3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
@@ -120,8 +131,8 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 **Workflow:**
 ```
-1. search_modules("vpc")
-   # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0 (among others)
+1. Check catalog://terraform-ibm-modules-index
+   # Browse the index to identify relevant VPC modules
 2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Get detailed inputs, outputs, and module interface
 3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
@@ -138,12 +149,12 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 **Workflow:**
 ```
-1. search_modules("vpc")
-   # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0, etc.
+1. Check catalog://terraform-ibm-modules-index
+   # Browse the index to identify relevant modules for VPC, security groups, and clusters
 2. search_modules("security group")
-   # Returns: terraform-ibm-modules/security-group/ibm/2.7.0, etc.
+   # Optional: Search for specific security group modules if needed
 3. search_modules("cluster")
-   # Returns: terraform-ibm-modules/base-ocp-vpc/ibm/3.62.0, etc.
+   # Optional: Search for specific cluster modules if needed
 4. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
 5. get_module_details("terraform-ibm-modules/security-group/ibm/2.7.0")
 6. get_module_details("terraform-ibm-modules/base-ocp-vpc/ibm/3.62.0")
@@ -159,8 +170,8 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 **Workflow:**
 ```
-1. search_modules("vpc")
-   # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0, etc.
+1. Check catalog://terraform-ibm-modules-index
+   # Browse the index to identify relevant VPC modules
 2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Understand what the module does and its capabilities
 3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
@@ -176,8 +187,8 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 **Workflow:**
 ```
-1. search_modules("vpc")
-   # Returns: terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0, etc.
+1. Check catalog://terraform-ibm-modules-index
+   # Browse the index to identify relevant VPC modules
 2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
    # Understand module interface
 3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
@@ -248,6 +259,11 @@ When generating Terraform configurations:
 - **Always prefer terraform-ibm-modules over direct provider resources**
 - Only use IBM Cloud Terraform provider resources when no appropriate module exists
 - Gain insights from example code to understand when to use modules vs provider resources
+
+### Module Discovery
+- **Start with the module index resource** to get a comprehensive overview of available modules
+- Use search only when you need more specific information than what the index provides
+- The index gives you a broad, high-level picture that helps identify the most relevant modules
 
 ### Search Strategy
 - Use specific, targeted search terms
