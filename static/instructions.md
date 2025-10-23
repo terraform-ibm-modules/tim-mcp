@@ -71,9 +71,9 @@ module "observability_instances" {
 ```
 
 **Real-world example of this mistake:**
-- `terraform-ibm-modules/cloud-monitoring/ibm` EXISTS
-- `terraform-ibm-modules/log-analysis/ibm` DOES NOT EXIST
-- The correct module for log analysis is `terraform-ibm-modules/observability-instances/ibm`
+- AI saw that `terraform-ibm-modules/cloud-monitoring/ibm` exists
+- AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
+- This module does NOT exist - always verify first
 
 ## Workflow by Intent
 
