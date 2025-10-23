@@ -99,6 +99,9 @@ async def search_modules_impl(
             batch_size = 50  # Fetch modules in smaller batches
             max_attempts = 10  # Prevent infinite loops
 
+            # Track the total count from the first API response
+            total_count = 0
+
             attempt = 0
             while len(validated_modules) < request.limit and attempt < max_attempts:
                 attempt += 1
@@ -116,7 +119,11 @@ async def search_modules_impl(
 
                 # Extract metadata from response
                 meta = api_response["meta"]
-                total_count = meta.get("total_count", 0)
+                
+                # Capture total_count from the first batch only
+                # Subsequent batches might have inconsistent or missing total_count
+                if attempt == 1:
+                    total_count = meta.get("total_count", 0)
 
                 # If no more modules available, break
                 if not api_response["modules"]:
@@ -174,9 +181,14 @@ async def search_modules_impl(
             # Ensure we don't exceed the requested limit
             final_modules = validated_modules[: request.limit]
 
+            # Since the Terraform Registry API doesn't return total_count,
+            # we use the actual number of modules we found and validated
+            # If total_count was provided in the API response, use that; otherwise use our count
+            result_total = total_count if total_count > 0 else len(final_modules)
+
             logger.info(
                 "Search completed",
-                total_found=total_count,
+                total_found=result_total,
                 modules_validated=len(final_modules),
                 attempts=attempt,
             )
@@ -184,7 +196,7 @@ async def search_modules_impl(
             # Create and return the formatted response
             return ModuleSearchResponse(
                 query=request.query,
-                total_found=total_count,
+                total_found=result_total,
                 modules=final_modules,
             )
 

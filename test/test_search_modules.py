@@ -1208,3 +1208,137 @@ class TestModuleInfoValidation:
                 verified=True,
                 published_at=datetime.now(),
             )
+
+
+class TestTotalFoundBug:
+    """Test for issue #21 - total_found incorrectly set to 0."""
+
+    @pytest.mark.asyncio
+    async def test_total_found_reflects_actual_total_from_registry(self):
+        """
+        Test that total_found reflects the total count from the Terraform Registry,
+        not 0 or the number of returned modules.
+        
+        This test reproduces issue #21 where total_found was being set to 0
+        even though modules were returned.
+        """
+        config = Config()
+        
+        # Create mock clients
+        mock_terraform_client = AsyncMock()
+        mock_github_client = MagicMock()  # Use MagicMock for GitHub client since parse_github_url is sync
+        
+        # Mock the async context manager methods
+        mock_terraform_client.__aenter__.return_value = mock_terraform_client
+        mock_terraform_client.__aexit__.return_value = None
+        mock_github_client.__aenter__.return_value = mock_github_client
+        mock_github_client.__aexit__.return_value = None
+        
+        # Mock GitHub client to validate all repositories
+        def mock_parse_url(url):
+            # Extract owner/repo from the URL
+            if "terraform-ibm-vsi" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-vsi")
+            elif "landing-zone-vsi" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-landing-zone-vsi")
+            elif "vpc-vsi" in url:
+                return ("terraform-ibm-modules", "terraform-ibm-vpc-vsi")
+            return ("terraform-ibm-modules", "test-repo")
+        
+        mock_github_client.parse_github_url.side_effect = mock_parse_url
+        
+        # Mock get_repository_info to return valid repo data
+        async def mock_get_repo_info(owner, repo_name):
+            return {
+                "archived": False,
+                "topics": ["core-team"],  # Required topic
+            }
+        
+        mock_github_client.get_repository_info.side_effect = mock_get_repo_info
+        
+        # Simulate a search that requires multiple batches
+        # Registry has 15 total modules, but we need to fetch them in batches
+        # First batch returns total_count=15, second batch is missing total_count
+        batch_count = 0
+        
+        async def mock_search(*args, **kwargs):
+            nonlocal batch_count
+            batch_count += 1
+            
+            if batch_count == 1:
+                # First batch: has total_count=15
+                return {
+                    "modules": [
+                        {
+                            "id": "terraform-ibm-modules/vpc-vsi/ibm",
+                            "namespace": "terraform-ibm-modules",
+                            "name": "vpc-vsi",
+                            "provider": "ibm",
+                            "version": "2.0.0",
+                            "description": "VPC VSI module",
+                            "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-vsi",
+                            "downloads": 3000,
+                            "verified": True,
+                            "published_at": "2025-09-01T00:00:00.000Z",
+                        },
+                    ],
+                    "meta": {
+                        "limit": 10,
+                        "offset": 0,
+                        "total_count": 15,  # Total modules matching "vsi" query
+                    },
+                }
+            else:
+                # Second batch: missing total_count (simulates API inconsistency)
+                # This causes the bug - total_count gets reset to 0
+                return {
+                    "modules": [
+                        {
+                            "id": "terraform-ibm-modules/vsi/ibm",
+                            "namespace": "terraform-ibm-modules",
+                            "name": "vsi",
+                            "provider": "ibm",
+                            "version": "1.0.0",
+                            "description": "VSI module",
+                            "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vsi",
+                            "downloads": 1000,
+                            "verified": True,
+                            "published_at": "2025-09-01T00:00:00.000Z",
+                        },
+                        {
+                            "id": "terraform-ibm-modules/landing-zone-vsi/ibm",
+                            "namespace": "terraform-ibm-modules",
+                            "name": "landing-zone-vsi",
+                            "provider": "ibm",
+                            "version": "5.10.0",
+                            "description": "Landing Zone VSI module",
+                            "source": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi",
+                            "downloads": 2000,
+                            "verified": True,
+                            "published_at": "2025-09-01T00:00:00.000Z",
+                        },
+                    ],
+                    "meta": {
+                        "limit": 10,
+                        "offset": 50,
+                        # total_count is missing here - causes bug!
+                    },
+                }
+        
+        mock_terraform_client.search_modules = mock_search
+        
+        request = ModuleSearchRequest(query="vsi", limit=3)
+        
+        # Patch the context managers
+        with patch("tim_mcp.tools.search.TerraformClient", return_value=mock_terraform_client), \
+             patch("tim_mcp.tools.search.GitHubClient", return_value=mock_github_client):
+            result = await search_modules_impl(request, config)
+        
+        # The bug: total_found is set to 0 instead of 15
+        # This assertion should FAIL initially, demonstrating the bug
+        assert result.total_found == 15, \
+            f"Expected total_found=15 (total from registry), but got {result.total_found}"
+        
+        # Verify we got the expected modules
+        assert len(result.modules) == 3
+        assert result.query == "vsi"
