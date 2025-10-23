@@ -24,6 +24,42 @@ The main purpose of this MCP server is to help generate terraform-based composit
 5. Access example code and specific files to understand how to use and combine modules
 6. Generate complete, working Terraform configurations
 
+## Understanding Modules vs Submodules
+
+**Do not confuse module IDs with submodule paths.**
+
+### Modules
+A **module** is a Terraform module published to the Terraform Registry at the repository root.
+
+- **Module ID**: `namespace/name/provider/version` (e.g., `terraform-ibm-modules/cbr/ibm/1.33.6`)
+- **Use with**: `search_modules`, `get_module_details`, Terraform registry source
+- **Terraform usage**: 
+  ```terraform
+  module "cbr" {
+    source  = "terraform-ibm-modules/cbr/ibm"
+    version = "1.33.6"
+  }
+  ```
+
+### Submodules
+A **submodule** is a nested module within a repository's `modules/` directory.
+
+- **Path**: `modules/submodule-name` (e.g., `modules/cbr-rule-module`)
+- **Use with**: `list_content` and `get_content` `path` parameter
+- **Terraform usage**:
+  ```terraform
+  module "cbr_rule" {
+    source = "git::https://github.com/terraform-ibm-modules/terraform-ibm-cbr.git//modules/cbr-rule-module?ref=v1.33.6"
+  }
+  ```
+
+### Key Rules
+
+1. **Never use submodule paths as module IDs** - `modules/cbr-rule-module` is NOT a module ID
+2. **Module tools require module IDs** - Use full registry format: `terraform-ibm-modules/cbr/ibm/1.33.6`
+3. **Submodule content requires both** - Module ID + path: `get_content(module_id="...", path="modules/...")`
+4. **Submodules inherit parent version** - No separate versioning for submodules
+
 ## Architectural Best Practices
 
 **ALWAYS prefer terraform-ibm-modules over direct provider resources**
