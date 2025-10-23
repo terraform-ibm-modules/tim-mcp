@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from tim_mcp.clients.github_client import GitHubClient
-from tim_mcp.clients.terraform_client import TerraformClient
+from tim_mcp.clients.terraform_client import TerraformClient, is_prerelease_version
 from tim_mcp.exceptions import ModuleNotFoundError
 
 
@@ -30,6 +30,41 @@ def mock_cache():
 
 class TestTerraformClient:
     """Tests for the TerraformClient class."""
+
+    def test_is_prerelease_version_with_beta(self):
+        """Test identifying beta versions as pre-release."""
+        assert is_prerelease_version("1.0.0-beta") is True
+        assert is_prerelease_version("2.1.0-beta.1") is True
+
+    def test_is_prerelease_version_with_alpha(self):
+        """Test identifying alpha versions as pre-release."""
+        assert is_prerelease_version("1.0.0-alpha") is True
+        assert is_prerelease_version("3.2.1-alpha.2") is True
+
+    def test_is_prerelease_version_with_rc(self):
+        """Test identifying release candidate versions as pre-release."""
+        assert is_prerelease_version("1.0.0-rc") is True
+        assert is_prerelease_version("2.0.0-rc.1") is True
+
+    def test_is_prerelease_version_with_draft(self):
+        """Test identifying draft versions as pre-release."""
+        assert is_prerelease_version("2.0.1-draft") is True
+        assert is_prerelease_version("2.0.1-draft-addons") is True  # Real example from issue #20
+
+    def test_is_prerelease_version_stable(self):
+        """Test that stable versions are not identified as pre-release."""
+        assert is_prerelease_version("1.0.0") is False
+        assert is_prerelease_version("2.5.3") is False
+        assert is_prerelease_version("10.20.30") is False
+
+    def test_is_prerelease_version_edge_cases(self):
+        """Test edge cases for version identification."""
+        # Version with metadata but no pre-release identifier
+        assert is_prerelease_version("1.0.0+build.123") is False
+        # Empty string
+        assert is_prerelease_version("") is False
+        # Invalid format
+        assert is_prerelease_version("invalid") is False
 
     @pytest.fixture
     def mock_session(self):
@@ -123,6 +158,65 @@ class TestTerraformClient:
         assert result == ["1.0.0", "1.1.0", "1.2.0"]
         terraform_client.client.get.assert_called_once_with(
             "/modules/hashicorp/consul/aws/versions"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_module_versions_filters_prerelease(self, terraform_client, mock_cache):
+        """Test that pre-release versions are filtered out."""
+        # Setup - mix of stable and pre-release versions
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "modules": [
+                {"version": "1.0.0"},
+                {"version": "1.1.0-beta"},
+                {"version": "1.2.0"},
+                {"version": "2.0.0-draft"},
+                {"version": "2.0.1-draft-addons"},  # Real example from issue #20
+                {"version": "2.1.0-rc.1"},
+                {"version": "2.2.0"},
+                {"version": "3.0.0-alpha"},
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_response.status_code = 200
+        terraform_client.client.get = AsyncMock(return_value=mock_response)
+
+        # Execute
+        result = await terraform_client.get_module_versions(
+            "terraform-ibm-modules", "db2-cloud", "ibm"
+        )
+
+        # Verify - only stable versions returned
+        assert result == ["1.0.0", "1.2.0", "2.2.0"]
+        terraform_client.client.get.assert_called_once_with(
+            "/modules/terraform-ibm-modules/db2-cloud/ibm/versions"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_module_versions_all_prerelease(self, terraform_client, mock_cache):
+        """Test behavior when all versions are pre-release."""
+        # Setup - only pre-release versions
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "modules": [
+                {"version": "1.0.0-beta"},
+                {"version": "1.1.0-alpha"},
+                {"version": "2.0.0-rc.1"},
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_response.status_code = 200
+        terraform_client.client.get = AsyncMock(return_value=mock_response)
+
+        # Execute
+        result = await terraform_client.get_module_versions(
+            "terraform-ibm-modules", "test-module", "ibm"
+        )
+
+        # Verify - empty list when all are pre-release
+        assert result == []
+        terraform_client.client.get.assert_called_once_with(
+            "/modules/terraform-ibm-modules/test-module/ibm/versions"
         )
 
 

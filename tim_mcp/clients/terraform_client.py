@@ -5,6 +5,7 @@ This module provides an async client for interacting with the Terraform Registry
 with retry logic, caching, and comprehensive error handling.
 """
 
+import re
 import time
 from typing import Any
 
@@ -20,6 +21,34 @@ from ..config import Config, get_terraform_registry_headers
 from ..exceptions import RateLimitError, TerraformRegistryError
 from ..logging import get_logger, log_api_request, log_cache_operation
 from ..utils.cache import Cache
+
+
+def is_prerelease_version(version: str) -> bool:
+    """
+    Check if a version string is a pre-release version.
+    
+    Pre-release versions contain identifiers like:
+    - beta, alpha, rc (release candidate)
+    - draft, dev, pre
+    - Any version with a hyphen followed by additional identifiers
+    
+    Examples:
+        - "2.0.1-beta" -> True
+        - "2.0.1-draft-addons" -> True
+        - "1.0.0-rc.1" -> True
+        - "2.0.1" -> False
+        - "1.2.3" -> False
+    
+    Args:
+        version: Version string to check
+        
+    Returns:
+        True if the version is a pre-release, False otherwise
+    """
+    # Pattern matches semantic versions with pre-release identifiers
+    # Format: X.Y.Z-<prerelease>
+    prerelease_pattern = r"^\d+\.\d+\.\d+-"
+    return bool(re.match(prerelease_pattern, version))
 
 
 class TerraformClient:
@@ -425,10 +454,13 @@ class TerraformClient:
             response.raise_for_status()
             data = response.json()
 
-            # Extract versions
-            versions = [
+            # Extract versions and filter out pre-release versions
+            all_versions = [
                 v.get("version") for v in data.get("modules", []) if v.get("version")
             ]
+            
+            # Filter out pre-release versions (beta, alpha, rc, draft, etc.)
+            versions = [v for v in all_versions if not is_prerelease_version(v)]
 
             # Log successful request
             log_api_request(
@@ -439,6 +471,8 @@ class TerraformClient:
                 duration_ms,
                 module_id=f"{namespace}/{name}/{provider}",
                 version_count=len(versions),
+                total_versions=len(all_versions),
+                filtered_count=len(all_versions) - len(versions),
             )
 
             # Cache the result
