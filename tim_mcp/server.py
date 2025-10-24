@@ -606,10 +606,10 @@ def main(transport_config=None):
 
     if transport_config is None:
         # Default STDIO mode
-        mcp.run()
+        mcp.run(show_banner=False)
     elif transport_config.mode == "stdio":
         # Explicit STDIO mode
-        mcp.run()
+        mcp.run(show_banner=False)
     elif transport_config.mode == "http":
         # HTTP mode with specified host and port (always stateless)
         logger.info(
@@ -620,6 +620,7 @@ def main(transport_config=None):
             host=transport_config.host,
             port=transport_config.port,
             stateless_http=True,
+            show_banner=False,
         )
     else:
         raise ValueError(f"Unsupported transport mode: {transport_config.mode}")
