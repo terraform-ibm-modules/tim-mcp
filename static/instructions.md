@@ -72,6 +72,45 @@ Modules provide:
 
 Use direct provider resources only when no suitable module exists.
 
+## Module Hallucination Prevention
+
+**NEVER hallucinate or assume module names based on patterns.**
+
+This is the most important rule when using this MCP server. You MUST:
+
+1. **ALWAYS verify modules exist** before using them in generated code
+2. **Use `search_modules`** or check the module index FIRST
+3. **Use exact module IDs** from search results - never modify or infer them
+4. **NEVER assume** a module exists because a similar one does
+5. **NEVER infer** module names from naming patterns
+
+This applies to ALL modules across ALL categories (compute, networking, observability, security, databases, etc.).
+
+**Example of incorrect behavior:**
+```terraform
+# WRONG - This module doesn't exist!
+module "log_analysis" {
+  source  = "terraform-ibm-modules/log-analysis/ibm"  # Hallucinated!
+  version = "1.9.2"
+  ...
+}
+```
+
+**Correct approach:**
+```terraform
+# CORRECT - Use the actual module that exists
+module "observability_instances" {
+  source  = "terraform-ibm-modules/observability-instances/ibm"  # Verified to exist
+  version = "3.5.3"
+  ...
+}
+```
+
+**Real-world example of this mistake:**
+- AI saw that `terraform-ibm-modules/cloud-monitoring/ibm` exists
+- AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
+- This module does NOT exist - always verify first
+
 ## Workflow by Intent
 
 The server supports two distinct workflows based on user intent:
@@ -250,6 +289,32 @@ When generating Terraform configurations:
 9. **Ask clarifying questions when ambiguous** - If the user's request lacks specific details or could be interpreted multiple ways, ask targeted questions to ensure accurate implementation
 10. **Leverage IBM Cloud MCP when available** - If you have access to IBM Cloud MCP tools, use them to verify region lists, image IDs (for VSIs based on region), availability zones, and other cloud-specific parameters to ensure accuracy
 11. **Generate vanilla Terraform configurations** - Always generate the most straightforward Terraform files (`.tf` files) and a README. Avoid creating scripts, Makefiles, or automation tools to launch Terraform unless explicitly requested. You may generate a template tfvars file if needed.
+
+### Module Verification
+
+**REMINDER: See "Module Hallucination Prevention" section at the top of this document.**
+
+**NEVER assume a module exists based on naming patterns or similar modules.**
+
+Before using ANY module in generated code:
+
+1. **ALWAYS verify the module exists** using `search_modules` or the module index
+2. **ALWAYS use the exact module ID** returned from search results
+3. **NEVER infer module names** from similar modules
+4. **NEVER use modules from outdated documentation** - always verify current availability
+
+**Examples of incorrect behavior to avoid:**
+- Seeing one module and assuming a similar-named module exists
+- Using a module without first searching for it or checking the index
+- Assuming version numbers without verification
+- Using modules from AI training data that may no longer exist
+
+**Correct workflow:**
+1. Search for modules using `search_modules` or check the module index
+2. Verify results and confirm what modules actually exist
+3. Use ONLY verified modules from search results
+4. Get module details to verify inputs, outputs, and usage
+5. Generate code with confidence
 
 ## Validation and Quality Assurance
 
