@@ -119,7 +119,7 @@ async def search_modules_impl(
 
                 # Extract metadata from response
                 meta = api_response["meta"]
-                
+
                 # Capture total_count from the first batch only
                 # Subsequent batches might have inconsistent or missing total_count
                 if attempt == 1:
