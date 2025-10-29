@@ -111,6 +111,99 @@ module "observability_instances" {
 - AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
 - This module does NOT exist - always verify first
 
+### Verification Applies to All Statements
+
+The verification rules above apply to ALL module and submodule statements, not just code generation:
+
+**ALWAYS verify before stating:**
+- Submodule counts or names
+- Module versions or capabilities
+- Available examples or features
+- Any factual claim about module data
+
+**Process for answering questions:**
+1. Use MCP tools to verify data
+2. Base response ONLY on tool results
+3. If uncertain, check with tools first, then respond
+
+**Never rely on:**
+- Memory from earlier conversation
+- Training data or assumptions
+- Pattern matching or inference
+
+## Comprehensive Module Discovery
+
+When a user asks about a capability or use case (e.g., "reserved IPs", "load balancing", "encryption"), don't stop at finding ONE solution. Follow this discovery process to explore all options, then present the most relevant ones.
+
+**Note**: If only one solution matches the user's specific use case after verification, it's fine to present just that option - as long as you've verified other options don't fit.
+
+### Multi-Level Search Strategy
+
+**1. Search the module index metadata first** (most reliable):
+```python
+# Search descriptions, README excerpts, and submodule descriptions
+# This finds modules that actually provide the capability
+```
+
+**2. Search with varied terminology**:
+- Primary term: User's exact request (e.g., "reserved ip", "load balancer", "encryption")
+- Related terms: Similar or alternative names (e.g., "vpe", "endpoint", "floating ip" for reserved IPs)
+- Broader terms: Parent category or infrastructure layer (e.g., "vpc", "networking" for reserved IPs)
+
+**3. List content for promising modules**:
+- Check main module capabilities
+- **Examine ALL submodules** - don't assume functionality from the root module alone
+- Review examples that might demonstrate the use case
+
+### Presenting Results
+
+When presenting solutions, provide a curated response based on what fits:
+
+**DO** - Present the most relevant option(s) with clear guidance:
+- If multiple approaches fit: Present 2-3 options with trade-offs and use cases
+- If only one fits after verification: Present that single option with confidence
+- Always explain when/why to use each approach
+
+**Example - Multiple valid approaches:**
+```
+For creating reserved IPs, you have two main approaches:
+
+1. **FloatingIP submodule** (terraform-ibm-modules/vpc/ibm//modules/floatingIP)
+   - Use when: You need standalone reserved IPs for VSIs, load balancers
+   - Simpler, direct resource creation
+
+2. **VPE Gateway reserved-ips submodule** (terraform-ibm-modules/vpe-gateway/ibm//modules/reserved-ips)
+   - Use when: You need reserved IPs for VPC endpoints to IBM Cloud services
+   - Includes gateway attachment logic
+```
+
+**Example - Single best fit:**
+```
+For VPC endpoint reserved IPs specifically, use:
+
+**VPE Gateway reserved-ips submodule** (terraform-ibm-modules/vpe-gateway/ibm//modules/reserved-ips)
+- Purpose-built for VPC endpoint gateways
+- Handles gateway attachment automatically
+- (Note: floatingIP exists but is for different use cases like VSIs)
+```
+
+**DON'T:**
+- Give an exhaustive list of every possible module
+- Present only one option without exploring alternatives first
+- Assume you've found all options after the first search result
+- Present multiple options when only one actually fits the use case
+
+### Discovery Checklist
+
+Before answering user requests about capabilities:
+
+- [ ] Searched module index metadata (descriptions, submodules)
+- [ ] Searched with 2-3 related terms
+- [ ] Listed content for top 2-3 candidate modules
+- [ ] Identified relevant submodules (not just root modules)
+- [ ] Compared approaches and their use cases
+- [ ] Presented most relevant options (2-3 max) with guidance
+
 ## Workflow by Intent
 
 The server supports two distinct workflows based on user intent:
