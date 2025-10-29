@@ -1342,3 +1342,266 @@ class TestTotalFoundBug:
         # Verify we got the expected modules
         assert len(result.modules) == 3
         assert result.query == "vsi"
+
+
+class TestPrereleaseVersionFiltering:
+    """Test that pre-release versions are filtered and replaced with stable versions."""
+
+    def _create_mock_github_client(self):
+        """Create a properly configured mock GitHub client."""
+        mock_github_client = AsyncMock()
+        mock_github_client.parse_github_url.side_effect = lambda url: (
+            ("terraform-ibm-modules", "terraform-ibm-db2-cloud")
+            if "db2-cloud" in url
+            else ("terraform-ibm-modules", "terraform-ibm-vpc")
+            if "vpc" in url
+            else None
+        )
+
+        # Mock async function to return the expected dict with topics
+        async def mock_get_repo_info(*args, **kwargs):
+            return {
+                "default_branch": "main",
+                "size": 100,
+                "archived": False,
+                "topics": [
+                    "terraform",
+                    "ibm-cloud",
+                    "terraform-module",
+                ],
+            }
+
+        mock_github_client.get_repository_info = mock_get_repo_info
+        return mock_github_client
+
+    @pytest.fixture
+    def config(self):
+        """Create a test configuration."""
+        return Config()
+
+    async def test_prerelease_version_replaced_with_stable(self, config):
+        """Test that modules with pre-release versions are replaced with stable versions."""
+        mock_terraform_client = AsyncMock()
+        mock_github_client = self._create_mock_github_client()
+
+        # Mock search results with pre-release version
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/db2-cloud/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "db2-cloud",
+                        "provider": "ibm",
+                        "version": "2.0.1-beta",  # Pre-release version
+                        "description": "IBM Cloud DB2 module",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-db2-cloud",
+                        "downloads": 1000,
+                        "verified": True,
+                        "published_at": "2025-09-01T00:00:00.000Z",
+                    }
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 1},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
+
+        # Mock get_module_versions to return stable versions
+        mock_terraform_client.get_module_versions.return_value = ["2.0.0", "1.9.0", "1.8.5"]
+
+        request = ModuleSearchRequest(query="db2")
+
+        # Patch the context managers
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
+            result = await search_modules_impl(request, config)
+
+        # Verify the pre-release version was replaced with stable version
+        assert len(result.modules) == 1
+        module = result.modules[0]
+        assert module.version == "2.0.0", f"Expected stable version 2.0.0, got {module.version}"
+        assert module.name == "db2-cloud"
+
+        # Verify get_module_versions was called to fetch stable versions
+        mock_terraform_client.get_module_versions.assert_called_once_with(
+            "terraform-ibm-modules", "db2-cloud", "ibm"
+        )
+
+    async def test_prerelease_module_skipped_when_no_stable_versions(self, config):
+        """Test that modules with only pre-release versions are skipped."""
+        mock_terraform_client = AsyncMock()
+        mock_github_client = self._create_mock_github_client()
+
+        # Mock search results with pre-release version
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/db2-cloud/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "db2-cloud",
+                        "provider": "ibm",
+                        "version": "1.0.0-alpha",  # Pre-release version
+                        "description": "IBM Cloud DB2 module",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-db2-cloud",
+                        "downloads": 1000,
+                        "verified": True,
+                        "published_at": "2025-09-01T00:00:00.000Z",
+                    }
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 1},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
+
+        # Mock get_module_versions to return no stable versions
+        mock_terraform_client.get_module_versions.return_value = []
+
+        request = ModuleSearchRequest(query="db2")
+
+        # Patch the context managers
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
+            result = await search_modules_impl(request, config)
+
+        # Verify the module was skipped
+        assert len(result.modules) == 0, "Module with only pre-release versions should be skipped"
+        # total_found reflects the API's count, not filtered results
+        assert result.total_found == 1
+
+    async def test_stable_version_not_replaced(self, config):
+        """Test that modules with stable versions are not changed."""
+        mock_terraform_client = AsyncMock()
+        mock_github_client = self._create_mock_github_client()
+
+        # Mock search results with stable version
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/vpc/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "vpc",
+                        "provider": "ibm",
+                        "version": "5.1.0",  # Stable version
+                        "description": "IBM Cloud VPC module",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
+                        "downloads": 50000,
+                        "verified": True,
+                        "published_at": "2025-09-01T00:00:00.000Z",
+                    }
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 1},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
+
+        request = ModuleSearchRequest(query="vpc")
+
+        # Patch the context managers
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
+            result = await search_modules_impl(request, config)
+
+        # Verify the stable version was not changed
+        assert len(result.modules) == 1
+        module = result.modules[0]
+        assert module.version == "5.1.0", f"Stable version should not be changed, got {module.version}"
+
+        # Verify get_module_versions was NOT called for stable versions
+        mock_terraform_client.get_module_versions.assert_not_called()
+
+    async def test_multiple_modules_with_mixed_versions(self, config):
+        """Test search with multiple modules having both stable and pre-release versions."""
+        mock_terraform_client = AsyncMock()
+        mock_github_client = self._create_mock_github_client()
+
+        # Mock search results with mixed versions
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/vpc/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "vpc",
+                        "provider": "ibm",
+                        "version": "5.1.0",  # Stable
+                        "description": "IBM Cloud VPC module",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
+                        "downloads": 50000,
+                        "verified": True,
+                        "published_at": "2025-09-01T00:00:00.000Z",
+                    },
+                    {
+                        "id": "terraform-ibm-modules/db2-cloud/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "db2-cloud",
+                        "provider": "ibm",
+                        "version": "2.0.1-beta",  # Pre-release
+                        "description": "IBM Cloud DB2 module",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-db2-cloud",
+                        "downloads": 1000,
+                        "verified": True,
+                        "published_at": "2025-09-01T00:00:00.000Z",
+                    },
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 2},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+        ]
+
+        # Mock get_module_versions
+        mock_terraform_client.get_module_versions.return_value = ["2.0.0", "1.9.0"]
+
+        request = ModuleSearchRequest(query="ibm")
+
+        # Patch the context managers
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True
+
+            result = await search_modules_impl(request, config)
+
+        # Verify both modules are in results
+        assert len(result.modules) == 2
+
+        # Find each module
+        vpc_module = next(m for m in result.modules if m.name == "vpc")
+        db2_module = next(m for m in result.modules if m.name == "db2-cloud")
+
+        # Verify stable version unchanged
+        assert vpc_module.version == "5.1.0"
+
+        # Verify pre-release replaced with stable
+        assert db2_module.version == "2.0.0"
+
+        # Verify get_module_versions was only called for pre-release module
+        mock_terraform_client.get_module_versions.assert_called_once_with(
+            "terraform-ibm-modules", "db2-cloud", "ibm"
+        )
