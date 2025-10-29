@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from ..clients.github_client import GitHubClient
-from ..clients.terraform_client import TerraformClient
+from ..clients.terraform_client import TerraformClient, is_prerelease_version
 from ..config import Config
 from ..exceptions import TIMError
 from ..exceptions import ValidationError as TIMValidationError
@@ -139,7 +139,52 @@ async def search_modules_impl(
                 for i, module_data in enumerate(api_response["modules"]):
                     try:
                         module = _transform_module_data(module_data)
-                        # Apply module exclusion filtering first
+                        
+                        # Check if the version is a pre-release
+                        if is_prerelease_version(module.version):
+                            # Fetch all versions and find the latest stable one
+                            try:
+                                versions = await terraform_client.get_module_versions(
+                                    module.namespace, module.name, module.provider
+                                )
+                                if versions:
+                                    # The versions are already filtered to stable only
+                                    # Use the first one (latest stable)
+                                    latest_stable = versions[0]
+                                    # Update the module version
+                                    module = ModuleInfo(
+                                        id=f"{module.namespace}/{module.name}/{module.provider}",
+                                        namespace=module.namespace,
+                                        name=module.name,
+                                        provider=module.provider,
+                                        version=latest_stable,
+                                        description=module.description,
+                                        source_url=module.source_url,
+                                        downloads=module.downloads,
+                                        verified=module.verified,
+                                        published_at=module.published_at,
+                                    )
+                                    logger.info(
+                                        f"Replaced pre-release version with stable version",
+                                        module_id=module.id,
+                                        prerelease=module_data["version"],
+                                        stable=latest_stable,
+                                    )
+                                else:
+                                    # No stable versions available, skip this module
+                                    logger.warning(
+                                        f"No stable versions available for module, skipping",
+                                        module_id=module.id,
+                                    )
+                                    continue
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to fetch versions for module, using original version",
+                                    module_id=module.id,
+                                    error=str(e),
+                                )
+                        
+                        # Apply module exclusion filtering
                         if _is_module_excluded(module.id, config.excluded_modules):
                             logger.info(
                                 "Module excluded from results", module_id=module.id
@@ -216,6 +261,9 @@ def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
 
     This function validates required fields, handles datetime conversion,
     and creates a properly typed ModuleInfo object.
+    
+    NOTE: The version field from the API may be a pre-release version.
+    The caller should replace it with the latest stable version if needed.
 
     Args:
         module_data: Raw module data from the Terraform Registry API
