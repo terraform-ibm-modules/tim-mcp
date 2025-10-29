@@ -133,76 +133,31 @@ The verification rules above apply to ALL module and submodule statements, not j
 
 ## Comprehensive Module Discovery
 
-When a user asks about a capability or use case (e.g., "reserved IPs", "load balancing", "encryption"), don't stop at finding ONE solution. Follow this discovery process to explore all options, then present the most relevant ones.
+When a user asks about a capability (e.g., "reserved IPs", "load balancing"), explore all options before presenting results. Present 1-3 most relevant solutions based on what actually fits the user's specific use case.
 
-**Note**: If only one solution matches the user's specific use case after verification, it's fine to present just that option - as long as you've verified other options don't fit.
+### Discovery Process
 
-### Multi-Level Search Strategy
-
-**1. Search the module index metadata first** (most reliable):
-```python
-# Search descriptions, README excerpts, and submodule descriptions
-# This finds modules that actually provide the capability
-```
+**1. Search module index metadata** (descriptions, README excerpts, submodule descriptions)
 
 **2. Search with varied terminology**:
-- Primary term: User's exact request (e.g., "reserved ip", "load balancer", "encryption")
-- Related terms: Similar or alternative names (e.g., "vpe", "endpoint", "floating ip" for reserved IPs)
-- Broader terms: Parent category or infrastructure layer (e.g., "vpc", "networking" for reserved IPs)
+- User's exact request + related terms + broader category terms
 
-**3. List content for promising modules**:
-- Check main module capabilities
-- **Examine ALL submodules** - don't assume functionality from the root module alone
-- Review examples that might demonstrate the use case
+**3. List content for top candidates**:
+- Check main module and **ALL submodules** 
+- Review examples demonstrating the use case
 
 ### Presenting Results
 
-When presenting solutions, provide a curated response based on what fits:
-
-**DO** - Present the most relevant option(s) with clear guidance:
-- If multiple approaches fit: Present 2-3 options with trade-offs and use cases
-- If only one fits after verification: Present that single option with confidence
-- Always explain when/why to use each approach
-
-**Example - Multiple valid approaches:**
-```
-For creating reserved IPs, you have two main approaches:
-
-1. **FloatingIP submodule** (terraform-ibm-modules/vpc/ibm//modules/floatingIP)
-   - Use when: You need standalone reserved IPs for VSIs, load balancers
-   - Simpler, direct resource creation
-
-2. **VPE Gateway reserved-ips submodule** (terraform-ibm-modules/vpe-gateway/ibm//modules/reserved-ips)
-   - Use when: You need reserved IPs for VPC endpoints to IBM Cloud services
-   - Includes gateway attachment logic
-```
-
-**Example - Single best fit:**
-```
-For VPC endpoint reserved IPs specifically, use:
-
-**VPE Gateway reserved-ips submodule** (terraform-ibm-modules/vpe-gateway/ibm//modules/reserved-ips)
-- Purpose-built for VPC endpoint gateways
-- Handles gateway attachment automatically
-- (Note: floatingIP exists but is for different use cases like VSIs)
-```
+Present curated options with clear guidance on when to use each:
+- **Multiple fits**: Show 2-3 options with trade-offs
+- **Single fit**: Present one option (after verifying alternatives don't fit)
+- **Always explain**: When/why to use each approach
 
 **DON'T:**
-- Give an exhaustive list of every possible module
-- Present only one option without exploring alternatives first
-- Assume you've found all options after the first search result
-- Present multiple options when only one actually fits the use case
-
-### Discovery Checklist
-
-Before answering user requests about capabilities:
-
-- [ ] Searched module index metadata (descriptions, submodules)
-- [ ] Searched with 2-3 related terms
-- [ ] Listed content for top 2-3 candidate modules
-- [ ] Identified relevant submodules (not just root modules)
-- [ ] Compared approaches and their use cases
-- [ ] Presented most relevant options (2-3 max) with guidance
+- Give exhaustive lists of all possible modules
+- Present one option without exploring alternatives first
+- Assume you've found all options after first search
+- Present multiple options when only one fits the use case
 
 ## Workflow by Intent
 
