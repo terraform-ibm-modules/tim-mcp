@@ -45,7 +45,7 @@ A **module** is a Terraform module published to the Terraform Registry at the re
 A **submodule** is a nested module within a repository's `modules/` directory.
 
 - **Path**: `modules/submodule-name` (e.g., `modules/cbr-rule-module`)
-- **Use with**: `list_content` and `get_content` `path` parameter
+- **Use with**: `get_content` `path` parameter (discovered via `list_content`)
 - **Terraform usage**:
   ```terraform
   module "cbr_rule" {
