@@ -136,13 +136,17 @@ class TestTerraformClient:
     @pytest.mark.asyncio
     async def test_get_module_versions(self, terraform_client, mock_cache):
         """Test getting module versions."""
-        # Setup
+        # Setup - use correct nested API structure
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "modules": [
-                {"version": "1.0.0"},
-                {"version": "1.1.0"},
-                {"version": "1.2.0"},
+                {
+                    "versions": [
+                        {"version": "1.0.0"},
+                        {"version": "1.1.0"},
+                        {"version": "1.2.0"},
+                    ]
+                }
             ]
         }
         mock_response.raise_for_status = MagicMock()
@@ -154,8 +158,8 @@ class TestTerraformClient:
             "hashicorp", "consul", "aws"
         )
 
-        # Verify
-        assert result == ["1.0.0", "1.1.0", "1.2.0"]
+        # Verify - sorted in descending order (latest first)
+        assert result == ["1.2.0", "1.1.0", "1.0.0"]
         terraform_client.client.get.assert_called_once_with(
             "/modules/hashicorp/consul/aws/versions"
         )
@@ -163,18 +167,22 @@ class TestTerraformClient:
     @pytest.mark.asyncio
     async def test_get_module_versions_filters_prerelease(self, terraform_client, mock_cache):
         """Test that pre-release versions are filtered out."""
-        # Setup - mix of stable and pre-release versions
+        # Setup - mix of stable and pre-release versions with correct nested structure
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "modules": [
-                {"version": "1.0.0"},
-                {"version": "1.1.0-beta"},
-                {"version": "1.2.0"},
-                {"version": "2.0.0-draft"},
-                {"version": "2.0.1-draft-addons"},  # Real example from issue #20
-                {"version": "2.1.0-rc.1"},
-                {"version": "2.2.0"},
-                {"version": "3.0.0-alpha"},
+                {
+                    "versions": [
+                        {"version": "1.0.0"},
+                        {"version": "1.1.0-beta"},
+                        {"version": "1.2.0"},
+                        {"version": "2.0.0-draft"},
+                        {"version": "2.0.1-draft-addons"},  # Real example from issue #20
+                        {"version": "2.1.0-rc.1"},
+                        {"version": "2.2.0"},
+                        {"version": "3.0.0-alpha"},
+                    ]
+                }
             ]
         }
         mock_response.raise_for_status = MagicMock()
@@ -186,8 +194,8 @@ class TestTerraformClient:
             "terraform-ibm-modules", "db2-cloud", "ibm"
         )
 
-        # Verify - only stable versions returned
-        assert result == ["1.0.0", "1.2.0", "2.2.0"]
+        # Verify - only stable versions returned, sorted descending (latest first)
+        assert result == ["2.2.0", "1.2.0", "1.0.0"]
         terraform_client.client.get.assert_called_once_with(
             "/modules/terraform-ibm-modules/db2-cloud/ibm/versions"
         )
@@ -195,13 +203,17 @@ class TestTerraformClient:
     @pytest.mark.asyncio
     async def test_get_module_versions_all_prerelease(self, terraform_client, mock_cache):
         """Test behavior when all versions are pre-release."""
-        # Setup - only pre-release versions
+        # Setup - only pre-release versions with correct nested structure
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "modules": [
-                {"version": "1.0.0-beta"},
-                {"version": "1.1.0-alpha"},
-                {"version": "2.0.0-rc.1"},
+                {
+                    "versions": [
+                        {"version": "1.0.0-beta"},
+                        {"version": "1.1.0-alpha"},
+                        {"version": "2.0.0-rc.1"},
+                    ]
+                }
             ]
         }
         mock_response.raise_for_status = MagicMock()
