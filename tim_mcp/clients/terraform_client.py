@@ -454,13 +454,25 @@ class TerraformClient:
             response.raise_for_status()
             data = response.json()
 
-            # Extract versions and filter out pre-release versions
-            all_versions = [
-                v.get("version") for v in data.get("modules", []) if v.get("version")
-            ]
+            # Extract versions from the nested structure
+            # API returns: {"modules": [{"versions": [{"version": "1.0.0"}, ...]}]}
+            modules = data.get("modules", [])
+            if not modules:
+                all_versions = []
+            else:
+                versions_list = modules[0].get("versions", [])
+                all_versions = [v.get("version") for v in versions_list if v.get("version")]
             
             # Filter out pre-release versions (beta, alpha, rc, draft, etc.)
             versions = [v for v in all_versions if not is_prerelease_version(v)]
+            
+            # Sort versions in descending order (latest first) using semantic versioning
+            from packaging.version import Version, InvalidVersion
+            try:
+                versions.sort(key=lambda v: Version(v), reverse=True)
+            except InvalidVersion:
+                # If version parsing fails, keep original order
+                pass
 
             # Log successful request
             log_api_request(
