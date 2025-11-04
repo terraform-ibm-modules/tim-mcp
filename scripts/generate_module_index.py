@@ -374,8 +374,16 @@ async def fetch_submodules(
     """
     submodules = []
     try:
+        # Get the latest stable version (filters out pre-releases)
+        versions = await tf_client.get_module_versions(namespace, name, provider)
+        if not versions:
+            print(f"Warning: No stable versions found for {namespace}/{name}/{provider}")
+            return []
+        
+        latest_stable_version = versions[0]
+        
         module_details = await tf_client.get_module_details(
-            namespace, name, provider, "latest"
+            namespace, name, provider, latest_stable_version
         )
 
         # Parse owner/repo from source URL for README fetching
