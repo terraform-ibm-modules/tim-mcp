@@ -17,35 +17,47 @@ from tim_mcp.tools.search import search_modules_impl
 from tim_mcp.types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
 
 
+def create_mock_github_client(repo_mappings=None):
+    """
+    Create a properly configured mock GitHub client.
+    
+    Args:
+        repo_mappings: Dict mapping URL substrings to (owner, repo) tuples.
+                      Defaults to common test repos.
+    """
+    if repo_mappings is None:
+        repo_mappings = {
+            "vpc": ("terraform-ibm-modules", "terraform-ibm-vpc"),
+            "security-group": ("terraform-ibm-modules", "terraform-ibm-security-group"),
+            "db2-cloud": ("terraform-ibm-modules", "terraform-ibm-db2-cloud"),
+            "namespace": ("terraform-ibm-modules", "terraform-ibm-namespace"),
+            "icd-postgresql": ("terraform-ibm-modules", "terraform-ibm-icd-postgresql"),
+        }
+    
+    mock_github_client = AsyncMock()
+    
+    def parse_url_side_effect(url):
+        for key, value in repo_mappings.items():
+            if key in url:
+                return value
+        return None
+    
+    mock_github_client.parse_github_url.side_effect = parse_url_side_effect
+
+    async def mock_get_repo_info(*args, **kwargs):
+        return {
+            "default_branch": "main",
+            "size": 100,
+            "archived": False,
+            "topics": ["core-team", "terraform", "ibm-cloud", "terraform-module"],
+        }
+
+    mock_github_client.get_repository_info = mock_get_repo_info
+    return mock_github_client
+
+
 class TestSearchModulesImpl:
     """Test the search_modules_impl function."""
-
-    def _create_mock_github_client(self):
-        """Create a properly configured mock GitHub client."""
-        mock_github_client = AsyncMock()
-        mock_github_client.parse_github_url.side_effect = lambda url: (
-            ("terraform-ibm-modules", "terraform-ibm-vpc")
-            if "vpc" in url
-            else ("terraform-ibm-modules", "terraform-ibm-security-group")
-            if "security-group" in url
-            else None
-        )
-
-        # Mock async function to return the expected dict with topics
-        async def mock_get_repo_info(*args, **kwargs):
-            return {
-                "default_branch": "main",
-                "size": 100,
-                "archived": False,
-                "topics": [
-                    "terraform",
-                    "ibm-cloud",
-                    "terraform-module",
-                ],  # Add required topics
-            }
-
-        mock_github_client.get_repository_info = mock_get_repo_info
-        return mock_github_client
 
     @pytest.fixture
     def config(self):
@@ -66,8 +78,7 @@ class TestSearchModulesImpl:
     @pytest.fixture
     def mock_terraform_client(self):
         """Create a mock Terraform client."""
-        client = AsyncMock()
-        return client
+        return AsyncMock()
 
     @pytest.fixture
     def sample_registry_response(self):
@@ -152,7 +163,7 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc")
 
         # Create a mock GitHub client
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -196,7 +207,7 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="vpc", limit=5)
 
         # Create a mock GitHub client
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -229,7 +240,7 @@ class TestSearchModulesImpl:
         request = ModuleSearchRequest(query="nonexistent")
 
         # Create a mock GitHub client
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -364,7 +375,7 @@ class TestSearchModulesImpl:
         ]
         request = ModuleSearchRequest(query="vpc")
 
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         with (
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
@@ -1347,32 +1358,6 @@ class TestTotalFoundBug:
 class TestPrereleaseVersionFiltering:
     """Test that pre-release versions are filtered and replaced with stable versions."""
 
-    def _create_mock_github_client(self):
-        """Create a properly configured mock GitHub client."""
-        mock_github_client = AsyncMock()
-        mock_github_client.parse_github_url.side_effect = lambda url: (
-            ("terraform-ibm-modules", "terraform-ibm-db2-cloud")
-            if "db2-cloud" in url
-            else ("terraform-ibm-modules", "terraform-ibm-vpc")
-            if "vpc" in url
-            else None
-        )
-
-        # Mock async function to return the expected dict with topics
-        async def mock_get_repo_info(*args, **kwargs):
-            return {
-                "default_branch": "main",
-                "size": 100,
-                "archived": False,
-                "topics": [
-                    "terraform",
-                    "ibm-cloud",
-                    "terraform-module",
-                ],
-            }
-
-        mock_github_client.get_repository_info = mock_get_repo_info
-        return mock_github_client
 
     @pytest.fixture
     def config(self):
@@ -1382,7 +1367,7 @@ class TestPrereleaseVersionFiltering:
     async def test_prerelease_version_replaced_with_stable(self, config):
         """Test that modules with pre-release versions are replaced with stable versions."""
         mock_terraform_client = AsyncMock()
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         # Mock search results with pre-release version
         mock_terraform_client.search_modules.side_effect = [
@@ -1408,6 +1393,15 @@ class TestPrereleaseVersionFiltering:
 
         # Mock get_module_versions to return stable versions
         mock_terraform_client.get_module_versions.return_value = ["2.0.0", "1.9.0", "1.8.5"]
+
+        # Mock get_module_details to return description for latest version
+        async def mock_get_details(namespace, name, provider, version):
+            return {
+                "description": "IBM Cloud DB2 module",
+                "version": version,
+            }
+
+        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
 
         request = ModuleSearchRequest(query="db2")
 
@@ -1437,7 +1431,7 @@ class TestPrereleaseVersionFiltering:
     async def test_prerelease_module_skipped_when_no_stable_versions(self, config):
         """Test that modules with only pre-release versions are skipped."""
         mock_terraform_client = AsyncMock()
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         # Mock search results with pre-release version
         mock_terraform_client.search_modules.side_effect = [
@@ -1483,12 +1477,12 @@ class TestPrereleaseVersionFiltering:
         # total_found reflects the API's count, not filtered results
         assert result.total_found == 1
 
-    async def test_stable_version_not_replaced(self, config):
-        """Test that modules with stable versions are not changed."""
+    async def test_stable_version_updated_if_newer_available(self, config):
+        """Test that stable versions are updated to latest if search returns outdated version."""
         mock_terraform_client = AsyncMock()
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
-        # Mock search results with stable version
+        # Mock search results with older stable version
         mock_terraform_client.search_modules.side_effect = [
             {
                 "modules": [
@@ -1497,8 +1491,8 @@ class TestPrereleaseVersionFiltering:
                         "namespace": "terraform-ibm-modules",
                         "name": "vpc",
                         "provider": "ibm",
-                        "version": "5.1.0",  # Stable version
-                        "description": "IBM Cloud VPC module",
+                        "version": "5.1.0",  # Old stable version from search API
+                        "description": "Old IBM Cloud VPC module description",
                         "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
                         "downloads": 50000,
                         "verified": True,
@@ -1509,6 +1503,23 @@ class TestPrereleaseVersionFiltering:
             },
             {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
         ]
+
+        # Mock get_module_versions to return newer version available
+        mock_terraform_client.get_module_versions.return_value = ["5.2.0", "5.1.0"]
+
+        # Mock get_module_details for latest version
+        async def mock_get_details(namespace, name, provider, version):
+            if version == "5.2.0":
+                return {
+                    "description": "Latest IBM Cloud VPC module",
+                    "version": "5.2.0",
+                }
+            return {
+                "description": "Old IBM Cloud VPC module description",
+                "version": version,
+            }
+
+        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
 
         request = ModuleSearchRequest(query="vpc")
 
@@ -1524,18 +1535,21 @@ class TestPrereleaseVersionFiltering:
 
             result = await search_modules_impl(request, config)
 
-        # Verify the stable version was not changed
+        # Verify the version was updated to latest
         assert len(result.modules) == 1
         module = result.modules[0]
-        assert module.version == "5.1.0", f"Stable version should not be changed, got {module.version}"
+        assert module.version == "5.2.0", f"Expected latest version 5.2.0, got {module.version}"
+        assert module.description == "Latest IBM Cloud VPC module"
 
-        # Verify get_module_versions was NOT called for stable versions
-        mock_terraform_client.get_module_versions.assert_not_called()
+        # Verify get_module_versions was called (we always fetch latest now)
+        mock_terraform_client.get_module_versions.assert_called_once_with(
+            "terraform-ibm-modules", "vpc", "ibm"
+        )
 
-    async def test_multiple_modules_with_mixed_versions(self, config):
-        """Test search with multiple modules having both stable and pre-release versions."""
+    async def test_multiple_modules_always_get_latest_versions(self, config):
+        """Test search with multiple modules - all get updated to latest versions."""
         mock_terraform_client = AsyncMock()
-        mock_github_client = self._create_mock_github_client()
+        mock_github_client = create_mock_github_client()
 
         # Mock search results with mixed versions
         mock_terraform_client.search_modules.side_effect = [
@@ -1546,7 +1560,7 @@ class TestPrereleaseVersionFiltering:
                         "namespace": "terraform-ibm-modules",
                         "name": "vpc",
                         "provider": "ibm",
-                        "version": "5.1.0",  # Stable
+                        "version": "5.1.0",  # Older stable
                         "description": "IBM Cloud VPC module",
                         "source": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
                         "downloads": 50000,
@@ -1571,8 +1585,24 @@ class TestPrereleaseVersionFiltering:
             {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
         ]
 
-        # Mock get_module_versions
-        mock_terraform_client.get_module_versions.return_value = ["2.0.0", "1.9.0"]
+        # Mock get_module_versions - called for both modules now
+        def mock_get_versions(namespace, name, provider):
+            if name == "vpc":
+                return ["5.2.0", "5.1.0"]  # Newer version available
+            elif name == "db2-cloud":
+                return ["2.0.0", "1.9.0"]  # Stable versions
+            return []
+
+        mock_terraform_client.get_module_versions = AsyncMock(side_effect=mock_get_versions)
+
+        # Mock get_module_details
+        async def mock_get_details(namespace, name, provider, version):
+            return {
+                "description": f"{name} v{version}",
+                "version": version,
+            }
+
+        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
 
         request = ModuleSearchRequest(query="ibm")
 
@@ -1595,13 +1625,204 @@ class TestPrereleaseVersionFiltering:
         vpc_module = next(m for m in result.modules if m.name == "vpc")
         db2_module = next(m for m in result.modules if m.name == "db2-cloud")
 
-        # Verify stable version unchanged
-        assert vpc_module.version == "5.1.0"
+        # Verify both were updated to latest versions
+        assert vpc_module.version == "5.2.0", f"Expected VPC v5.2.0, got {vpc_module.version}"
+        assert db2_module.version == "2.0.0", f"Expected DB2 v2.0.0, got {db2_module.version}"
 
-        # Verify pre-release replaced with stable
-        assert db2_module.version == "2.0.0"
-
-        # Verify get_module_versions was only called for pre-release module
-        mock_terraform_client.get_module_versions.assert_called_once_with(
+        # Verify get_module_versions was called for BOTH modules (new behavior)
+        assert mock_terraform_client.get_module_versions.call_count == 2
+        mock_terraform_client.get_module_versions.assert_any_call(
+            "terraform-ibm-modules", "vpc", "ibm"
+        )
+        mock_terraform_client.get_module_versions.assert_any_call(
             "terraform-ibm-modules", "db2-cloud", "ibm"
+        )
+
+
+class TestLatestVersionFetching:
+    """Test for issue #47 - Always fetch latest version to get correct description."""
+
+
+    @pytest.fixture
+    def config(self):
+        """Create a test configuration."""
+        return Config()
+
+    @pytest.mark.asyncio
+    async def test_outdated_version_replaced_with_latest_and_correct_description(
+        self, config
+    ):
+        """
+        Test that search API returning outdated versions is corrected to latest version.
+        This fixes issue #47 where namespace module showed wrong description from v1.0.0
+        instead of correct description from v1.0.3.
+        """
+        mock_terraform_client = AsyncMock()
+        mock_github_client = create_mock_github_client()
+
+        # Mock search results - registry returns old version 1.0.0 with wrong description
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/namespace/ibm/1.0.0",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "namespace",
+                        "provider": "ibm",
+                        "version": "1.0.0",  # Old version from search API
+                        "description": "Implements a ICD Postgresql instance with tags, users, memory allocation, disk allocation, cpu allocation and context based restrictions",  # Wrong description!
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-namespace",
+                        "downloads": 72588,
+                        "verified": False,
+                        "published_at": "2024-02-08T14:45:13.252062Z",
+                    }
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 1},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
+
+        # Mock get_module_versions to return all versions (sorted descending)
+        mock_terraform_client.get_module_versions.return_value = [
+            "1.0.3",  # Latest
+            "1.0.2",
+            "1.0.1",
+            "1.0.0",  # Oldest
+        ]
+
+        # Mock get_module_details to return correct description for latest version
+        async def mock_get_details(namespace, name, provider, version):
+            if version == "1.0.3":
+                return {
+                    "description": "Configures a Kubernetes namespace or Openshift project.",  # Correct description
+                    "version": "1.0.3",
+                }
+            else:
+                return {
+                    "description": "Implements a ICD Postgresql instance with tags, users, memory allocation, disk allocation, cpu allocation and context based restrictions",
+                    "version": version,
+                }
+
+        mock_terraform_client.get_module_details = AsyncMock(
+            side_effect=mock_get_details
+        )
+
+        request = ModuleSearchRequest(query="postgresql", limit=5)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True  # Repository validation passes
+
+            result = await search_modules_impl(request, config)
+
+        # Verify we got the module
+        assert len(result.modules) == 1
+        module = result.modules[0]
+
+        # Verify version was updated to latest
+        assert module.version == "1.0.3", f"Expected latest version 1.0.3, got {module.version}"
+
+        # Verify description is correct (from latest version)
+        expected_desc = "Configures a Kubernetes namespace or Openshift project."
+        assert (
+            module.description == expected_desc
+        ), f"Expected correct description from v1.0.3, got: {module.description}"
+
+        # Verify get_module_versions was called
+        mock_terraform_client.get_module_versions.assert_called_once_with(
+            "terraform-ibm-modules", "namespace", "ibm"
+        )
+
+        # Verify get_module_details was called for latest version
+        mock_terraform_client.get_module_details.assert_called_once_with(
+            "terraform-ibm-modules", "namespace", "ibm", "1.0.3"
+        )
+
+    @pytest.mark.asyncio
+    async def test_always_fetch_latest_version_even_for_stable_versions(self, config):
+        """
+        Test that we always fetch the latest version, not just for pre-releases.
+        The search API may return any version, not necessarily the latest.
+        """
+        mock_terraform_client = AsyncMock()
+        mock_github_client = create_mock_github_client()
+
+        # Mock search results - returns stable but outdated version
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/icd-postgresql/ibm/1.0.0",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "icd-postgresql",
+                        "provider": "ibm",
+                        "version": "1.0.0",  # Old stable version
+                        "description": "Old description",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-postgresql",
+                        "downloads": 50000,
+                        "verified": True,
+                        "published_at": "2023-01-01T00:00:00.000Z",
+                    }
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 1},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 1}},
+        ]
+
+        # Mock get_module_versions - latest is 4.2.29
+        mock_terraform_client.get_module_versions.return_value = [
+            "4.2.29",  # Latest
+            "4.2.28",
+            "1.0.0",  # What search returned
+        ]
+
+        # Mock get_module_details for latest version
+        async def mock_get_details(namespace, name, provider, version):
+            if version == "4.2.29":
+                return {
+                    "description": "Implements an instance of the IBM Cloud Databases for PostgreSQL service.",
+                    "version": "4.2.29",
+                }
+            return {
+                "description": "Old description",
+                "version": version,
+            }
+
+        mock_terraform_client.get_module_details = AsyncMock(
+            side_effect=mock_get_details
+        )
+
+        request = ModuleSearchRequest(query="postgresql", limit=5)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = mock_github_client
+            mock_is_valid.return_value = True  # Repository validation passes
+
+            result = await search_modules_impl(request, config)
+
+        # Verify version was updated to latest
+        assert len(result.modules) == 1
+        module = result.modules[0]
+        assert (
+            module.version == "4.2.29"
+        ), f"Expected latest version 4.2.29, got {module.version}"
+        assert (
+            module.description
+            == "Implements an instance of the IBM Cloud Databases for PostgreSQL service."
+        )
+
+        # Verify latest version was fetched
+        mock_terraform_client.get_module_versions.assert_called_once()
+        mock_terraform_client.get_module_details.assert_called_once_with(
+            "terraform-ibm-modules", "icd-postgresql", "ibm", "4.2.29"
         )

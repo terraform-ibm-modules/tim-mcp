@@ -140,49 +140,59 @@ async def search_modules_impl(
                     try:
                         module = _transform_module_data(module_data)
                         
-                        # Check if the version is a pre-release
-                        if is_prerelease_version(module.version):
-                            # Fetch all versions and find the latest stable one
-                            try:
-                                versions = await terraform_client.get_module_versions(
-                                    module.namespace, module.name, module.provider
+                        # Always fetch the latest stable version since the search API
+                        # may return outdated versions with stale metadata (description, etc.)
+                        try:
+                            versions = await terraform_client.get_module_versions(
+                                module.namespace, module.name, module.provider
+                            )
+                            if versions:
+                                # The versions are already filtered to stable only
+                                # Use the first one (latest stable)
+                                latest_stable = versions[0]
+                                
+                                # Fetch the module details for the latest version to get accurate metadata
+                                latest_module_data = await terraform_client.get_module_details(
+                                    module.namespace, module.name, module.provider, latest_stable
                                 )
-                                if versions:
-                                    # The versions are already filtered to stable only
-                                    # Use the first one (latest stable)
-                                    latest_stable = versions[0]
-                                    # Update the module version
-                                    module = ModuleInfo(
-                                        id=f"{module.namespace}/{module.name}/{module.provider}",
-                                        namespace=module.namespace,
-                                        name=module.name,
-                                        provider=module.provider,
-                                        version=latest_stable,
-                                        description=module.description,
-                                        source_url=module.source_url,
-                                        downloads=module.downloads,
-                                        verified=module.verified,
-                                        published_at=module.published_at,
-                                    )
+                                
+                                # Use description from latest version (more accurate)
+                                latest_description = latest_module_data.get("description", module.description)
+                                
+                                # Update the module with latest version and metadata
+                                module = ModuleInfo(
+                                    id=f"{module.namespace}/{module.name}/{module.provider}",
+                                    namespace=module.namespace,
+                                    name=module.name,
+                                    provider=module.provider,
+                                    version=latest_stable,
+                                    description=latest_description,
+                                    source_url=module.source_url,
+                                    downloads=module.downloads,
+                                    verified=module.verified,
+                                    published_at=module.published_at,
+                                )
+                                
+                                if module_data["version"] != latest_stable:
                                     logger.info(
-                                        f"Replaced pre-release version with stable version",
+                                        f"Updated to latest stable version",
                                         module_id=module.id,
-                                        prerelease=module_data["version"],
-                                        stable=latest_stable,
+                                        old_version=module_data["version"],
+                                        new_version=latest_stable,
                                     )
-                                else:
-                                    # No stable versions available, skip this module
-                                    logger.warning(
-                                        f"No stable versions available for module, skipping",
-                                        module_id=module.id,
-                                    )
-                                    continue
-                            except Exception as e:
+                            else:
+                                # No stable versions available, skip this module
                                 logger.warning(
-                                    f"Failed to fetch versions for module, using original version",
+                                    f"No stable versions available for module, skipping",
                                     module_id=module.id,
-                                    error=str(e),
                                 )
+                                continue
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to fetch latest version for module, using search result version",
+                                module_id=module.id,
+                                error=str(e),
+                            )
                         
                         # Apply module exclusion filtering
                         if _is_module_excluded(module.id, config.excluded_modules):
