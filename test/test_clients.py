@@ -49,7 +49,9 @@ class TestTerraformClient:
     def test_is_prerelease_version_with_draft(self):
         """Test identifying draft versions as pre-release."""
         assert is_prerelease_version("2.0.1-draft") is True
-        assert is_prerelease_version("2.0.1-draft-addons") is True  # Real example from issue #20
+        assert (
+            is_prerelease_version("2.0.1-draft-addons") is True
+        )  # Real example from issue #20
 
     def test_is_prerelease_version_stable(self):
         """Test that stable versions are not identified as pre-release."""
@@ -165,7 +167,9 @@ class TestTerraformClient:
         )
 
     @pytest.mark.asyncio
-    async def test_get_module_versions_filters_prerelease(self, terraform_client, mock_cache):
+    async def test_get_module_versions_filters_prerelease(
+        self, terraform_client, mock_cache
+    ):
         """Test that pre-release versions are filtered out."""
         # Setup - mix of stable and pre-release versions with correct nested structure
         mock_response = MagicMock()
@@ -177,7 +181,9 @@ class TestTerraformClient:
                         {"version": "1.1.0-beta"},
                         {"version": "1.2.0"},
                         {"version": "2.0.0-draft"},
-                        {"version": "2.0.1-draft-addons"},  # Real example from issue #20
+                        {
+                            "version": "2.0.1-draft-addons"
+                        },  # Real example from issue #20
                         {"version": "2.1.0-rc.1"},
                         {"version": "2.2.0"},
                         {"version": "3.0.0-alpha"},
@@ -201,7 +207,9 @@ class TestTerraformClient:
         )
 
     @pytest.mark.asyncio
-    async def test_get_module_versions_all_prerelease(self, terraform_client, mock_cache):
+    async def test_get_module_versions_all_prerelease(
+        self, terraform_client, mock_cache
+    ):
         """Test behavior when all versions are pre-release."""
         # Setup - only pre-release versions with correct nested structure
         mock_response = MagicMock()
