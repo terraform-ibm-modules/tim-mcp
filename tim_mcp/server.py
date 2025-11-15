@@ -6,8 +6,8 @@ for Terraform IBM Modules discovery and implementation support.
 """
 
 import json
-import time
 import textwrap
+import time
 from pathlib import Path
 from typing import Any
 
@@ -34,13 +34,13 @@ logger = get_logger(__name__)
 def _find_static_file(filename: str) -> Path:
     """
     Find a file in the static directory, checking both packaged and development locations.
-    
+
     Args:
         filename: Name of the file to find in the static directory
-        
+
     Returns:
         Path object to the found file
-        
+
     Raises:
         FileNotFoundError: If the file cannot be found in either location
     """
@@ -48,11 +48,11 @@ def _find_static_file(filename: str) -> Path:
     packaged_path = Path(__file__).parent / "static" / filename
     # Then try the development location (when running from source)
     dev_path = Path(__file__).parent.parent / "static" / filename
-    
+
     for file_path in [packaged_path, dev_path]:
         if file_path.exists():
             return file_path
-            
+
     # If neither path works, provide helpful error message
     logger.error(f"File not found at {packaged_path} or {dev_path}")
     raise FileNotFoundError(
@@ -530,7 +530,7 @@ async def get_content(
     uri="whitepaper://terraform-best-practices-on-ibm-cloud",
     name="IBM Terraform Whitepaper",
     description=textwrap.dedent("""
-    A concise guide to best practices for designing, coding, securing, and operating Terraform Infrastructure as Code solutions on IBM Cloud. 
+    A concise guide to best practices for designing, coding, securing, and operating Terraform Infrastructure as Code solutions on IBM Cloud.
     Focuses on modularity, deployable architectures, security governance, and operational workflows.
     """),
     mime_type="text/markdown",
@@ -539,8 +539,8 @@ async def get_content(
         "version": "1.0",
         "team": "IBM Cloud",
         "update_frequency": "monthly",
-        "file_size_bytes": _find_static_file("terraform-white-paper.md").stat().st_size
-    }
+        "file_size_bytes": _find_static_file("terraform-white-paper.md").stat().st_size,
+    },
 )
 async def terraform_whitepaper():
     whitepaper_path = _find_static_file("terraform-white-paper.md")
@@ -574,8 +574,8 @@ async def terraform_whitepaper():
         "version": "1.0",
         "team": "IBM Cloud",
         "update_frequency": "weekly",
-        "file_size_bytes": _find_static_file("module_index.json").stat().st_size
-    }
+        "file_size_bytes": _find_static_file("module_index.json").stat().st_size,
+    },
 )
 async def module_index():
     try:
