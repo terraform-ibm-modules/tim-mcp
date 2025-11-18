@@ -96,6 +96,34 @@ Before configuring TIM-MCP, ensure you have the following installed:
 
 ## Installation Instructions
 
+### VS Code
+
+Visual Studio Code supports MCP servers through extension and configuration files.
+
+**Quick Install:**
+<p><a href="vscode:mcp/install?%7B%22name%22%3A%22tim-mcp%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22git%2Bhttps%3A%2F%2Fgithub.com%2Fterraform-ibm-modules%2Ftim-mcp.git%22%2C%22tim-mcp%22%5D%7D"><img src="https://img.shields.io/badge/VS_Code-Install_tim--mcp-0098FF?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Install tim-mcp in VS Code"></a></p>
+
+> Click the button above to install directly. Requires VS Code 1.88.0+ with MCP extension.
+
+**Manual Setup:**
+1. Open VS Code Command Palette: `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+2. Run: **MCP: Add Server**
+3. Enter this configuration:
+
+   ```json
+   {
+     "name": "tim-mcp",
+     "command": "uvx",
+     "args": [
+       "--from",
+       "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
+       "tim-mcp"
+     ]
+   }
+   ```
+
+4. Optionally add a `GITHUB_TOKEN` environment variable to avoid rate limits
+
 ### Claude Desktop
 
 Claude Desktop is a standalone application that supports MCP servers through a JSON configuration file.
@@ -142,18 +170,6 @@ Claude Desktop is a standalone application that supports MCP servers through a J
 3. **Restart Claude Desktop** and look for the 🔨 icon to confirm MCP tools are loaded
 
 4. **Test it**: Ask Claude "What IBM Cloud VPC modules are available?"
-
-### VS Code
-
-Visual Studio Code supports MCP servers through extension and configuration files.
-
-1. **Install the MCP extension** for VS Code if not already installed
-
-2. **Configure TIM-MCP** using one of these methods:
-   - Create/edit `.vscode/mcp.json` in your project directory
-   - Use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P) and select "MCP: Add Server"
-
-3. **Add the configuration** using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
 
 ### Cursor
 
