@@ -124,6 +124,8 @@ Visual Studio Code supports MCP servers through extension and configuration file
 
 4. Optionally add a `GITHUB_TOKEN` environment variable to avoid rate limits
 
+> **Note:** The VS Code button above configures MCP for VS Code's native MCP support. If you're using **Claude Code CLI** (the command-line tool), you need separate configuration. See the [Claude Code](#claude-code) section below for CLI setup.
+
 ### Claude Desktop
 
 Claude Desktop is a standalone application that supports MCP servers through a JSON configuration file.
