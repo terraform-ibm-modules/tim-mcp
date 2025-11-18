@@ -12,8 +12,9 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 - [Why TIM-MCP?](#why-tim-mcp)
 - [Prerequisites](#prerequisites)
 - [Installation Instructions](#installation-instructions)
-  - [Claude Desktop](#claude-desktop)
   - [VS Code](#vs-code)
+  - [Smithery](#smithery)
+  - [Claude Desktop](#claude-desktop)
   - [Cursor](#cursor)
   - [IBM Bob](#ibm-bob)
   - [Claude Code](#claude-code)
@@ -125,6 +126,37 @@ Visual Studio Code supports MCP servers through extension and configuration file
 4. Optionally add a `GITHUB_TOKEN` environment variable to avoid rate limits
 
 > **Note:** The VS Code button above configures MCP for VS Code's native MCP support. If you're using **Claude Code CLI** (the command-line tool), you need separate configuration. See the [Claude Code](#claude-code) section below for CLI setup.
+
+### Smithery
+
+[Smithery](https://smithery.ai) is a central registry and management platform for MCP servers. Once tim-mcp is registered with Smithery, you can discover, install, and manage it through the Smithery CLI.
+
+> **Status:** tim-mcp registration with Smithery is pending. This section documents how to install once it becomes available in the Smithery registry.
+
+**Quick Install via Smithery CLI** (once registered):
+
+```bash
+# Install tim-mcp with interactive client selection
+npx @smithery/cli install tim-mcp
+
+# Or specify the client directly
+npx @smithery/cli install tim-mcp --client claude          # Claude Desktop
+npx @smithery/cli install tim-mcp --client vscode          # VS Code
+npx @smithery/cli install tim-mcp --client cursor          # Cursor
+npx @smithery/cli install tim-mcp --client claude-code     # Claude Code
+npx @smithery/cli install tim-mcp --client windsurf        # Windsurf
+```
+
+**Benefits of using Smithery:**
+- Unified MCP server discovery and installation
+- Easy configuration for multiple clients
+- Automatic environment variable setup (e.g., GITHUB_TOKEN)
+- One-click server management
+
+**Setup optional GitHub Token via Smithery:**
+When prompted during installation, you can provide your GitHub Personal Access Token to avoid API rate limits (recommended).
+
+**In the meantime**, use one of the other installation methods above (VS Code, Claude Desktop, Cursor, or Claude Code).
 
 ### Claude Desktop
 
