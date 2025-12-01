@@ -153,7 +153,7 @@ terraform {
 }
 
 provider "ibm" {
-  ibmcloud_api_key = var.ibmcloud_api_key
+  ibmcloud_api_key = var.ibmcloud_api_key  # pragma: allowlist secret
 }
 
 # Create a Cloud Object Storage (COS) instance
@@ -252,7 +252,7 @@ Terraform will perform the following actions:
       + location                 = "global"
       + locked                   = (known after apply)
       + name                     = "my-storage-service"
-      + onetime_credentials      = (known after apply)
+      + onetime_credentials      = (known after apply)  # pragma: allowlist secret
       + plan                     = "standard"
       + plan_history             = (known after apply)
       + resource_aliases_url     = (known after apply)
@@ -489,7 +489,7 @@ The distinction between root and reusable modules isn't enforced through specifi
 ```hcl
 provider "ibm" {
   region           = "us-south"
-  ibmcloud_api_key = "your_api_key"
+  ibmcloud_api_key = "your_api_key"  # pragma: allowlist secret
 }
 ```
 
@@ -1123,7 +1123,7 @@ This example demonstrates how to generate Terraform code for an existing Object 
     }
 
     provider "ibm" {
-      ibmcloud_api_key = var.ibmcloud_api_key
+      ibmcloud_api_key = var.ibmcloud_api_key  # pragma: allowlist secret
     }
     ```
 
@@ -1162,7 +1162,7 @@ This example demonstrates how to generate Terraform code for an existing Object 
     parameters        = null
     parameters_json   = null
     plan              = "standard"
-    resource_group_id = "848b91f5cc844415abeded89bb340a4d"
+    resource_group_id = "848b91f5cc844415abeded89bb340a4d"  # pragma: allowlist secret
     service           = "cloud-object-storage"
     service_endpoints = null
     tags              = []
@@ -1369,7 +1369,7 @@ The following is an extract of the `credentials.txt` file
 ```text
 [default]
 aws_access_key_id = < your key id >
-aws_secret_access_key = < secret key >
+aws_secret_access_key = < secret key >  # pragma: allowlist secret
 ```
 
 The key names contain the term "aws", but it is not an error and you can still use your IBM Cloud key and secret values here.
@@ -1442,7 +1442,7 @@ Key tips for deployable architecture authors:
 
 ### Use compliance scans on infrastructure created by automation
 
-From an operational standpoint, it is equaly critical to ensure that the infrastructure that is provisioned by the deployable architecture remains compliant over time. Continued compliance involves scanning the deployed resources with [IBM Cloud Security and Compliance Center](https://www.ibm.com/products/security-and-compliance-center) (SCC) regularly to detect misconfigurations or drift from the declared compliance standards.
+From an operational standpoint, it is equally critical to ensure that the infrastructure that is provisioned by the deployable architecture remains compliant over time. Continued compliance involves scanning the deployed resources with [IBM Cloud Security and Compliance Center](https://www.ibm.com/products/security-and-compliance-center) (SCC) regularly to detect misconfigurations or drift from the declared compliance standards.
 
 
 Start with the deployable architecture compliance claims

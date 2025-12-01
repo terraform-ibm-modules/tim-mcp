@@ -251,7 +251,7 @@
     {
       "id": "terraform-ibm-modules/iam-access-group/ibm/1.5.13",
       "name": "iam-access-group",
-      "description": "This module is used to create an acess group, adding members to access group, defining the acces group policy and adding dynamic rules to access group.",
+      "description": "This module is used to create an access group, adding members to access group, defining the access group policy and adding dynamic rules to access group.",
       "category": "security",
       "downloads": 202902,
       "published_at": "2025-09-06T00:38:24.606551Z",
@@ -264,7 +264,7 @@
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-access-group/tree/main/modules/access-management"
         }
       ],
-      "readme_excerpt": "This module is used to create an acess group, adding members to access group, defining the acces group policy and adding dynamic rules to access group. Access groups can be used to define a set of permissions that you want to grant to a group of users. terraform-ibm-iam-access-group, Submodules, access-management, Examples, Access Management example, and more"
+      "readme_excerpt": "This module is used to create an access group, adding members to access group, defining the access group policy and adding dynamic rules to access group. Access groups can be used to define a set of permissions that you want to grant to a group of users. terraform-ibm-iam-access-group, Submodules, access-management, Examples, Access Management example, and more"
     },
     {
       "id": "terraform-ibm-modules/secrets-manager-private-cert-engine/ibm/1.10.1",

@@ -76,6 +76,7 @@ dev = [
 include = [
     "tim_mcp/**/*.py",
     "static/**/*",
+    "sops/**/*.md",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -83,6 +84,7 @@ packages = ["tim_mcp"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "static" = "tim_mcp/static"
+"sops" = "tim_mcp/sops"
 
 [tool.hatch.version]
 source = "vcs"

@@ -33,7 +33,7 @@ A **module** is a Terraform module published to the Terraform Registry at the re
 
 - **Module ID**: `namespace/name/provider/version` (e.g., `terraform-ibm-modules/cbr/ibm/1.33.6`)
 - **Use with**: `search_modules`, `get_module_details`, Terraform registry source
-- **Terraform usage**: 
+- **Terraform usage**:
   ```terraform
   module "cbr" {
     source  = "terraform-ibm-modules/cbr/ibm"
@@ -112,39 +112,15 @@ module "observability_instances" {
 - AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
 - This module does NOT exist - always verify first
 
-## Workflow by Intent
+## Workflow Guidance
 
-The server supports two distinct workflows based on user intent:
+For interactive, step-by-step workflow guidance, use the MCP prompts available in your client:
 
-### For Examples/Samples Workflow
-**When users want existing deployments or working examples:**
+- **`quick_start`** - Not sure which workflow to use? Start here to determine the best approach for your goal
+- **`examples_workflow`** - Finding and using existing module examples/samples (for deploying existing patterns)
+- **`development_workflow`** - Building custom Terraform configurations from scratch (for custom development)
 
-Keywords to detect this intent: "example", "sample", "deploy", "show me", "simple"
-
-1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
-2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
-3. Use **`get_module_details`** to understand module capabilities using module ID from the index or search results
-4. Use **`list_content`** to check what examples are available for the module
-5. Use **`get_content`** to fetch example Terraform files (main.tf, provider.tf, version.tf)
-
-The example files provide valuable insights:
-- **Main configuration file**: Shows how to use and combine the module with others
-- **Provider configuration file**: Demonstrates proper provider configuration
-- **Version constraints file**: Shows required provider versions and constraints
-- **Variables and outputs**: Define module interface and available values
-
-Note: File names may vary (e.g., main.tf, provider.tf, version.tf, variables.tf, outputs.tf, etc.). Use `list_content` to see the actual file structure and names available in each example.
-
-### For New Development Workflow
-**When users need to write custom terraform:**
-
-Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop"
-
-1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
-2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
-3. Use **`get_module_details`** to understand inputs/outputs/interface using module ID from the index or search results
-4. Use **`list_content`** to explore available examples and structure
-5. Use **`get_content`** to fetch example files to understand usage patterns and provider setup
+These prompts provide detailed, parameterized guidance tailored to your specific use case. Simply invoke the prompt with your requirements and follow the interactive steps.
 
 ## Resource and Tool Usage Tips
 

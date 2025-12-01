@@ -20,7 +20,7 @@ from tim_mcp.types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
 def create_mock_github_client(repo_mappings=None):
     """
     Create a properly configured mock GitHub client.
-    
+
     Args:
         repo_mappings: Dict mapping URL substrings to (owner, repo) tuples.
                       Defaults to common test repos.
@@ -33,15 +33,15 @@ def create_mock_github_client(repo_mappings=None):
             "namespace": ("terraform-ibm-modules", "terraform-ibm-namespace"),
             "icd-postgresql": ("terraform-ibm-modules", "terraform-ibm-icd-postgresql"),
         }
-    
+
     mock_github_client = AsyncMock()
-    
+
     def parse_url_side_effect(url):
         for key, value in repo_mappings.items():
             if key in url:
                 return value
         return None
-    
+
     mock_github_client.parse_github_url.side_effect = parse_url_side_effect
 
     async def mock_get_repo_info(*args, **kwargs):
@@ -1229,22 +1229,24 @@ class TestTotalFoundBug:
         """
         Test that total_found reflects the total count from the Terraform Registry,
         not 0 or the number of returned modules.
-        
+
         This test reproduces issue #21 where total_found was being set to 0
         even though modules were returned.
         """
         config = Config()
-        
+
         # Create mock clients
         mock_terraform_client = AsyncMock()
-        mock_github_client = MagicMock()  # Use MagicMock for GitHub client since parse_github_url is sync
-        
+        mock_github_client = (
+            MagicMock()
+        )  # Use MagicMock for GitHub client since parse_github_url is sync
+
         # Mock the async context manager methods
         mock_terraform_client.__aenter__.return_value = mock_terraform_client
         mock_terraform_client.__aexit__.return_value = None
         mock_github_client.__aenter__.return_value = mock_github_client
         mock_github_client.__aexit__.return_value = None
-        
+
         # Mock GitHub client to validate all repositories
         def mock_parse_url(url):
             # Extract owner/repo from the URL
@@ -1255,27 +1257,27 @@ class TestTotalFoundBug:
             elif "vpc-vsi" in url:
                 return ("terraform-ibm-modules", "terraform-ibm-vpc-vsi")
             return ("terraform-ibm-modules", "test-repo")
-        
+
         mock_github_client.parse_github_url.side_effect = mock_parse_url
-        
+
         # Mock get_repository_info to return valid repo data
         async def mock_get_repo_info(owner, repo_name):
             return {
                 "archived": False,
                 "topics": ["core-team"],  # Required topic
             }
-        
+
         mock_github_client.get_repository_info.side_effect = mock_get_repo_info
-        
+
         # Simulate a search that requires multiple batches
         # Registry has 15 total modules, but we need to fetch them in batches
         # First batch returns total_count=15, second batch is missing total_count
         batch_count = 0
-        
+
         async def mock_search(*args, **kwargs):
             nonlocal batch_count
             batch_count += 1
-            
+
             if batch_count == 1:
                 # First batch: has total_count=15
                 return {
@@ -1335,21 +1337,27 @@ class TestTotalFoundBug:
                         # total_count is missing here - causes bug!
                     },
                 }
-        
+
         mock_terraform_client.search_modules = mock_search
-        
+
         request = ModuleSearchRequest(query="vsi", limit=3)
-        
+
         # Patch the context managers
-        with patch("tim_mcp.tools.search.TerraformClient", return_value=mock_terraform_client), \
-             patch("tim_mcp.tools.search.GitHubClient", return_value=mock_github_client):
+        with (
+            patch(
+                "tim_mcp.tools.search.TerraformClient",
+                return_value=mock_terraform_client,
+            ),
+            patch("tim_mcp.tools.search.GitHubClient", return_value=mock_github_client),
+        ):
             result = await search_modules_impl(request, config)
-        
+
         # The bug: total_found is set to 0 instead of 15
         # This assertion should FAIL initially, demonstrating the bug
-        assert result.total_found == 15, \
+        assert result.total_found == 15, (
             f"Expected total_found=15 (total from registry), but got {result.total_found}"
-        
+        )
+
         # Verify we got the expected modules
         assert len(result.modules) == 3
         assert result.query == "vsi"
@@ -1357,7 +1365,6 @@ class TestTotalFoundBug:
 
 class TestPrereleaseVersionFiltering:
     """Test that pre-release versions are filtered and replaced with stable versions."""
-
 
     @pytest.fixture
     def config(self):
@@ -1392,7 +1399,11 @@ class TestPrereleaseVersionFiltering:
         ]
 
         # Mock get_module_versions to return stable versions
-        mock_terraform_client.get_module_versions.return_value = ["2.0.0", "1.9.0", "1.8.5"]
+        mock_terraform_client.get_module_versions.return_value = [
+            "2.0.0",
+            "1.9.0",
+            "1.8.5",
+        ]
 
         # Mock get_module_details to return description for latest version
         async def mock_get_details(namespace, name, provider, version):
@@ -1401,7 +1412,9 @@ class TestPrereleaseVersionFiltering:
                 "version": version,
             }
 
-        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
+        mock_terraform_client.get_module_details = AsyncMock(
+            side_effect=mock_get_details
+        )
 
         request = ModuleSearchRequest(query="db2")
 
@@ -1420,7 +1433,9 @@ class TestPrereleaseVersionFiltering:
         # Verify the pre-release version was replaced with stable version
         assert len(result.modules) == 1
         module = result.modules[0]
-        assert module.version == "2.0.0", f"Expected stable version 2.0.0, got {module.version}"
+        assert module.version == "2.0.0", (
+            f"Expected stable version 2.0.0, got {module.version}"
+        )
         assert module.name == "db2-cloud"
 
         # Verify get_module_versions was called to fetch stable versions
@@ -1473,7 +1488,9 @@ class TestPrereleaseVersionFiltering:
             result = await search_modules_impl(request, config)
 
         # Verify the module was skipped
-        assert len(result.modules) == 0, "Module with only pre-release versions should be skipped"
+        assert len(result.modules) == 0, (
+            "Module with only pre-release versions should be skipped"
+        )
         # total_found reflects the API's count, not filtered results
         assert result.total_found == 1
 
@@ -1519,7 +1536,9 @@ class TestPrereleaseVersionFiltering:
                 "version": version,
             }
 
-        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
+        mock_terraform_client.get_module_details = AsyncMock(
+            side_effect=mock_get_details
+        )
 
         request = ModuleSearchRequest(query="vpc")
 
@@ -1538,7 +1557,9 @@ class TestPrereleaseVersionFiltering:
         # Verify the version was updated to latest
         assert len(result.modules) == 1
         module = result.modules[0]
-        assert module.version == "5.2.0", f"Expected latest version 5.2.0, got {module.version}"
+        assert module.version == "5.2.0", (
+            f"Expected latest version 5.2.0, got {module.version}"
+        )
         assert module.description == "Latest IBM Cloud VPC module"
 
         # Verify get_module_versions was called (we always fetch latest now)
@@ -1593,7 +1614,9 @@ class TestPrereleaseVersionFiltering:
                 return ["2.0.0", "1.9.0"]  # Stable versions
             return []
 
-        mock_terraform_client.get_module_versions = AsyncMock(side_effect=mock_get_versions)
+        mock_terraform_client.get_module_versions = AsyncMock(
+            side_effect=mock_get_versions
+        )
 
         # Mock get_module_details
         async def mock_get_details(namespace, name, provider, version):
@@ -1602,7 +1625,9 @@ class TestPrereleaseVersionFiltering:
                 "version": version,
             }
 
-        mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_details)
+        mock_terraform_client.get_module_details = AsyncMock(
+            side_effect=mock_get_details
+        )
 
         request = ModuleSearchRequest(query="ibm")
 
@@ -1626,8 +1651,12 @@ class TestPrereleaseVersionFiltering:
         db2_module = next(m for m in result.modules if m.name == "db2-cloud")
 
         # Verify both were updated to latest versions
-        assert vpc_module.version == "5.2.0", f"Expected VPC v5.2.0, got {vpc_module.version}"
-        assert db2_module.version == "2.0.0", f"Expected DB2 v2.0.0, got {db2_module.version}"
+        assert vpc_module.version == "5.2.0", (
+            f"Expected VPC v5.2.0, got {vpc_module.version}"
+        )
+        assert db2_module.version == "2.0.0", (
+            f"Expected DB2 v2.0.0, got {db2_module.version}"
+        )
 
         # Verify get_module_versions was called for BOTH modules (new behavior)
         assert mock_terraform_client.get_module_versions.call_count == 2
@@ -1641,7 +1670,6 @@ class TestPrereleaseVersionFiltering:
 
 class TestLatestVersionFetching:
     """Test for issue #47 - Always fetch latest version to get correct description."""
-
 
     @pytest.fixture
     def config(self):
@@ -1725,13 +1753,15 @@ class TestLatestVersionFetching:
         module = result.modules[0]
 
         # Verify version was updated to latest
-        assert module.version == "1.0.3", f"Expected latest version 1.0.3, got {module.version}"
+        assert module.version == "1.0.3", (
+            f"Expected latest version 1.0.3, got {module.version}"
+        )
 
         # Verify description is correct (from latest version)
         expected_desc = "Configures a Kubernetes namespace or Openshift project."
-        assert (
-            module.description == expected_desc
-        ), f"Expected correct description from v1.0.3, got: {module.description}"
+        assert module.description == expected_desc, (
+            f"Expected correct description from v1.0.3, got: {module.description}"
+        )
 
         # Verify get_module_versions was called
         mock_terraform_client.get_module_versions.assert_called_once_with(
@@ -1813,9 +1843,9 @@ class TestLatestVersionFetching:
         # Verify version was updated to latest
         assert len(result.modules) == 1
         module = result.modules[0]
-        assert (
-            module.version == "4.2.29"
-        ), f"Expected latest version 4.2.29, got {module.version}"
+        assert module.version == "4.2.29", (
+            f"Expected latest version 4.2.29, got {module.version}"
+        )
         assert (
             module.description
             == "Implements an instance of the IBM Cloud Databases for PostgreSQL service."

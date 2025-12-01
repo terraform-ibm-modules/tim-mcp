@@ -3,22 +3,21 @@ Tests for the generate_module_index.py script.
 """
 
 import json
-import os
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # Import the script functions directly
 import sys
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from scripts.generate_module_index import (
+    CATEGORY_KEYWORDS,
     categorize_module,
     clean_excerpt,
-    generate_module_index,
     fetch_submodule_description,
-    CATEGORY_KEYWORDS,
 )
 
 
@@ -31,8 +30,14 @@ class TestHelperFunctions:
         for category, keywords in CATEGORY_KEYWORDS.items():
             if keywords:  # Make sure we have at least one keyword
                 keyword = keywords[0]
-                assert categorize_module(f"{keyword}-module", "Generic description") == category
-                assert categorize_module("module", f"Description with {keyword}") == category
+                assert (
+                    categorize_module(f"{keyword}-module", "Generic description")
+                    == category
+                )
+                assert (
+                    categorize_module("module", f"Description with {keyword}")
+                    == category
+                )
 
     def test_categorize_module_empty(self):
         """Test categorizing empty inputs."""
@@ -47,14 +52,16 @@ class TestHelperFunctions:
         if len(categories) >= 2:
             first_category = categories[0]
             second_category = categories[1]
-            
+
             if CATEGORY_KEYWORDS[first_category] and CATEGORY_KEYWORDS[second_category]:
                 first_keyword = CATEGORY_KEYWORDS[first_category][0]
                 second_keyword = CATEGORY_KEYWORDS[second_category][0]
-                
+
                 # This should match the first category because categories are checked in order
                 test_name = f"{first_keyword}-{second_keyword}"
-                assert categorize_module(test_name, "Test description") == first_category
+                assert (
+                    categorize_module(test_name, "Test description") == first_category
+                )
 
     def test_clean_excerpt_unicode_symbols(self):
         """Test cleaning unicode symbols from README excerpts."""
@@ -71,7 +78,7 @@ class TestHelperFunctions:
     def test_clean_excerpt_empty(self):
         """Test cleaning empty excerpts."""
         assert clean_excerpt("") == ""
-        assert clean_excerpt(None) == None
+        assert clean_excerpt(None) is None
 
     def test_clean_excerpt_paragraph_breaks(self):
         """Test preserving paragraph breaks in README excerpts."""
@@ -106,7 +113,7 @@ def mock_config():
 def mock_terraform_client():
     """Create a mock TerraformClient."""
     mock_client = MagicMock()
-    
+
     # Mock list_all_modules method
     mock_modules = [
         {
@@ -148,35 +155,31 @@ def mock_terraform_client():
             "source": "https://github.com/terraform-ibm-modules/terraform-ibm-old-module",
             "published_at": (datetime.now(UTC) - timedelta(days=120)).isoformat(),
             "downloads": 1000,
-        }
+        },
     ]
-    
+
     mock_client.list_all_modules = AsyncMock(return_value=mock_modules)
-    
+
     # Mock get_module_details method
     mock_module_details = {
         "terraform-ibm-modules/vpc/ibm": {
             "submodules": [
                 {"path": "modules/subnet", "name": "subnet"},
-                {"path": "modules/security-group", "name": "security-group"}
+                {"path": "modules/security-group", "name": "security-group"},
             ]
         },
         "terraform-ibm-modules/cos/ibm": {
-            "submodules": [
-                {"path": "modules/bucket", "name": "bucket"}
-            ]
+            "submodules": [{"path": "modules/bucket", "name": "bucket"}]
         },
-        "terraform-ibm-modules/watsonx/ibm": {
-            "submodules": []
-        }
+        "terraform-ibm-modules/watsonx/ibm": {"submodules": []},
     }
-    
+
     async def mock_get_module_details(namespace, name, provider, version):
         module_id = f"{namespace}/{name}/{provider}"
         return mock_module_details.get(module_id, {"submodules": []})
-    
+
     mock_client.get_module_details = AsyncMock(side_effect=mock_get_module_details)
-    
+
     return mock_client
 
 
@@ -184,7 +187,7 @@ def mock_terraform_client():
 def mock_github_client():
     """Create a mock GitHubClient."""
     mock_client = MagicMock()
-    
+
     # Mock parse_github_url method
     def mock_parse_github_url(source_url):
         if "terraform-ibm-vpc" in source_url:
@@ -194,9 +197,9 @@ def mock_github_client():
         elif "terraform-ibm-watsonx" in source_url:
             return "terraform-ibm-modules", "terraform-ibm-watsonx"
         return None
-    
+
     mock_client.parse_github_url = MagicMock(side_effect=mock_parse_github_url)
-    
+
     # Mock get_file_content method
     mock_readme_contents = {
         ("terraform-ibm-modules", "terraform-ibm-vpc"): {
@@ -207,16 +210,16 @@ def mock_github_client():
         },
         ("terraform-ibm-modules", "terraform-ibm-watsonx"): {
             "decoded_content": "# IBM WatsonX Module\n\nThis module creates WatsonX AI resources on IBM Cloud.\n\n## Features\n\n- Creates WatsonX instances\n- Configures AI models\n- Sets up training data\n\n## Usage\n\nSee examples directory."
-        }
+        },
     }
-    
+
     async def mock_get_file_content(owner, repo, path):
         if path == "README.md":
             return mock_readme_contents.get((owner, repo), {"decoded_content": ""})
         return {"decoded_content": ""}
-    
+
     mock_client.get_file_content = AsyncMock(side_effect=mock_get_file_content)
-    
+
     return mock_client
 
 
@@ -228,7 +231,7 @@ async def _generate_module_index_impl(output_path, tf_client, gh_client):
     # Use fixed namespace for tests
     namespace = "terraform-ibm-modules"
     print(f"Fetching modules from namespace: {namespace}")
-    
+
     # Get modules from the mock client
     all_modules = await tf_client.list_all_modules(namespace)
     print(f"Found {len(all_modules)} total modules")
@@ -247,9 +250,7 @@ async def _generate_module_index_impl(output_path, tf_client, gh_client):
         # Parse published date
         published_at = module.get("published_at", "")
         try:
-            published_date = datetime.fromisoformat(
-                published_at.replace("Z", "+00:00")
-            )
+            published_date = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
 
             # Filter: skip modules older than 3 months
             if published_date < three_months_ago:
@@ -288,15 +289,11 @@ async def _generate_module_index_impl(output_path, tf_client, gh_client):
             raw_submodules = module_details.get("submodules", [])
             for submodule in raw_submodules:
                 submodule_path = submodule.get("path", "")
-                submodule_name = (
-                    submodule_path.split("/")[-1] if submodule_path else ""
-                )
+                submodule_name = submodule_path.split("/")[-1] if submodule_path else ""
 
                 # Generate GitHub source URL for submodule
                 submodule_source_url = (
-                    f"{source}/tree/main/{submodule_path}"
-                    if submodule_path
-                    else source
+                    f"{source}/tree/main/{submodule_path}" if submodule_path else source
                 )
 
                 # For tests, use empty description (actual implementation would fetch from README)
@@ -324,9 +321,7 @@ async def _generate_module_index_impl(output_path, tf_client, gh_client):
             owner_repo = gh_client.parse_github_url(source)
             if owner_repo:
                 owner, repo = owner_repo
-                readme_data = await gh_client.get_file_content(
-                    owner, repo, "README.md"
-                )
+                readme_data = await gh_client.get_file_content(owner, repo, "README.md")
                 content = readme_data.get("decoded_content", "")
 
                 # Extract meaningful description paragraph
@@ -384,50 +379,54 @@ async def _generate_module_index_impl(output_path, tf_client, gh_client):
 
 
 @pytest.mark.asyncio
-async def test_generate_module_index(mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path):
+async def test_generate_module_index(
+    mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path
+):
     """Test the generate_module_index function."""
     # Create a temporary directory for the output
     static_dir = tmp_path / "static"
     static_dir.mkdir()
-    
+
     # Create the output path
     output_path = static_dir / "module_index.json"
-    
+
     # Run our test implementation directly with the mocks
-    output_data = await _generate_module_index_impl(output_path, mock_terraform_client, mock_github_client)
-    
+    output_data = await _generate_module_index_impl(
+        output_path, mock_terraform_client, mock_github_client
+    )
+
     # Check that the output file was created
     output_path = static_dir / "module_index.json"
     assert output_path.exists()
-    
+
     # Load and validate the output
     with open(output_path) as f:
         output_data = json.load(f)
-    
+
     # Verify the structure and content
     assert "generated_at" in output_data
     assert output_data["namespace"] == "terraform-ibm-modules"
     assert output_data["total_modules"] == 3  # Should exclude the old module
-    
+
     # Verify modules are sorted by downloads
     modules = output_data["modules"]
     assert len(modules) == 3
     assert modules[0]["id"] == "terraform-ibm-modules/vpc/ibm"
     assert modules[1]["id"] == "terraform-ibm-modules/cos/ibm"
     assert modules[2]["id"] == "terraform-ibm-modules/watsonx/ibm"
-    
+
     # Verify categories
     # We don't need to test specific category assignments as they might change
     # Just verify we have categories assigned
     assert "category" in modules[0]
     assert "category" in modules[1]
     assert "category" in modules[2]
-    
+
     # Verify submodules
     assert len(modules[0]["submodules"]) == 2
     assert modules[0]["submodules"][0]["name"] == "security-group"  # Should be sorted
     assert modules[0]["submodules"][1]["name"] == "subnet"
-    
+
     # Verify README excerpts
     assert "VPC resources" in modules[0]["readme_excerpt"]
     assert "Cloud Object Storage" in modules[1]["readme_excerpt"]
@@ -435,65 +434,75 @@ async def test_generate_module_index(mock_config, mock_cache, mock_terraform_cli
 
 
 @pytest.mark.asyncio
-async def test_generate_module_index_with_exceptions(mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path):
+async def test_generate_module_index_with_exceptions(
+    mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path
+):
     """Test the generate_module_index function with exceptions."""
     # Create a temporary directory for the output
     static_dir = tmp_path / "static"
     static_dir.mkdir()
-    
+
     # Make the GitHub client raise an exception for one of the modules
     async def mock_get_file_content_with_exception(owner, repo, path):
         if repo == "terraform-ibm-cos":
             raise Exception("Failed to fetch README")
-        
+
         if path == "README.md":
-            return {
-                "decoded_content": f"# {repo}\n\nThis is a test module for {repo}."
-            }
+            return {"decoded_content": f"# {repo}\n\nThis is a test module for {repo}."}
         return {"decoded_content": ""}
-    
-    mock_github_client.get_file_content = AsyncMock(side_effect=mock_get_file_content_with_exception)
-    
+
+    mock_github_client.get_file_content = AsyncMock(
+        side_effect=mock_get_file_content_with_exception
+    )
+
     # Make the Terraform client raise an exception for one of the module details
-    async def mock_get_module_details_with_exception(namespace, name, provider, version):
+    async def mock_get_module_details_with_exception(
+        namespace, name, provider, version
+    ):
         if name == "watsonx":
             raise Exception("Failed to fetch module details")
-        
+
         module_id = f"{namespace}/{name}/{provider}"
         if module_id == "terraform-ibm-modules/vpc/ibm":
             return {
                 "submodules": [
                     {"path": "modules/subnet", "name": "subnet"},
-                    {"path": "modules/security-group", "name": "security-group"}
+                    {"path": "modules/security-group", "name": "security-group"},
                 ]
             }
         return {"submodules": []}
-    
-    mock_terraform_client.get_module_details = AsyncMock(side_effect=mock_get_module_details_with_exception)
-    
+
+    mock_terraform_client.get_module_details = AsyncMock(
+        side_effect=mock_get_module_details_with_exception
+    )
+
     # Create the output path
     output_path = static_dir / "module_index.json"
-    
+
     # Run our test implementation directly with the mocks
-    output_data = await _generate_module_index_impl(output_path, mock_terraform_client, mock_github_client)
-    
+    output_data = await _generate_module_index_impl(
+        output_path, mock_terraform_client, mock_github_client
+    )
+
     # Check that the output file was created despite exceptions
     output_path = static_dir / "module_index.json"
     assert output_path.exists()
-    
+
     # Load and validate the output
     with open(output_path) as f:
         output_data = json.load(f)
-    
+
     # Verify the structure and content
     assert "generated_at" in output_data
     assert output_data["total_modules"] == 3  # Should still include all valid modules
-    
+
     # Verify modules that had exceptions still have basic info but empty submodules/excerpts
     modules = output_data["modules"]
     cos_module = next(m for m in modules if m["id"] == "terraform-ibm-modules/cos/ibm")
-    watsonx_module = next(m for m in modules if m["id"] == "terraform-ibm-modules/watsonx/ibm")
-    
+    watsonx_module = next(
+        m for m in modules if m["id"] == "terraform-ibm-modules/watsonx/ibm"
+    )
+
     assert cos_module["readme_excerpt"] == ""  # README fetch failed
     assert watsonx_module["submodules"] == []  # Module details fetch failed
 
@@ -505,7 +514,7 @@ class TestSubmoduleDescription:
     async def test_fetch_submodule_description_basic(self):
         """Test fetching a basic submodule description."""
         mock_gh_client = MagicMock()
-        
+
         # Mock README content with a clear description
         readme_content = """# FSCloud Submodule
 
@@ -520,15 +529,18 @@ It provides the following features:
 
 See the examples directory.
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-cos", "modules/fscloud"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-cos",
+            "modules/fscloud",
+        )
+
         assert result != ""
         assert "Financial Services Cloud" in result
         assert len(result) <= 1200  # Should respect character limit
@@ -537,7 +549,7 @@ See the examples directory.
     async def test_fetch_submodule_description_with_bullet_list(self):
         """Test fetching description that ends with a colon and has a bullet list."""
         mock_gh_client = MagicMock()
-        
+
         readme_content = """# Redis FSCloud Module
 
 This submodule includes the following:
@@ -551,15 +563,18 @@ This submodule includes the following:
 
 IBM Cloud account required.
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-redis", "modules/fscloud"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-redis",
+            "modules/fscloud",
+        )
+
         assert result != ""
         # Should include the bullet list items formatted inline
         assert "Financial Services" in result
@@ -571,7 +586,7 @@ IBM Cloud account required.
     async def test_fetch_submodule_description_truncation(self):
         """Test that very long descriptions are truncated at word boundaries."""
         mock_gh_client = MagicMock()
-        
+
         # Create a very long paragraph
         long_text = "This is a test description. " * 100  # Will exceed 1200 chars
         readme_content = f"""# Long Module
@@ -580,15 +595,18 @@ IBM Cloud account required.
 
 ## More content
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/test"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/test",
+        )
+
         assert result != ""
         assert len(result) <= 1200
         # Should end at a word boundary, not mid-word
@@ -598,51 +616,62 @@ IBM Cloud account required.
     async def test_fetch_submodule_description_no_readme(self):
         """Test handling when README doesn't exist."""
         mock_gh_client = MagicMock()
-        
+
         # Mock a 404 error
-        mock_gh_client.get_file_content = AsyncMock(side_effect=Exception("404 Not Found"))
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/missing"
+        mock_gh_client.get_file_content = AsyncMock(
+            side_effect=Exception("404 Not Found")
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/missing",
+        )
+
         assert result == ""  # Should return empty string on error
 
     @pytest.mark.asyncio
     async def test_fetch_submodule_description_empty_readme(self):
         """Test handling when README exists but is empty."""
         mock_gh_client = MagicMock()
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": ""
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/empty"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": ""}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/empty",
+        )
+
         assert result == ""
 
     @pytest.mark.asyncio
     async def test_fetch_submodule_description_markdown_links_removed(self):
         """Test that markdown links are removed from descriptions."""
         mock_gh_client = MagicMock()
-        
+
         readme_content = """# Module with Links
 
 This module uses [IBM Cloud](https://cloud.ibm.com) and integrates with [Key Protect](https://cloud.ibm.com/catalog/services/key-protect).
 
 See the [documentation](https://github.com/terraform-ibm-modules/terraform-ibm-cos) for details.
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/test"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/test",
+        )
+
         assert result != ""
         # Links should be removed, only text remains
         assert "[" not in result
@@ -654,7 +683,7 @@ See the [documentation](https://github.com/terraform-ibm-modules/terraform-ibm-c
     async def test_fetch_submodule_description_etc_suffix(self):
         """Test that bullet lists get properly extracted and formatted."""
         mock_gh_client = MagicMock()
-        
+
         readme_content = """# Module with Many Features
 
 This module includes the following:
@@ -669,15 +698,18 @@ This module includes the following:
 
 ## More info
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/test"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/test",
+        )
+
         assert result != ""
         # The implementation currently always adds "etc" suffix
         assert "etc" in result
@@ -689,7 +721,7 @@ This module includes the following:
     async def test_fetch_submodule_description_whitespace_normalization(self):
         """Test that multi-line text is normalized to single line."""
         mock_gh_client = MagicMock()
-        
+
         readme_content = """# Module
 
 This is a description
@@ -699,15 +731,18 @@ normalized to a single line.
 
 ## More content
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-test", "modules/test"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-test",
+            "modules/test",
+        )
+
         assert result != ""
         # Newlines should be collapsed to spaces
         assert "\n" not in result
@@ -717,7 +752,7 @@ normalized to a single line.
     async def test_fetch_submodule_description_skips_html_comments_in_fallback(self):
         """Test that HTML comments are skipped even in second pass fallback."""
         mock_gh_client = MagicMock()
-        
+
         # Simulate README structure like vpc-private-path module:
         # Title, then multi-line HTML comment with text, then actual description
         readme_content = """# IBM Cloud Private Path module
@@ -734,15 +769,18 @@ The Private Path solution solves security, privacy and complexity problems.
 
 ## More content
 """
-        
-        mock_gh_client.get_file_content = AsyncMock(return_value={
-            "decoded_content": readme_content
-        })
-        
-        result = await fetch_submodule_description(
-            mock_gh_client, "terraform-ibm-modules", "terraform-ibm-vpc-private-path", "modules/test"
+
+        mock_gh_client.get_file_content = AsyncMock(
+            return_value={"decoded_content": readme_content}
         )
-        
+
+        result = await fetch_submodule_description(
+            mock_gh_client,
+            "terraform-ibm-modules",
+            "terraform-ibm-vpc-private-path",
+            "modules/test",
+        )
+
         assert result != ""
         # Should extract actual description, not HTML comment content
         assert "Private Path solution" in result
@@ -759,42 +797,43 @@ class TestParallelProcessing:
     async def test_parallel_submodule_fetching(self):
         """Test that submodules are fetched in parallel."""
         import asyncio
-        from unittest.mock import call
-        
+
         mock_gh_client = MagicMock()
         call_times = []
-        
+
         async def track_call_time(*args, **kwargs):
             call_times.append(asyncio.get_event_loop().time())
             await asyncio.sleep(0.1)  # Simulate API call delay
             return {"decoded_content": "# Test\n\nDescription text."}
-        
+
         mock_gh_client.get_file_content = AsyncMock(side_effect=track_call_time)
-        
+
         # Simulate fetching 3 submodules
         submodules = [
             {"path": "modules/sub1"},
             {"path": "modules/sub2"},
             {"path": "modules/sub3"},
         ]
-        
+
         tasks = [
             fetch_submodule_description(mock_gh_client, "owner", "repo", sub["path"])
             for sub in submodules
         ]
-        
+
         start_time = asyncio.get_event_loop().time()
         results = await asyncio.gather(*tasks)
         total_time = asyncio.get_event_loop().time() - start_time
-        
+
         # All should complete
         assert len(results) == 3
         assert all(r != "" for r in results)
-        
+
         # Should take ~0.1s (parallel) not ~0.3s (sequential)
         # Add some buffer for test execution overhead
-        assert total_time < 0.25, f"Parallel execution took {total_time}s, expected < 0.25s"
-        
+        assert total_time < 0.25, (
+            f"Parallel execution took {total_time}s, expected < 0.25s"
+        )
+
         # Verify calls were made in parallel (timestamps should be close)
         if len(call_times) >= 2:
             time_diff = max(call_times) - min(call_times)
@@ -804,10 +843,11 @@ class TestParallelProcessing:
     async def test_parallel_exception_handling(self):
         """Test that exceptions in parallel processing don't stop other tasks."""
         import asyncio
-        
+
         mock_gh_client = MagicMock()
-        
+
         call_count = 0
+
         async def fail_on_second_call(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -815,20 +855,22 @@ class TestParallelProcessing:
                 raise Exception("Simulated API error")
             await asyncio.sleep(0.05)
             return {"decoded_content": "# Test\n\nDescription text."}
-        
+
         mock_gh_client.get_file_content = AsyncMock(side_effect=fail_on_second_call)
-        
+
         # Fetch 3 submodules, one will fail
         tasks = [
-            fetch_submodule_description(mock_gh_client, "owner", "repo", f"modules/sub{i}")
+            fetch_submodule_description(
+                mock_gh_client, "owner", "repo", f"modules/sub{i}"
+            )
             for i in range(3)
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Should have 3 results
         assert len(results) == 3
-        
+
         # One should be empty (failed), others should succeed
         successful = [r for r in results if isinstance(r, str) and r != ""]
         assert len(successful) == 2
@@ -839,25 +881,24 @@ class TestParallelProcessing:
         # This is more of an integration test concept
         # The actual batching happens in generate_module_index
         # We can verify the batch size logic works
-        
+
         # Simulate 25 modules processed in batches of 10
         total_modules = 25
         batch_size = 10
-        
+
         batches = []
         for i in range(0, total_modules, batch_size):
             batch = list(range(i, min(i + batch_size, total_modules)))
             batches.append(batch)
-        
+
         # Should have 3 batches: [0-9], [10-19], [20-24]
         assert len(batches) == 3
         assert len(batches[0]) == 10
         assert len(batches[1]) == 10
         assert len(batches[2]) == 5
-        
+
         # Verify all modules are included
         all_items = []
         for batch in batches:
             all_items.extend(batch)
         assert sorted(all_items) == list(range(total_modules))
-
