@@ -33,7 +33,7 @@ A **module** is a Terraform module published to the Terraform Registry at the re
 
 - **Module ID**: `namespace/name/provider/version` (e.g., `terraform-ibm-modules/cbr/ibm/1.33.6`)
 - **Use with**: `search_modules`, `get_module_details`, Terraform registry source
-- **Terraform usage**: 
+- **Terraform usage**:
   ```terraform
   module "cbr" {
     source  = "terraform-ibm-modules/cbr/ibm"
@@ -112,39 +112,15 @@ module "observability_instances" {
 - AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
 - This module does NOT exist - always verify first
 
-## Workflow by Intent
+## Workflow Guidance
 
-The server supports two distinct workflows based on user intent:
+For interactive, step-by-step workflow guidance, use the MCP prompts available in your client:
 
-### For Examples/Samples Workflow
-**When users want existing deployments or working examples:**
+- **`quick_start`** - Not sure which workflow to use? Start here to determine the best approach for your goal
+- **`examples_workflow`** - Finding and using existing module examples/samples (for deploying existing patterns)
+- **`development_workflow`** - Building custom Terraform configurations from scratch (for custom development)
 
-Keywords to detect this intent: "example", "sample", "deploy", "show me", "simple"
-
-1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
-2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
-3. Use **`get_module_details`** to understand module capabilities using module ID from the index or search results
-4. Use **`list_content`** to check what examples are available for the module
-5. Use **`get_content`** to fetch example Terraform files (main.tf, provider.tf, version.tf)
-
-The example files provide valuable insights:
-- **Main configuration file**: Shows how to use and combine the module with others
-- **Provider configuration file**: Demonstrates proper provider configuration
-- **Version constraints file**: Shows required provider versions and constraints
-- **Variables and outputs**: Define module interface and available values
-
-Note: File names may vary (e.g., main.tf, provider.tf, version.tf, variables.tf, outputs.tf, etc.). Use `list_content` to see the actual file structure and names available in each example.
-
-### For New Development Workflow
-**When users need to write custom terraform:**
-
-Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop"
-
-1. First, check the **`catalog://terraform-ibm-modules-index`** resource to get a broad, high-level picture of available modules
-2. If needed, use **`search_modules`** to find more specific modules (optional if the index provides enough information)
-3. Use **`get_module_details`** to understand inputs/outputs/interface using module ID from the index or search results
-4. Use **`list_content`** to explore available examples and structure
-5. Use **`get_content`** to fetch example files to understand usage patterns and provider setup
+These prompts provide detailed, parameterized guidance tailored to your specific use case. Simply invoke the prompt with your requirements and follow the interactive steps.
 
 ## Resource and Tool Usage Tips
 
@@ -183,97 +159,13 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 ## Example Workflows
 
-### Example 1: User Wants VPC Examples
+For interactive, executable workflow examples, use the MCP prompts:
 
-**User Request:** "Show me a VPC example"
-**Intent Detection:** Examples/Samples workflow (keywords: "show me", "example")
+- **`quick_start`** - Workflow routing with real-time module checking and intelligent recommendations
+- **`examples_workflow`** - Step-by-step examples discovery and retrieval with progress tracking
+- **`development_workflow`** - Complete custom development workflow with validation checkpoints
 
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand module capabilities, inputs, outputs
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Find available examples: examples/basic, examples/default, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Get configuration files showing module usage and provider setup
-```
-
-### Example 2: User Wants to Build Custom VPC Configuration
-
-**User Request:** "I need to create a VPC with custom settings, what inputs does the module take?"
-**Intent Detection:** Development workflow (keywords: "create", "inputs")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Get detailed inputs, outputs, and module interface
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Check available examples for usage patterns
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Study example usage and provider configuration
-5. [Generate custom configuration based on module interface and example patterns]
-```
-
-### Example 3: Complete Infrastructure Solution
-
-**User Request:** "Create a VPC with subnets, security groups, and a cluster"
-**Intent Detection:** Development workflow (keywords: "create")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant modules for VPC, security groups, and clusters
-2. search_modules("security group")
-   # Optional: Search for specific security group modules if needed
-3. search_modules("cluster")
-   # Optional: Search for specific cluster modules if needed
-4. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-5. get_module_details("terraform-ibm-modules/security-group/ibm/2.7.0")
-6. get_module_details("terraform-ibm-modules/base-ocp-vpc/ibm/3.62.0")
-7. list_content() for each module to find relevant examples
-8. get_content() to examine example files showing module integration
-9. [Generate complete Terraform combining all modules with proper provider setup]
-```
-
-### Example 4: Finding and Using Working Examples
-
-**User Request:** "Show me how to deploy a complete VPC setup"
-**Intent Detection:** Examples/Samples workflow (keywords: "show me", "deploy")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand what the module does and its capabilities
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Find examples: basic, default, landing_zone, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/default", ["*.tf"])
-   # Get comprehensive example showing full VPC setup with provider configuration
-```
-
-### Example 5: Comparing Different Approaches
-
-**User Request:** "What's the difference between basic and default VPC examples?"
-**Intent Detection:** Examples/Samples workflow (keywords: "example")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand module interface
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # See all available examples: basic, default, custom_security_group, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Get basic example files
-5. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/default", ["*.tf"])
-   # Get default example files for comparison
-```
+These Agent SOPs provide structured, executable workflows with RFC 2119 constraints (MUST, SHOULD, MAY) and progress tracking. They guide you through the same processes described in this documentation but in a reliable, repeatable format.
 
 ## Code Generation Guidelines
 
