@@ -159,97 +159,13 @@ These prompts provide detailed, parameterized guidance tailored to your specific
 
 ## Example Workflows
 
-### Example 1: User Wants VPC Examples
+For interactive, executable workflow examples, use the MCP prompts:
 
-**User Request:** "Show me a VPC example"
-**Intent Detection:** Examples/Samples workflow (keywords: "show me", "example")
+- **`quick_start`** - Workflow routing with real-time module checking and intelligent recommendations
+- **`examples_workflow`** - Step-by-step examples discovery and retrieval with progress tracking
+- **`development_workflow`** - Complete custom development workflow with validation checkpoints
 
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand module capabilities, inputs, outputs
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Find available examples: examples/basic, examples/default, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Get configuration files showing module usage and provider setup
-```
-
-### Example 2: User Wants to Build Custom VPC Configuration
-
-**User Request:** "I need to create a VPC with custom settings, what inputs does the module take?"
-**Intent Detection:** Development workflow (keywords: "create", "inputs")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Get detailed inputs, outputs, and module interface
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Check available examples for usage patterns
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Study example usage and provider configuration
-5. [Generate custom configuration based on module interface and example patterns]
-```
-
-### Example 3: Complete Infrastructure Solution
-
-**User Request:** "Create a VPC with subnets, security groups, and a cluster"
-**Intent Detection:** Development workflow (keywords: "create")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant modules for VPC, security groups, and clusters
-2. search_modules("security group")
-   # Optional: Search for specific security group modules if needed
-3. search_modules("cluster")
-   # Optional: Search for specific cluster modules if needed
-4. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-5. get_module_details("terraform-ibm-modules/security-group/ibm/2.7.0")
-6. get_module_details("terraform-ibm-modules/base-ocp-vpc/ibm/3.62.0")
-7. list_content() for each module to find relevant examples
-8. get_content() to examine example files showing module integration
-9. [Generate complete Terraform combining all modules with proper provider setup]
-```
-
-### Example 4: Finding and Using Working Examples
-
-**User Request:** "Show me how to deploy a complete VPC setup"
-**Intent Detection:** Examples/Samples workflow (keywords: "show me", "deploy")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand what the module does and its capabilities
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Find examples: basic, default, landing_zone, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/default", ["*.tf"])
-   # Get comprehensive example showing full VPC setup with provider configuration
-```
-
-### Example 5: Comparing Different Approaches
-
-**User Request:** "What's the difference between basic and default VPC examples?"
-**Intent Detection:** Examples/Samples workflow (keywords: "example")
-
-**Workflow:**
-```
-1. Check catalog://terraform-ibm-modules-index
-   # Browse the index to identify relevant VPC modules
-2. get_module_details("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # Understand module interface
-3. list_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0")
-   # See all available examples: basic, default, custom_security_group, etc.
-4. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/basic", ["*.tf"])
-   # Get basic example files
-5. get_content("terraform-ibm-modules/landing-zone-vpc/ibm/8.4.0", "examples/default", ["*.tf"])
-   # Get default example files for comparison
-```
+These Agent SOPs provide structured, executable workflows with RFC 2119 constraints (MUST, SHOULD, MAY) and progress tracking. They guide you through the same processes described in this documentation but in a reliable, repeatable format.
 
 ## Code Generation Guidelines
 
