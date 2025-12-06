@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from ..clients.github_client import GitHubClient
-from ..clients.terraform_client import TerraformClient, is_prerelease_version
+from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..exceptions import TIMError
 from ..exceptions import ValidationError as TIMValidationError
@@ -119,7 +119,7 @@ async def search_modules_impl(
 
                 # Extract metadata from response
                 meta = api_response["meta"]
-                
+
                 # Capture total_count from the first batch only
                 # Subsequent batches might have inconsistent or missing total_count
                 if attempt == 1:
@@ -139,7 +139,7 @@ async def search_modules_impl(
                 for i, module_data in enumerate(api_response["modules"]):
                     try:
                         module = _transform_module_data(module_data)
-                        
+
                         # Always fetch the latest stable version since the search API
                         # may return outdated versions with stale metadata (description, etc.)
                         try:
@@ -150,15 +150,22 @@ async def search_modules_impl(
                                 # The versions are already filtered to stable only
                                 # Use the first one (latest stable)
                                 latest_stable = versions[0]
-                                
+
                                 # Fetch the module details for the latest version to get accurate metadata
-                                latest_module_data = await terraform_client.get_module_details(
-                                    module.namespace, module.name, module.provider, latest_stable
+                                latest_module_data = (
+                                    await terraform_client.get_module_details(
+                                        module.namespace,
+                                        module.name,
+                                        module.provider,
+                                        latest_stable,
+                                    )
                                 )
-                                
+
                                 # Use description from latest version (more accurate)
-                                latest_description = latest_module_data.get("description", module.description)
-                                
+                                latest_description = latest_module_data.get(
+                                    "description", module.description
+                                )
+
                                 # Update the module with latest version and metadata
                                 module = ModuleInfo(
                                     id=f"{module.namespace}/{module.name}/{module.provider}",
@@ -172,10 +179,10 @@ async def search_modules_impl(
                                     verified=module.verified,
                                     published_at=module.published_at,
                                 )
-                                
+
                                 if module_data["version"] != latest_stable:
                                     logger.info(
-                                        f"Updated to latest stable version",
+                                        "Updated to latest stable version",
                                         module_id=module.id,
                                         old_version=module_data["version"],
                                         new_version=latest_stable,
@@ -183,17 +190,17 @@ async def search_modules_impl(
                             else:
                                 # No stable versions available, skip this module
                                 logger.warning(
-                                    f"No stable versions available for module, skipping",
+                                    "No stable versions available for module, skipping",
                                     module_id=module.id,
                                 )
                                 continue
                         except Exception as e:
                             logger.warning(
-                                f"Failed to fetch latest version for module, using search result version",
+                                "Failed to fetch latest version for module, using search result version",
                                 module_id=module.id,
                                 error=str(e),
                             )
-                        
+
                         # Apply module exclusion filtering
                         if _is_module_excluded(module.id, config.excluded_modules):
                             logger.info(
@@ -271,7 +278,7 @@ def _transform_module_data(module_data: dict[str, Any]) -> ModuleInfo:
 
     This function validates required fields, handles datetime conversion,
     and creates a properly typed ModuleInfo object.
-    
+
     NOTE: The version field from the API may be a pre-release version.
     The caller should replace it with the latest stable version if needed.
 
