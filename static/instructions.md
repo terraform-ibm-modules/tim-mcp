@@ -33,7 +33,7 @@ A **module** is a Terraform module published to the Terraform Registry at the re
 
 - **Module ID**: `namespace/name/provider/version` (e.g., `terraform-ibm-modules/cbr/ibm/1.33.6`)
 - **Use with**: `search_modules`, `get_module_details`, Terraform registry source
-- **Terraform usage**: 
+- **Terraform usage**:
   ```terraform
   module "cbr" {
     source  = "terraform-ibm-modules/cbr/ibm"
