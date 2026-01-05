@@ -34,6 +34,8 @@ dev = [
     "hypothesis==6.148.11",
 ]
 
+[tool.uv]
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
