@@ -26,22 +26,22 @@ from ..utils.cache import Cache
 def is_prerelease_version(version: str) -> bool:
     """
     Check if a version string is a pre-release version.
-    
+
     Pre-release versions contain identifiers like:
     - beta, alpha, rc (release candidate)
     - draft, dev, pre
     - Any version with a hyphen followed by additional identifiers
-    
+
     Examples:
         - "2.0.1-beta" -> True
         - "2.0.1-draft-addons" -> True
         - "1.0.0-rc.1" -> True
         - "2.0.1" -> False
         - "1.2.3" -> False
-    
+
     Args:
         version: Version string to check
-        
+
     Returns:
         True if the version is a pre-release, False otherwise
     """
@@ -461,13 +461,16 @@ class TerraformClient:
                 all_versions = []
             else:
                 versions_list = modules[0].get("versions", [])
-                all_versions = [v.get("version") for v in versions_list if v.get("version")]
-            
+                all_versions = [
+                    v.get("version") for v in versions_list if v.get("version")
+                ]
+
             # Filter out pre-release versions (beta, alpha, rc, draft, etc.)
             versions = [v for v in all_versions if not is_prerelease_version(v)]
-            
+
             # Sort versions in descending order (latest first) using semantic versioning
-            from packaging.version import Version, InvalidVersion
+            from packaging.version import InvalidVersion, Version
+
             try:
                 versions.sort(key=lambda v: Version(v), reverse=True)
             except InvalidVersion:

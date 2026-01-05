@@ -15,7 +15,7 @@ import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Any
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -133,18 +133,18 @@ OUTPUT_FILENAME = "module_index.json"
 def categorize_module(module_name: str, description: str) -> str:
     """
     Categorize a module based on its name and description.
-    
+
     Args:
         module_name: The name of the module
         description: The description of the module
-        
+
     Returns:
         The category name as a string, or "other" if no category matches
     """
     # Handle None values gracefully
     module_name = module_name or ""
     description = description or ""
-    
+
     search_text = f"{module_name} {description}".lower()
 
     for category, keywords in CATEGORY_KEYWORDS.items():
@@ -157,10 +157,10 @@ def categorize_module(module_name: str, description: str) -> str:
 def clean_excerpt(text: str) -> str:
     """
     Clean up README excerpt by removing unicode symbols and normalizing whitespace.
-    
+
     Args:
         text: The text to clean
-        
+
     Returns:
         The cleaned text with normalized whitespace and removed symbols
     """
@@ -175,9 +175,9 @@ def clean_excerpt(text: str) -> str:
         "\u00a0": " ",  # non-breaking space
         "&reg;": "",
         "&trade;": "",
-        "&copy;": ""
+        "&copy;": "",
     }
-    
+
     for symbol, replacement in replacements.items():
         text = text.replace(symbol, replacement)
 
@@ -196,13 +196,13 @@ def clean_excerpt(text: str) -> str:
     return text.strip()
 
 
-def parse_iso_date(date_str: str) -> Optional[datetime]:
+def parse_iso_date(date_str: str) -> datetime | None:
     """
     Parse an ISO format date string into a datetime object.
-    
+
     Args:
         date_str: ISO format date string
-        
+
     Returns:
         Datetime object or None if parsing fails
     """
@@ -214,20 +214,17 @@ def parse_iso_date(date_str: str) -> Optional[datetime]:
 
 
 async def fetch_submodule_description(
-    gh_client: GitHubClient,
-    owner: str,
-    repo: str,
-    submodule_path: str
+    gh_client: GitHubClient, owner: str, repo: str, submodule_path: str
 ) -> str:
     """
     Extract a brief description from a submodule's README.
-    
+
     Args:
         gh_client: GitHubClient instance
         owner: Repository owner
         repo: Repository name
         submodule_path: Path to the submodule directory
-        
+
     Returns:
         Brief description extracted from the submodule's README
     """
@@ -236,13 +233,13 @@ async def fetch_submodule_description(
         readme_path = f"{submodule_path}/README.md"
         readme_data = await gh_client.get_file_content(owner, repo, readme_path)
         content = readme_data.get("decoded_content", "")
-        
+
         if not content:
             return ""
-        
+
         # Extract first meaningful paragraph (simple extraction)
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
-        
+
         in_html_comment = False
         for para in paragraphs:
             # Track HTML comment state
@@ -251,33 +248,33 @@ async def fetch_submodule_description(
             if "-->" in para:
                 in_html_comment = False
                 continue  # Skip the closing comment line
-            
+
             # Skip if we're inside a comment
             if in_html_comment:
                 continue
-            
+
             # Skip headers
             if para.startswith("#"):
                 continue
-            
+
             # Skip code blocks
             if para.startswith("```"):
                 continue
-                
+
             # Skip badges
             if "[![" in para[:50]:
                 continue
-                
+
             # Skip markdown tables
             if para.startswith("|") or "|---" in para[:100]:
                 continue
-            
+
             # Found a meaningful paragraph
             # Clean it up: remove inline markdown links and normalize whitespace
             clean_para = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", para)
             # Normalize whitespace (replace multiple spaces/newlines with single space)
             clean_para = " ".join(clean_para.split())
-            
+
             # Check if this paragraph ends with a colon (e.g., "following:")
             # and is followed by a bullet list
             if clean_para.rstrip().endswith(":"):
@@ -302,7 +299,7 @@ async def fetch_submodule_description(
                             # Remove any nested bullets or extra formatting
                             if item and len(item) < 80:
                                 bullet_items.append(item)
-                    
+
                     if bullet_items:
                         # Combine the intro text with comma-separated list and add "etc" at the end
                         items_str = ", ".join(bullet_items[:5])
@@ -317,35 +314,35 @@ async def fetch_submodule_description(
                         if len(description) > 1200:
                             # Find last space before the 1197 char limit
                             truncated = description[:1197]
-                            last_space = truncated.rfind(' ')
+                            last_space = truncated.rfind(" ")
                             if last_space > 0:
                                 description = description[:last_space] + "..."
                             else:
                                 description = description[:1197] + "..."
                         return description
-            
+
             # Take first sentence or limit to ~150 chars
             sentences = clean_para.split(". ")
             if sentences:
                 description = sentences[0]
                 if not description.endswith("."):
                     description += "."
-                
+
                 # Limit length, truncating at word boundary
                 if len(description) > 1200:
                     # Find last space before the 1197 char limit
                     truncated = description[:1197]
-                    last_space = truncated.rfind(' ')
+                    last_space = truncated.rfind(" ")
                     if last_space > 0:
                         description = description[:last_space] + "..."
                     else:
                         description = description[:1197] + "..."
-                    
+
                 return description
-        
+
         return ""
-        
-    except Exception as e:
+
+    except Exception:
         # Silently fail - it's okay if we can't get a description
         return ""
 
@@ -356,11 +353,11 @@ async def fetch_submodules(
     namespace: str,
     name: str,
     provider: str,
-    source: str
-) -> List[Dict[str, str]]:
+    source: str,
+) -> list[dict[str, str]]:
     """
     Fetch submodules for a Terraform module with descriptions.
-    
+
     Args:
         tf_client: TerraformClient instance
         gh_client: GitHubClient instance
@@ -368,7 +365,7 @@ async def fetch_submodules(
         name: Module name
         provider: Module provider
         source: Module source URL
-        
+
     Returns:
         List of submodule dictionaries with path, name, source_url, and description
     """
@@ -377,11 +374,13 @@ async def fetch_submodules(
         # Get the latest stable version (filters out pre-releases)
         versions = await tf_client.get_module_versions(namespace, name, provider)
         if not versions:
-            print(f"Warning: No stable versions found for {namespace}/{name}/{provider}")
+            print(
+                f"Warning: No stable versions found for {namespace}/{name}/{provider}"
+            )
             return []
-        
+
         latest_stable_version = versions[0]
-        
+
         module_details = await tf_client.get_module_details(
             namespace, name, provider, latest_stable_version
         )
@@ -396,7 +395,7 @@ async def fetch_submodules(
 
         # Extract submodules
         raw_submodules = module_details.get("submodules", [])
-        
+
         # Fetch all submodule descriptions in parallel
         async def fetch_single_submodule(submodule):
             submodule_path = submodule.get("path", "")
@@ -404,11 +403,9 @@ async def fetch_submodules(
 
             # Generate GitHub source URL for submodule
             submodule_source_url = (
-                f"{source}/tree/main/{submodule_path}"
-                if submodule_path
-                else source
+                f"{source}/tree/main/{submodule_path}" if submodule_path else source
             )
-            
+
             # Fetch description from submodule's README
             description = ""
             if owner and repo and submodule_path:
@@ -422,13 +419,13 @@ async def fetch_submodules(
                 "description": description,
                 "source_url": submodule_source_url,
             }
-        
+
         # Fetch all submodules in parallel
         submodules = await asyncio.gather(
             *[fetch_single_submodule(sub) for sub in raw_submodules],
-            return_exceptions=True
+            return_exceptions=True,
         )
-        
+
         # Filter out any exceptions
         submodules = [sub for sub in submodules if isinstance(sub, dict)]
 
@@ -441,18 +438,18 @@ async def fetch_submodules(
     return submodules
 
 
-def extract_bullet_items(bullet_text: str, max_length: int = 80) -> List[str]:
+def extract_bullet_items(bullet_text: str, max_length: int = 80) -> list[str]:
     """
     Extract bullet items from a markdown bullet list.
-    
+
     This function parses markdown bullet lists (lines starting with - or *),
     cleans up the items by removing markdown formatting, and returns a list
     of the extracted items.
-    
+
     Args:
         bullet_text: Text containing bullet points
         max_length: Maximum length for each bullet item
-        
+
     Returns:
         List of cleaned bullet items
     """
@@ -462,48 +459,48 @@ def extract_bullet_items(bullet_text: str, max_length: int = 80) -> List[str]:
         if line.startswith("-") or line.startswith("*"):
             # Remove the bullet marker and leading/trailing whitespace
             item = line.lstrip("-*").strip()
-            
+
             # Remove markdown links but keep the link text
             item = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", item)
-            
+
             # Extract just the first part before colon
             if ":" in item:
                 item = item.split(":")[0].strip()
-                
+
             if len(item) > 0 and len(item) < max_length:
                 items.append(item)
-    
+
     return items
 
 
 def should_skip_paragraph(para: str) -> bool:
     """
     Determine if a paragraph should be skipped when extracting README excerpts.
-    
+
     This function checks for common patterns in README files that should be
     skipped when extracting meaningful descriptions, such as code blocks,
     badges, tables, and boilerplate text.
-    
+
     Args:
         para: Paragraph text
-        
+
     Returns:
         True if paragraph should be skipped, False otherwise
     """
     para_lower = para.lower()
-    
+
     # Skip code blocks
     if para.startswith("```"):
         return True
-        
+
     # Skip badges
     if "[![" in para[:50]:
         return True
-        
+
     # Skip markdown tables
     if para.startswith("|") or "|---" in para[:100]:
         return True
-        
+
     # Skip permissions/requirements boilerplate
     skip_phrases = [
         "you need the following permissions",
@@ -513,28 +510,28 @@ def should_skip_paragraph(para: str) -> bool:
         "uncomment the following",
         "prerequisites",
     ]
-    
+
     if any(skip in para_lower for skip in skip_phrases):
         return True
-        
+
     return False
 
 
 async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
     """
     Extract a meaningful excerpt from a module's README.
-    
+
     This function fetches the README.md file from a GitHub repository and
     extracts a meaningful description by:
     1. Looking for paragraphs containing descriptive phrases about the module
     2. Extracting bullet points that describe features
     3. Cleaning up the text by removing markdown formatting and HTML comments
     4. Falling back to the first meaningful paragraph if no descriptive text is found
-    
+
     Args:
         gh_client: GitHubClient instance
         source: Module source URL
-        
+
     Returns:
         Cleaned README excerpt
     """
@@ -544,7 +541,7 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
         owner_repo = gh_client.parse_github_url(source)
         if not owner_repo:
             return ""
-            
+
         owner, repo = owner_repo
         readme_data = await gh_client.get_file_content(owner, repo, "README.md")
         content = readme_data.get("decoded_content", "")
@@ -581,7 +578,7 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
                 "terraform module",
                 "a module for",
             ]
-            
+
             if any(phrase in para_lower for phrase in descriptive_phrases):
                 # Extract the descriptive text, removing HTML comments and headers
                 lines = para.split("\n")
@@ -613,17 +610,22 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
                         continue
 
                     # Skip placeholder/template text
-                    if ("use real values" in stripped.lower() or
-                        "var.<var_name>" in stripped.lower()):
+                    if (
+                        "use real values" in stripped.lower()
+                        or "var.<var_name>" in stripped.lower()
+                    ):
                         continue
 
                     # Skip standalone URLs
-                    if (stripped.startswith("http://") or
-                        stripped.startswith("https://")):
+                    if stripped.startswith("http://") or stripped.startswith(
+                        "https://"
+                    ):
                         continue
 
                     # Check if this is a bullet item
-                    if stripped and (stripped.startswith("-") or stripped.startswith("*")):
+                    if stripped and (
+                        stripped.startswith("-") or stripped.startswith("*")
+                    ):
                         # Extract bullet item text
                         item = stripped.lstrip("-*").strip()
                         # Remove markdown links but keep the link text
@@ -656,14 +658,16 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
 
                     # Also check if the next paragraph is a bullet list
                     # If the excerpt ends with ":" and next para has bullets, append them
-                    if (readme_excerpt.rstrip().endswith(":") and
-                        i + 1 < len(paragraphs)):
+                    if readme_excerpt.rstrip().endswith(":") and i + 1 < len(
+                        paragraphs
+                    ):
                         next_para = paragraphs[i + 1]
                         # Check if next paragraph is a bullet list
-                        if (next_para.strip().startswith("-") or
-                            next_para.strip().startswith("*")):
+                        if next_para.strip().startswith(
+                            "-"
+                        ) or next_para.strip().startswith("*"):
                             next_bullet_items = extract_bullet_items(next_para)
-                            
+
                             # Add bullet items as comma-separated list
                             if next_bullet_items:
                                 # Limit to first 5 items to keep excerpt reasonable
@@ -685,15 +689,15 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
                 if "-->" in para:
                     in_html_comment = False
                     continue  # Skip the closing comment line
-                
+
                 # Skip if we're inside a comment
                 if in_html_comment:
                     continue
-                
+
                 # Skip headers, code blocks, badges, and HTML comments
                 if should_skip_paragraph(para) or para.startswith("#"):
                     continue
-                    
+
                 # Found first real paragraph - use it
                 if para and len(para) > 30:
                     readme_excerpt = para
@@ -709,26 +713,26 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
 
 
 async def process_module(
-    module: Dict[str, Any],
+    module: dict[str, Any],
     tf_client: TerraformClient,
     gh_client: GitHubClient,
-    cutoff_date: datetime
-) -> Optional[Dict[str, Any]]:
+    cutoff_date: datetime,
+) -> dict[str, Any] | None:
     """
     Process a single module, filtering and enriching with additional data.
-    
+
     This function:
     1. Extracts basic module information (ID, name, description, etc.)
     2. Filters out modules that are too old or from incorrect sources
     3. Categorizes the module based on its name and description
     4. Fetches submodules and README excerpts to enrich the data
-    
+
     Args:
         module: Raw module data from the Terraform registry
         tf_client: TerraformClient instance for API calls
         gh_client: GitHubClient instance for GitHub API calls
         cutoff_date: Date cutoff for filtering modules
-        
+
     Returns:
         Processed module entry or None if module should be filtered out
     """
@@ -759,7 +763,9 @@ async def process_module(
 
     # Fetch submodules for this module
     print(f"Fetching submodules for {module_id}...")
-    submodules = await fetch_submodules(tf_client, gh_client, namespace, name, provider, source)
+    submodules = await fetch_submodules(
+        tf_client, gh_client, namespace, name, provider, source
+    )
 
     # Fetch README excerpt
     readme_excerpt = await extract_readme_excerpt(gh_client, source)
@@ -782,7 +788,7 @@ async def generate_module_index():
     """
     Generate the module index JSON file by fetching, filtering, and processing
     Terraform modules from the registry.
-    
+
     This function:
     1. Fetches all modules from the terraform-ibm-modules namespace
     2. Filters out modules older than the threshold (default: 90 days)
@@ -790,20 +796,20 @@ async def generate_module_index():
     4. Fetches submodules for each module
     5. Extracts meaningful excerpts from README files
     6. Generates a JSON file with the processed data
-    
+
     The output file is written to the static directory with the name defined
     in OUTPUT_FILENAME.
-    
+
     Raises:
         EnvironmentError: If GITHUB_TOKEN environment variable is not set
     """
     print("Starting module index generation...")
-    
+
     # Check for GitHub token to fail fast with a clear error message
     # Skip this check in test environments
     is_test = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
     if not os.environ.get("GITHUB_TOKEN") and not is_test:
-        raise EnvironmentError(
+        raise OSError(
             "GITHUB_TOKEN environment variable is not set. "
             "This is required to access GitHub API and avoid 403 errors."
         )
@@ -827,26 +833,34 @@ async def generate_module_index():
 
         # Process modules in parallel (with concurrency limit to avoid overwhelming the API)
         print("Processing modules in parallel...")
-        
+
         # Process in batches to avoid overwhelming the API
         batch_size = 10
         filtered_modules = []
-        
+
         for i in range(0, len(all_modules), batch_size):
-            batch = all_modules[i:i + batch_size]
+            batch = all_modules[i : i + batch_size]
             batch_results = await asyncio.gather(
-                *[process_module(module, tf_client, gh_client, cutoff_date) for module in batch],
-                return_exceptions=True
+                *[
+                    process_module(module, tf_client, gh_client, cutoff_date)
+                    for module in batch
+                ],
+                return_exceptions=True,
             )
-            
+
             # Filter out None results and exceptions
-            filtered_modules.extend([
-                result for result in batch_results 
-                if result is not None and not isinstance(result, Exception)
-            ])
-            
+            filtered_modules.extend(
+                [
+                    result
+                    for result in batch_results
+                    if result is not None and not isinstance(result, Exception)
+                ]
+            )
+
             # Print progress
-            print(f"Processed {min(i + batch_size, len(all_modules))}/{len(all_modules)} modules...")
+            print(
+                f"Processed {min(i + batch_size, len(all_modules))}/{len(all_modules)} modules..."
+            )
 
         # Sort by downloads (descending)
         filtered_modules.sort(key=lambda x: x["downloads"], reverse=True)

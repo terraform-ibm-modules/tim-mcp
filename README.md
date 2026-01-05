@@ -65,28 +65,28 @@ By connecting models to documentation and examples spread across many repositori
 Before configuring TIM-MCP, ensure you have the following installed:
 
 1. **uv Package Manager** (required for running the MCP server)
-   
+
    **macOS/Linux:**
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
-   
+
    **Windows:**
    ```powershell
    winget install --id=astral-sh.uv -e
    ```
-   
+
    Verify installation:
    ```bash
    uv --version
    ```
 
 2. **GitHub Personal Access Token** (optional but recommended)
-   
+
    A GitHub token helps avoid API rate limits when accessing TIM repositories:
    - Without token: 60 requests/hour
    - With token: 5,000 requests/hour
-   
+
    To create a token:
    - Go to: **GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens**
    - Create a token with:
