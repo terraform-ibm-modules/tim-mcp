@@ -1,0 +1,75 @@
+apiVersion: smithery.ai/v1
+kind: MCPServer
+metadata:
+  name: tim-mcp
+  displayName: "Terraform IBM Modules MCP"
+  description: "Structured access to the Terraform IBM Modules ecosystem. Discover, explore, and retrieve detailed information about IBM Cloud Terraform modules with real-time data from the Terraform Registry."
+  author: "IBM Terraform Modules Team"
+  license: "Apache-2.0"
+  repository: "https://github.com/terraform-ibm-modules/tim-mcp"
+  homepage: "https://github.com/terraform-ibm-modules/tim-mcp"
+
+spec:
+  runtime: "python"
+  pythonVersion: ">=3.11"
+
+  # Entry point for the MCP server
+  command: "python"
+  args:
+    - "-m"
+    - "tim_mcp.main"
+
+  # Installation method - use uvx for local installation
+  installation:
+    method: "uv"
+    command: "uvx"
+    args:
+      - "--from"
+      - "git+https://github.com/terraform-ibm-modules/tim-mcp.git"
+      - "tim-mcp"
+
+  # Environment variables that can be configured
+  environment:
+    optional:
+      - name: "GITHUB_TOKEN"
+        description: "GitHub Personal Access Token to avoid API rate limits (recommended). With token: 5,000 requests/hour. Without: 60 requests/hour"
+        required: false
+
+  # Server capabilities and features
+  features:
+    - name: "module-search"
+      description: "Search for Terraform IBM modules in the registry with quality-based ranking"
+    - name: "module-details"
+      description: "Get structured information about module inputs, outputs, and dependencies"
+    - name: "repository-exploration"
+      description: "Navigate examples, submodules, and implementation patterns"
+    - name: "content-retrieval"
+      description: "Access documentation, example code, and repository files"
+    - name: "white-paper-access"
+      description: "Access the IBM Cloud Terraform Best Practices white paper"
+
+  # System requirements
+  systemRequirements:
+    - "Python 3.11 or higher"
+    - "uv package manager (for installation)"
+    - "GitHub API access (optional GitHub token recommended)"
+
+  # Categories and tags for discovery
+  tags:
+    - "terraform"
+    - "infrastructure-as-code"
+    - "ibm-cloud"
+    - "modules"
+    - "devops"
+
+  # Supported clients (using Smithery CLI names)
+  clients:
+    - "claude"
+    - "vscode"
+    - "cursor"
+    - "claude-code"
+    - "windsurf"
+
+  # Status and maturity
+  status: "experimental"
+  maturity: "beta"
