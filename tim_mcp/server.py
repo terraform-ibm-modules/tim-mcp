@@ -18,6 +18,7 @@ from .config import Config, load_config
 from .exceptions import TIMError
 from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
+from .prompts import register_prompts
 from .types import (
     GetContentRequest,
     ListContentRequest,
@@ -78,6 +79,9 @@ mcp = FastMCP(
     "TIM-MCP",
     instructions=_load_instructions(),
 )
+
+# Register prompts
+register_prompts(mcp)
 
 
 def _sanitize_list_parameter(param: Any, param_name: str) -> list[str] | None:
