@@ -32,14 +32,31 @@ class Config(BaseModel):
 
     # Cache Configuration
     cache_ttl: int = Field(3600, ge=60, description="Cache TTL in seconds")
-    cache_dir: str | None = Field(None, description="Cache directory path")
+    cache_maxsize: int = Field(
+        1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
+    )
 
     # Request Configuration
     request_timeout: int = Field(30, ge=1, description="Request timeout in seconds")
     max_retries: int = Field(3, ge=0, description="Maximum retry attempts")
     retry_backoff: float = Field(1.0, ge=0.1, description="Retry backoff factor")
 
-    # Rate Limiting
+    # Rate Limiting Configuration
+    global_rate_limit: int = Field(
+        30,
+        ge=1,
+        description="Global rate limit: max requests per minute across all clients"
+    )
+    per_ip_rate_limit: int = Field(
+        10,
+        ge=1,
+        description="Per-IP rate limit: max requests per minute per client IP (HTTP mode only)"
+    )
+    rate_limit_window: int = Field(
+        60,
+        ge=1,
+        description="Rate limit time window in seconds"
+    )
     respect_rate_limits: bool = Field(
         True, description="Whether to respect API rate limits"
     )
@@ -90,8 +107,8 @@ def load_config() -> Config:
         if cache_ttl := os.getenv("TIM_CACHE_TTL"):
             config_data["cache_ttl"] = int(cache_ttl)
 
-        if cache_dir := os.getenv("TIM_CACHE_DIR"):
-            config_data["cache_dir"] = cache_dir
+        if cache_maxsize := os.getenv("TIM_CACHE_MAXSIZE"):
+            config_data["cache_maxsize"] = int(cache_maxsize)
 
         # Request configuration
         if request_timeout := os.getenv("TIM_REQUEST_TIMEOUT"):
@@ -104,6 +121,15 @@ def load_config() -> Config:
             config_data["retry_backoff"] = float(retry_backoff)
 
         # Rate limiting
+        if global_rate_limit := os.getenv("TIM_GLOBAL_RATE_LIMIT"):
+            config_data["global_rate_limit"] = int(global_rate_limit)
+
+        if per_ip_rate_limit := os.getenv("TIM_PER_IP_RATE_LIMIT"):
+            config_data["per_ip_rate_limit"] = int(per_ip_rate_limit)
+
+        if rate_limit_window := os.getenv("TIM_RATE_LIMIT_WINDOW"):
+            config_data["rate_limit_window"] = int(rate_limit_window)
+
         if respect_rate_limits := os.getenv("TIM_RESPECT_RATE_LIMITS"):
             config_data["respect_rate_limits"] = respect_rate_limits.lower() == "true"
 

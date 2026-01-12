@@ -24,11 +24,30 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
+from .utils.rate_limiter import RateLimiter
 
 # Global configuration and logger
 config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
+
+# Initialize global rate limiter
+global_rate_limiter = RateLimiter(
+    max_requests=config.global_rate_limit,
+    window_seconds=config.rate_limit_window,
+)
+
+# Set rate limiters for client modules
+from .clients import github_client, terraform_client
+
+github_client.set_global_limiter(global_rate_limiter)
+terraform_client.set_global_limiter(global_rate_limiter)
+
+logger.info(
+    "Rate limiter initialized",
+    global_rate_limit=config.global_rate_limit,
+    rate_limit_window=config.rate_limit_window,
+)
 
 
 def _find_static_file(filename: str) -> Path:
@@ -615,6 +634,27 @@ def main(transport_config=None):
         logger.info(
             f"Starting stateless HTTP server on {transport_config.host}:{transport_config.port}"
         )
+
+        # Add per-IP rate limiting middleware for HTTP mode
+        from .middleware import PerIPRateLimitMiddleware
+
+        per_ip_limiter = RateLimiter(
+            max_requests=config.per_ip_rate_limit,
+            window_seconds=config.rate_limit_window,
+        )
+
+        mcp.app.add_middleware(
+            PerIPRateLimitMiddleware,
+            rate_limiter=per_ip_limiter,
+            bypass_paths=["/health"],
+        )
+
+        logger.info(
+            "Per-IP rate limiting enabled",
+            per_ip_rate_limit=config.per_ip_rate_limit,
+            rate_limit_window=config.rate_limit_window,
+        )
+
         mcp.run(
             transport="http",
             host=transport_config.host,

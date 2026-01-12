@@ -20,7 +20,22 @@ from tenacity import (
 from ..config import Config, get_terraform_registry_headers
 from ..exceptions import RateLimitError, TerraformRegistryError
 from ..logging import get_logger, log_api_request, log_cache_operation
-from ..utils.cache import Cache
+from ..utils.cache import InMemoryCache
+from ..utils.rate_limiter import RateLimiter, with_rate_limit
+
+# Module-level global rate limiter (shared across all TerraformClient instances)
+_global_limiter: RateLimiter | None = None
+
+
+def set_global_limiter(limiter: RateLimiter) -> None:
+    """
+    Set the global rate limiter for all TerraformClient instances.
+
+    Args:
+        limiter: RateLimiter instance to use
+    """
+    global _global_limiter
+    _global_limiter = limiter
 
 
 def is_prerelease_version(version: str) -> bool:
@@ -54,7 +69,7 @@ def is_prerelease_version(version: str) -> bool:
 class TerraformClient:
     """Async client for interacting with Terraform Registry API."""
 
-    def __init__(self, config: Config, cache: Cache | None = None):
+    def __init__(self, config: Config, cache: InMemoryCache | None = None):
         """
         Initialize the Terraform client.
 
@@ -63,7 +78,9 @@ class TerraformClient:
             cache: Cache instance, or None to create a new one
         """
         self.config = config
-        self.cache = cache or Cache(ttl=config.cache_ttl)
+        self.cache = cache or InMemoryCache(
+            ttl=config.cache_ttl, maxsize=config.cache_maxsize
+        )
         self.logger = get_logger(__name__, client="terraform")
 
         # Configure HTTP client
@@ -86,6 +103,11 @@ class TerraformClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, query, namespace=None, limit=10, offset=0: f"module_search_{query}_{namespace}_{limit}_{offset}",
     )
     async def search_modules(
         self,
@@ -186,6 +208,11 @@ class TerraformClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, namespace: f"list_all_modules_{namespace}",
     )
     async def list_all_modules(
         self,
@@ -308,6 +335,11 @@ class TerraformClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, namespace, name, provider, version="latest": f"module_details_{namespace}_{name}_{provider}_{version}",
+    )
     async def get_module_details(
         self, namespace: str, name: str, provider: str, version: str = "latest"
     ) -> dict[str, Any]:
@@ -404,6 +436,11 @@ class TerraformClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, namespace, name, provider: f"module_versions_{namespace}_{name}_{provider}",
     )
     async def get_module_versions(
         self, namespace: str, name: str, provider: str
@@ -523,6 +560,11 @@ class TerraformClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, namespace, name: f"provider_info_{namespace}_{name}",
     )
     async def get_provider_info(self, namespace: str, name: str) -> dict[str, Any]:
         """
