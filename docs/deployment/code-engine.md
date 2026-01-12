@@ -62,12 +62,51 @@ ibmcloud cr namespace-list
 
 ## Step 3: Build and Push Container Image
 
+### Option A: Using Code Engine Build Service (Recommended)
+
+The Code Engine build service ensures the image is built for the correct platform (linux/amd64):
+
 ```bash
 # Navigate to tim-mcp directory
 cd /path/to/tim-mcp
 
-# Build the Docker image
-docker build -t us.icr.io/tim-mcp/tim-mcp:latest .
+# Create a build configuration
+ibmcloud ce build create --name tim-mcp-build \
+  --source https://github.com/terraform-ibm-modules/tim-mcp \
+  --commit main \
+  --context-dir . \
+  --dockerfile Dockerfile \
+  --image us.icr.io/tim-mcp/tim-mcp:latest \
+  --registry-secret icr-secret \
+  --size medium
+
+# Note: First create the registry secret if it doesn't exist:
+# ibmcloud ce registry create --name icr-secret \
+#   --server us.icr.io \
+#   --username iamapikey \
+#   --password <your-ibm-cloud-api-key>
+
+# Submit a build run
+ibmcloud ce buildrun submit --build tim-mcp-build --name tim-mcp-buildrun-1
+
+# Follow the build logs
+ibmcloud ce buildrun logs -f -n tim-mcp-buildrun-1
+
+# Verify the image
+ibmcloud cr image-list --restrict tim-mcp
+```
+
+### Option B: Local Docker Build
+
+If building locally, you must specify the platform to ensure compatibility with Code Engine:
+
+```bash
+# Navigate to tim-mcp directory
+cd /path/to/tim-mcp
+
+# Build the Docker image for linux/amd64 platform
+# IMPORTANT: Code Engine requires linux/amd64 images
+docker build --platform linux/amd64 -t us.icr.io/tim-mcp/tim-mcp:latest .
 
 # Login to IBM Container Registry
 ibmcloud cr login
@@ -78,6 +117,12 @@ docker push us.icr.io/tim-mcp/tim-mcp:latest
 # Verify the image
 ibmcloud cr image-list --restrict tim-mcp
 ```
+
+**Platform Architecture Note**:
+- Code Engine runs on AMD64/x86_64 architecture
+- If building on ARM64 systems (e.g., Apple Silicon Macs), you MUST use `--platform linux/amd64`
+- Without the platform flag, the image may fail to start with "no match for platform in manifest" errors
+- The Code Engine build service (Option A) handles this automatically
 
 ## Step 4: Create Code Engine Project
 
@@ -175,6 +220,7 @@ For convenience, use the provided deployment script:
 export GITHUB_TOKEN=<your-github-token>
 export IBM_CLOUD_REGION=us-south
 export IBM_CLOUD_RESOURCE_GROUP=default
+export GIT_BRANCH=main  # Optional, defaults to main
 
 # Run deployment script
 ./scripts/deploy-code-engine.sh
@@ -184,18 +230,43 @@ export IBM_CLOUD_RESOURCE_GROUP=default
 ```
 
 The script handles:
-- Building the container image
-- Pushing to IBM Container Registry
+- Building the container image using Code Engine build service (ensures correct platform)
+- Creating/updating build configuration
+- Submitting build runs and monitoring progress
 - Creating/updating secrets
 - Deploying/updating the Code Engine application
+
+**Note**: The deployment script uses Code Engine's build service instead of local Docker builds to ensure the image is built for the correct platform (linux/amd64), avoiding platform architecture mismatch errors.
 
 ## Updating the Application
 
 To deploy a new version:
 
+### Using Code Engine Build Service (Recommended)
+
 ```bash
-# Build and push new image
-docker build -t us.icr.io/tim-mcp/tim-mcp:v1.0.1 .
+# Update the build to point to the new version/branch
+ibmcloud ce build update --name tim-mcp-build \
+  --commit v1.0.1 \
+  --image us.icr.io/tim-mcp/tim-mcp:v1.0.1
+
+# Submit a new build run
+ibmcloud ce buildrun submit --build tim-mcp-build
+
+# Update application with new image
+ibmcloud ce application update --name tim-mcp \
+  --image us.icr.io/tim-mcp/tim-mcp:v1.0.1
+
+# Verify update
+ibmcloud ce application get --name tim-mcp
+```
+
+### Using Local Docker Build
+
+```bash
+# Build and push new image with platform flag
+docker build --platform linux/amd64 -t us.icr.io/tim-mcp/tim-mcp:v1.0.1 .
+ibmcloud cr login
 docker push us.icr.io/tim-mcp/tim-mcp:v1.0.1
 
 # Update application
@@ -329,6 +400,41 @@ ibmcloud ce application update --name tim-mcp --memory 1G
 # Check memory usage in logs
 ibmcloud ce application logs --name tim-mcp | grep -i memory
 ```
+
+### Platform Architecture Mismatch
+
+**Symptom**: Image pull errors with "no match for platform in manifest: not found"
+
+**Cause**: Docker image was built for the wrong CPU architecture (e.g., ARM64 instead of AMD64)
+
+**Solutions**:
+
+1. **Use Code Engine Build Service** (Recommended):
+   ```bash
+   # Create and run a build using Code Engine
+   ibmcloud ce build create --name tim-mcp-build \
+     --source https://github.com/terraform-ibm-modules/tim-mcp \
+     --commit main \
+     --dockerfile Dockerfile \
+     --image us.icr.io/tim-mcp/tim-mcp:latest \
+     --registry-secret icr-secret \
+     --size medium
+
+   ibmcloud ce buildrun submit --build tim-mcp-build
+   ```
+
+2. **Rebuild with Correct Platform Locally**:
+   ```bash
+   # Rebuild image for AMD64 platform
+   docker build --platform linux/amd64 -t us.icr.io/tim-mcp/tim-mcp:latest .
+   docker push us.icr.io/tim-mcp/tim-mcp:latest
+
+   # Update application to pull new image
+   ibmcloud ce application update --name tim-mcp \
+     --image us.icr.io/tim-mcp/tim-mcp:latest
+   ```
+
+**Prevention**: Always build images for linux/amd64 when deploying to Code Engine, especially when building on ARM64 systems (Apple Silicon Macs)
 
 ## Cost Optimization
 
