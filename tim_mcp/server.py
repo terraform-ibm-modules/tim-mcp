@@ -643,7 +643,7 @@ def main(transport_config=None):
             window_seconds=config.rate_limit_window,
         )
 
-        mcp.app.add_middleware(
+        mcp.add_middleware(
             PerIPRateLimitMiddleware,
             rate_limiter=per_ip_limiter,
             bypass_paths=["/health"],
