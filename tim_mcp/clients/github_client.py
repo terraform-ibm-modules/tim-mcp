@@ -21,13 +21,28 @@ from tenacity import (
 from ..config import Config, get_github_auth_headers
 from ..exceptions import GitHubError, ModuleNotFoundError, RateLimitError
 from ..logging import get_logger, log_api_request, log_cache_operation
-from ..utils.cache import Cache
+from ..utils.cache import InMemoryCache
+from ..utils.rate_limiter import RateLimiter, with_rate_limit
+
+# Module-level global rate limiter (shared across all GitHubClient instances)
+_global_limiter: RateLimiter | None = None
+
+
+def set_global_limiter(limiter: RateLimiter) -> None:
+    """
+    Set the global rate limiter for all GitHubClient instances.
+
+    Args:
+        limiter: RateLimiter instance to use
+    """
+    global _global_limiter
+    _global_limiter = limiter
 
 
 class GitHubClient:
     """Async client for interacting with GitHub API."""
 
-    def __init__(self, config: Config, cache: Cache | None = None):
+    def __init__(self, config: Config, cache: InMemoryCache | None = None):
         """
         Initialize the GitHub client.
 
@@ -36,7 +51,9 @@ class GitHubClient:
             cache: Cache instance, or None to create a new one
         """
         self.config = config
-        self.cache = cache or Cache(ttl=config.cache_ttl)
+        self.cache = cache or InMemoryCache(
+            ttl=config.cache_ttl, maxsize=config.cache_maxsize
+        )
         self.logger = get_logger(__name__, client="github")
 
         # Configure HTTP client
@@ -166,6 +183,11 @@ class GitHubClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo: f"repo_info_{owner}_{repo}",
+    )
     async def get_repository_info(self, owner: str, repo: str) -> dict[str, Any]:
         """
         Get repository information.
@@ -258,6 +280,11 @@ class GitHubClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo, path="", ref="HEAD": f"dir_contents_{owner}_{repo}_{path}_{ref}",
     )
     async def get_directory_contents(
         self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
@@ -364,6 +391,11 @@ class GitHubClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo, path, ref="HEAD": f"file_content_{owner}_{repo}_{path}_{ref}",
+    )
     async def get_file_content(
         self, owner: str, repo: str, path: str, ref: str = "HEAD"
     ) -> dict[str, Any]:
@@ -469,6 +501,11 @@ class GitHubClient:
             self.logger.error("Request error getting file content", error=str(e))
             raise GitHubError(f"Request error getting file content: {e}") from e
 
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo, ref="HEAD", recursive=True: f"repo_tree_{owner}_{repo}_{ref}_{recursive}",
+    )
     async def get_repository_tree(
         self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
     ) -> list[dict[str, Any]]:
@@ -680,6 +717,11 @@ class GitHubClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo: f"latest_release_{owner}_{repo}",
+    )
     async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any]:
         """
         Get the latest release for a repository.
@@ -770,6 +812,11 @@ class GitHubClient:
             self.logger.error("Request error getting latest release", error=str(e))
             raise GitHubError(f"Request error getting latest release: {e}") from e
 
+    @with_rate_limit(
+        global_limiter=lambda: _global_limiter,
+        cache=lambda self: self.cache,
+        cache_key_fn=lambda self, owner, repo, version="latest": f"resolve_version_{owner}_{repo}_{version}",
+    )
     async def resolve_version(
         self, owner: str, repo: str, version: str = "latest"
     ) -> str:

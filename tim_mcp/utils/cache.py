@@ -1,86 +1,85 @@
 """
 Cache utilities for Tim MCP.
 
-This module provides caching functionality to improve performance
-by storing frequently accessed data.
+This module provides in-memory caching functionality with TTL and LRU eviction
+to improve performance by storing frequently accessed data.
 """
 
-import json
-import logging
-import os
-import time
-from pathlib import Path
+import threading
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from cachetools import TTLCache
+
+from ..logging import get_logger
+
+logger = get_logger(__name__)
 
 
-class Cache:
-    """Simple file-based cache implementation."""
+class InMemoryCache:
+    """
+    Thread-safe in-memory cache with TTL and LRU eviction.
 
-    def __init__(self, cache_dir: str | None = None, ttl: int = 3600):
+    Uses cachetools.TTLCache for automatic expiration and eviction.
+    Maintains a separate stale cache for graceful degradation during rate limiting.
+    """
+
+    def __init__(self, ttl: int = 3600, maxsize: int = 1000):
         """
-        Initialize the cache.
+        Initialize the in-memory cache.
 
         Args:
-            cache_dir: Cache directory, or None to use default
-            ttl: Time-to-live in seconds (default: 1 hour)
+            ttl: Time-to-live in seconds (default: 3600 = 1 hour)
+            maxsize: Maximum number of cache entries (default: 1000)
+                    When exceeded, least recently used entries are evicted
         """
-        if cache_dir is None:
-            home_dir = os.path.expanduser("~")
-            cache_dir = os.path.join(home_dir, ".tim-mcp", "cache")
+        # TTLCache combines LRU + TTL: evicts oldest items when full,
+        # automatically expires items after TTL
+        self._cache = TTLCache(maxsize=maxsize, ttl=ttl)
 
-        self.cache_dir = Path(cache_dir)
+        # Separate dict to store expired entries for stale fallback
+        # This allows serving old data when rate limited
+        self._stale_cache: dict[str, Any] = {}
+
+        # Reentrant lock for thread safety (allows nested calls)
+        self._lock = threading.RLock()
+
         self.ttl = ttl
+        self.maxsize = maxsize
 
-        # Create cache directory if it doesn't exist
-        os.makedirs(self.cache_dir, exist_ok=True)
-        logger.debug(f"Cache initialized at {self.cache_dir}")
+        logger.debug(
+            "In-memory cache initialized",
+            ttl=ttl,
+            maxsize=maxsize
+        )
 
-    def _get_cache_path(self, key: str) -> Path:
-        """
-        Get the file path for a cache key.
-
-        Args:
-            key: Cache key
-
-        Returns:
-            Path to cache file
-        """
-        # Convert key to a valid filename
-        safe_key = "".join(c if c.isalnum() else "_" for c in key)
-        return self.cache_dir / f"{safe_key}.json"
-
-    def get(self, key: str) -> Any:
+    def get(self, key: str, allow_stale: bool = False) -> Any:
         """
         Get a value from the cache.
 
         Args:
             key: Cache key
+            allow_stale: If True, return expired entries from stale cache
+                        (used for rate limit fallback)
 
         Returns:
-            Cached value, or None if not found or expired
+            Cached value, or None if not found
         """
-        cache_path = self._get_cache_path(key)
+        with self._lock:
+            # Check active cache first
+            if key in self._cache:
+                logger.debug("Cache hit", cache_key=key)
+                return self._cache[key]
 
-        if not cache_path.exists():
-            logger.debug(f"Cache miss for key: {key}")
-            return None
+            # If allow_stale, check stale cache
+            if allow_stale and key in self._stale_cache:
+                logger.info(
+                    "Serving stale cache entry",
+                    cache_key=key,
+                    reason="allow_stale=True"
+                )
+                return self._stale_cache[key]
 
-        try:
-            with open(cache_path) as f:
-                cache_data = json.load(f)
-
-            # Check if cache has expired
-            if time.time() - cache_data["timestamp"] > self.ttl:
-                logger.debug(f"Cache expired for key: {key}")
-                os.remove(cache_path)
-                return None
-
-            logger.debug(f"Cache hit for key: {key}")
-            return cache_data["value"]
-        except (OSError, json.JSONDecodeError, KeyError) as e:
-            logger.warning(f"Error reading cache for key {key}: {e}")
+            logger.debug("Cache miss", cache_key=key)
             return None
 
     def set(self, key: str, value: Any) -> bool:
@@ -94,19 +93,23 @@ class Cache:
         Returns:
             True if successful, False otherwise
         """
-        cache_path = self._get_cache_path(key)
+        with self._lock:
+            try:
+                # Store in both caches:
+                # - TTLCache for normal access with expiration
+                # - stale_cache for fallback when rate limited
+                self._cache[key] = value
+                self._stale_cache[key] = value
 
-        try:
-            cache_data = {"timestamp": time.time(), "value": value}
-
-            with open(cache_path, "w") as f:
-                json.dump(cache_data, f)
-
-            logger.debug(f"Cached value for key: {key}")
-            return True
-        except OSError as e:
-            logger.warning(f"Error writing cache for key {key}: {e}")
-            return False
+                logger.debug("Cached value", cache_key=key)
+                return True
+            except Exception as e:
+                logger.warning(
+                    "Error caching value",
+                    cache_key=key,
+                    error=str(e)
+                )
+                return False
 
     def invalidate(self, key: str) -> bool:
         """
@@ -118,18 +121,24 @@ class Cache:
         Returns:
             True if successful, False otherwise
         """
-        cache_path = self._get_cache_path(key)
+        with self._lock:
+            try:
+                # Remove from both caches
+                if key in self._cache:
+                    del self._cache[key]
+                    logger.debug("Invalidated cache entry", cache_key=key)
 
-        if not cache_path.exists():
-            return True
+                if key in self._stale_cache:
+                    del self._stale_cache[key]
 
-        try:
-            os.remove(cache_path)
-            logger.debug(f"Invalidated cache for key: {key}")
-            return True
-        except OSError as e:
-            logger.warning(f"Error invalidating cache for key {key}: {e}")
-            return False
+                return True
+            except Exception as e:
+                logger.warning(
+                    "Error invalidating cache",
+                    cache_key=key,
+                    error=str(e)
+                )
+                return False
 
     def clear(self) -> bool:
         """
@@ -138,12 +147,35 @@ class Cache:
         Returns:
             True if successful, False otherwise
         """
-        try:
-            for cache_file in self.cache_dir.glob("*.json"):
-                os.remove(cache_file)
+        with self._lock:
+            try:
+                self._cache.clear()
+                self._stale_cache.clear()
+                logger.debug("Cleared all cache entries")
+                return True
+            except Exception as e:
+                logger.warning("Error clearing cache", error=str(e))
+                return False
 
-            logger.debug("Cleared all cache entries")
-            return True
-        except OSError as e:
-            logger.warning(f"Error clearing cache: {e}")
-            return False
+    def get_stats(self) -> dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Returns:
+            Dictionary with cache statistics:
+            - size: Current number of active entries
+            - maxsize: Maximum cache size
+            - ttl: Time-to-live in seconds
+            - stale_entries: Number of stale entries available for fallback
+        """
+        with self._lock:
+            return {
+                "size": len(self._cache),
+                "maxsize": self.maxsize,
+                "ttl": self.ttl,
+                "stale_entries": len(self._stale_cache) - len(self._cache)
+            }
+
+
+# Backward compatibility alias
+Cache = InMemoryCache
