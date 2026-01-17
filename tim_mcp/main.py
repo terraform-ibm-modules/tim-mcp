@@ -7,6 +7,7 @@ multiple transport modes (STDIO and HTTP).
 """
 
 import logging
+import os
 import sys
 
 import click
@@ -30,8 +31,8 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--port",
     type=click.IntRange(1, 65535),
-    default=8000,
-    help="Port for HTTP server (default: 8000, requires --http)",
+    default=lambda: int(os.getenv("PORT", "8000")),
+    help="Port for HTTP server (default: from PORT env var or 8000, requires --http)",
 )
 @click.option(
     "--log-level",

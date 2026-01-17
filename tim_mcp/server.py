@@ -13,6 +13,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import ValidationError
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .config import Config, load_config
 from .exceptions import TIMError
@@ -593,6 +595,18 @@ async def module_index():
             },
             indent=2,
         )
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    """
+    Health check endpoint for container orchestration platforms.
+    Returns 200 OK with basic service information.
+    """
+    return JSONResponse({
+        "status": "healthy",
+        "service": "tim-mcp",
+    })
 
 
 def main(transport_config=None):

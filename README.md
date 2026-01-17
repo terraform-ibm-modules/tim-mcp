@@ -205,6 +205,130 @@ claude mcp remove tim-mcp
 ```
 
 
+## HTTP Deployment (Code Engine)
+
+For deploying tim-mcp as a hosted service on IBM Code Engine, see the [Code Engine Deployment Guide](docs/deployment/code-engine.md).
+
+### Running Locally in HTTP Mode
+
+You can test tim-mcp in HTTP mode on your local machine before deploying to Code Engine.
+
+**Option 1: Using uv (Recommended for Development)**
+
+```bash
+# Install dependencies
+uv sync
+
+# Run in HTTP mode
+uv run tim-mcp --http --host 127.0.0.1 --port 8080
+
+# With GitHub token
+GITHUB_TOKEN=<your-token> uv run tim-mcp --http --host 127.0.0.1 --port 8080
+```
+
+**Option 2: Using Docker**
+
+```bash
+# Build the Docker image
+docker build -t tim-mcp:local .
+
+# Run the container
+docker run -p 8080:8080 -e GITHUB_TOKEN=<your-token> tim-mcp:local
+
+# Without GitHub token (rate limited)
+docker run -p 8080:8080 tim-mcp:local
+```
+
+**Test the Local Server:**
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# List tools
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+### Environment Variables for HTTP Mode
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITHUB_TOKEN` | No | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
+| `PORT` | No | 8000 | HTTP server port (auto-configured by Code Engine) |
+| `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `TIM_CACHE_TTL` | No | 3600 | Cache TTL in seconds |
+| `TIM_REQUEST_TIMEOUT` | No | 30 | External API timeout in seconds |
+| `TIM_ALLOWED_NAMESPACES` | No | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
+
+### Testing the HTTP Endpoint
+
+Once deployed, you can test the MCP server using HTTP requests:
+
+**Health Check:**
+```bash
+curl https://<your-code-engine-url>/health
+```
+
+Expected response:
+```json
+{"status":"healthy","service":"tim-mcp"}
+```
+
+**List Available Tools:**
+```bash
+curl -X POST https://<your-code-engine-url>/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**Search for Modules:**
+```bash
+curl -X POST https://<your-code-engine-url>/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+      "name": "search_modules",
+      "arguments": {
+        "query": "vpc",
+        "limit": 3
+      }
+    }
+  }'
+```
+
+**Get Module Details:**
+```bash
+curl -X POST https://<your-code-engine-url>/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "get_module_details",
+      "arguments": {
+        "module_id": "terraform-ibm-modules/vpc/ibm"
+      }
+    }
+  }'
+```
+
+> **Note:** The MCP endpoint returns Server-Sent Events (SSE) format by default. Responses are prefixed with `event: message` and `data:`.
+
 ## Version Pinning
 
 For production use, pin to a specific version to ensure consistent behavior (using the same format as in the [Claude Desktop](#claude-desktop) section):
