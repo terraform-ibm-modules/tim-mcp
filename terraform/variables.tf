@@ -13,7 +13,7 @@ variable "region" {
 variable "resource_group_name" {
   description = "Name of the IBM Cloud resource group"
   type        = string
-  default     = "default"
+  default     = "Default"
 }
 
 variable "project_name" {

@@ -30,7 +30,7 @@ export GITHUB_TOKEN="<your-github-token>"
 
 # Optional: customize region/resource group
 export IBM_CLOUD_REGION="us-south"
-export IBM_CLOUD_RESOURCE_GROUP="default"
+export IBM_CLOUD_RESOURCE_GROUP="Default"
 
 # Run deployment script
 ./scripts/deploy-code-engine.sh
