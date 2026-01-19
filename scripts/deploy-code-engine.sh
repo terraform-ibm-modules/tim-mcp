@@ -63,9 +63,15 @@ if [ ! -d ".terraform" ]; then
   terraform init
 fi
 
-# Apply Terraform configuration
-echo "Deploying infrastructure with Terraform..."
-terraform apply -auto-approve
+# Apply Terraform configuration in two phases
+# Phase 1: Create everything except the app (since app needs image to exist)
+echo "Deploying infrastructure with Terraform (Phase 1: project, build, secrets)..."
+terraform apply -auto-approve \
+  -target=ibm_cr_namespace.namespace \
+  -target=ibm_code_engine_project.project \
+  -target=ibm_code_engine_secret.icr_secret \
+  -target=ibm_code_engine_secret.app_secrets \
+  -target=ibm_code_engine_build.build
 
 # Get values from Terraform output
 PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "tim-mcp")
@@ -118,11 +124,15 @@ if [ "$BUILD_STATUS" != "succeeded" ]; then
 fi
 
 echo ""
-echo "Step 3: Updating application with new image..."
-echo "=============================================="
+echo "Step 3: Creating/updating application..."
+echo "=========================================="
 
-# Update the application to use the new image
-ibmcloud ce app update --name "$APP_NAME" --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+# Navigate back to Terraform directory
+cd "$TERRAFORM_DIR"
+
+# Phase 2: Create the app now that the image exists
+echo "Deploying application with Terraform (Phase 2: app)..."
+terraform apply -auto-approve
 
 # Get the application URL
 APP_URL=$(ibmcloud ce app get --name "$APP_NAME" --output url 2>/dev/null || echo "")

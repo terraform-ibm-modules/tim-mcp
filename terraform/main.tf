@@ -118,4 +118,15 @@ resource "ibm_code_engine_app" "app" {
     ibm_code_engine_secret.app_secrets,
     ibm_code_engine_secret.icr_secret
   ]
+
+  # Increase timeout to allow for image build
+  timeouts {
+    create = "5m"
+    update = "5m"
+  }
+
+  # Lifecycle: allow app to be created even if not immediately ready
+  lifecycle {
+    ignore_changes = [status, status_details]
+  }
 }
