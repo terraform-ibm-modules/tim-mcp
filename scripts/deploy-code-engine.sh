@@ -1,98 +1,100 @@
 #!/bin/bash
 set -e
 
+# Deployment script for tim-mcp to IBM Code Engine
+# This script uses Terraform for infrastructure management
+
 # Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TERRAFORM_DIR="${SCRIPT_DIR}/../terraform"
 APP_NAME="tim-mcp"
-IMAGE_NAME="us.icr.io/tim-mcp/tim-mcp"
 VERSION=${1:-latest}
-REGION=${IBM_CLOUD_REGION:-us-south}
-RESOURCE_GROUP=${IBM_CLOUD_RESOURCE_GROUP:-default}
-GIT_REPO="https://github.com/terraform-ibm-modules/tim-mcp"
-GIT_BRANCH=${GIT_BRANCH:-main}
-BUILD_NAME="${APP_NAME}-build"
-REGISTRY_SECRET="icr-secret"
 
 # Validate prerequisites
+echo "Validating prerequisites..."
+
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "Error: GITHUB_TOKEN environment variable not set"
+  echo "Export it with: export GITHUB_TOKEN=<your-token>"
   exit 1
 fi
 
-echo "Building container image using Code Engine build service..."
-echo "This ensures the image is built for the correct platform (linux/amd64)"
-
-# Check if build configuration exists, create or update
-if ibmcloud ce build get --name ${BUILD_NAME} &>/dev/null; then
-  echo "Updating existing build configuration..."
-  ibmcloud ce build update --name ${BUILD_NAME} \
-    --source ${GIT_REPO} \
-    --commit ${GIT_BRANCH} \
-    --image ${IMAGE_NAME}:${VERSION}
-else
-  echo "Creating build configuration..."
-  ibmcloud ce build create --name ${BUILD_NAME} \
-    --source ${GIT_REPO} \
-    --commit ${GIT_BRANCH} \
-    --context-dir . \
-    --dockerfile Dockerfile \
-    --image ${IMAGE_NAME}:${VERSION} \
-    --registry-secret ${REGISTRY_SECRET} \
-    --size medium \
-    --timeout 900
-fi
-
-# Submit build run
-BUILDRUN_NAME="${APP_NAME}-buildrun-$(date +%s)"
-echo "Submitting build run: ${BUILDRUN_NAME}"
-ibmcloud ce buildrun submit --build ${BUILD_NAME} --name ${BUILDRUN_NAME}
-
-# Wait for build to complete by following logs
-echo "Following build logs..."
-ibmcloud ce buildrun logs -f -n ${BUILDRUN_NAME} || true
-
-# Check build status
-BUILD_STATUS=$(ibmcloud ce buildrun get -n ${BUILDRUN_NAME} --output json | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-if [ "$BUILD_STATUS" != "Succeeded" ]; then
-  echo "Error: Build failed with status: ${BUILD_STATUS}"
+if [ -z "$IBM_CLOUD_API_KEY" ]; then
+  echo "Error: IBM_CLOUD_API_KEY environment variable not set"
+  echo "Export it with: export IBM_CLOUD_API_KEY=<your-api-key>"
   exit 1
 fi
 
-echo "Build completed successfully!"
-
-echo "Deploying to Code Engine..."
-ibmcloud target -r ${REGION} -g ${RESOURCE_GROUP}
-
-# Create or update secret
-if ibmcloud ce secret get --name ${APP_NAME}-secrets &>/dev/null; then
-  echo "Updating existing secret..."
-  ibmcloud ce secret update --name ${APP_NAME}-secrets \
-    --from-literal GITHUB_TOKEN="${GITHUB_TOKEN}"
-else
-  echo "Creating secret..."
-  ibmcloud ce secret create --name ${APP_NAME}-secrets \
-    --from-literal GITHUB_TOKEN="${GITHUB_TOKEN}"
+# Check for required tools
+if ! command -v terraform &> /dev/null; then
+  echo "Error: terraform not found. Please install Terraform >= 1.6"
+  exit 1
 fi
 
-# Create or update application
-if ibmcloud ce application get --name ${APP_NAME} &>/dev/null; then
-  echo "Updating existing application..."
-  ibmcloud ce application update --name ${APP_NAME} \
-    --image ${IMAGE_NAME}:${VERSION}
-else
-  echo "Creating application..."
-  ibmcloud ce application create --name ${APP_NAME} \
-    --image ${IMAGE_NAME}:${VERSION} \
-    --cpu 0.25 \
-    --memory 512M \
-    --min-scale 1 \
-    --max-scale 3 \
-    --port 8080 \
-    --env-from-secret ${APP_NAME}-secrets \
-    --env TIM_LOG_LEVEL=INFO \
-    --env TIM_ALLOWED_NAMESPACES=terraform-ibm-modules \
-    --probe-live /health \
-    --probe-ready /health
+if ! command -v ibmcloud &> /dev/null; then
+  echo "Error: ibmcloud CLI not found. Please install IBM Cloud CLI"
+  exit 1
 fi
 
-echo "Deployment complete!"
-ibmcloud ce application get --name ${APP_NAME} --output url
+# Set Terraform variables
+export TF_VAR_ibmcloud_api_key="$IBM_CLOUD_API_KEY"
+export TF_VAR_github_token="$GITHUB_TOKEN"
+export TF_VAR_image_name="us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+
+# Optional variables from environment
+if [ -n "$IBM_CLOUD_REGION" ]; then
+  export TF_VAR_region="$IBM_CLOUD_REGION"
+fi
+
+if [ -n "$IBM_CLOUD_RESOURCE_GROUP" ]; then
+  export TF_VAR_resource_group_name="$IBM_CLOUD_RESOURCE_GROUP"
+fi
+
+if [ -n "$GIT_BRANCH" ]; then
+  export TF_VAR_git_branch="$GIT_BRANCH"
+fi
+
+# Navigate to Terraform directory
+cd "$TERRAFORM_DIR"
+
+# Initialize Terraform if needed
+if [ ! -d ".terraform" ]; then
+  echo "Initializing Terraform..."
+  terraform init
+fi
+
+# Apply Terraform configuration
+echo "Deploying infrastructure with Terraform..."
+terraform apply -auto-approve
+
+# Get project name from Terraform output
+PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "tim-mcp")
+BUILD_NAME=$(terraform output -raw build_name 2>/dev/null || echo "${APP_NAME}-build")
+
+echo ""
+echo "Infrastructure deployment complete!"
+echo ""
+echo "Next step: Trigger container build"
+echo "======================================"
+echo ""
+echo "The Terraform configuration has created the build configuration,"
+echo "but you need to manually trigger the first build run:"
+echo ""
+echo "  # Login to IBM Cloud"
+echo "  ibmcloud login --apikey \$IBM_CLOUD_API_KEY"
+echo ""
+echo "  # Target the region and select the project"
+echo "  ibmcloud target -r ${TF_VAR_region:-us-south}"
+echo "  ibmcloud ce project select --name ${PROJECT_NAME}"
+echo ""
+echo "  # Submit build run"
+echo "  ibmcloud ce buildrun submit --build ${BUILD_NAME} --name ${APP_NAME}-buildrun-\$(date +%s)"
+echo ""
+echo "  # Follow the build logs"
+echo "  ibmcloud ce buildrun logs -f -n ${APP_NAME}-buildrun-<timestamp>"
+echo ""
+echo "After the build completes successfully, run 'terraform apply' again"
+echo "to update the application with the new image."
+echo ""
+echo "Terraform Outputs:"
+terraform output

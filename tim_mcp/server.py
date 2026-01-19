@@ -601,12 +601,83 @@ async def module_index():
 async def health_check(request: Request) -> JSONResponse:
     """
     Health check endpoint for container orchestration platforms.
-    Returns 200 OK with basic service information.
+    Returns 200 OK with basic service information and dependency checks.
+
+    Validates connectivity to:
+    - GitHub API (checks for token validity and rate limits)
+    - Terraform Registry API
     """
-    return JSONResponse({
+    from .clients.github_client import GitHubClient
+    from .clients.terraform_client import TerraformClient
+
+    health_status = {
         "status": "healthy",
         "service": "tim-mcp",
-    })
+        "dependencies": {}
+    }
+
+    # Check GitHub API connectivity using existing client
+    try:
+        async with GitHubClient(config) as github_client:
+            # Use rate_limit endpoint to verify connectivity and token validity
+            response = await github_client.client.get("/rate_limit")
+            if response.status_code == 200:
+                rate_data = response.json()
+                remaining = rate_data.get("rate", {}).get("remaining", 0)
+                limit = rate_data.get("rate", {}).get("limit", 0)
+                health_status["dependencies"]["github"] = {
+                    "status": "healthy",
+                    "rate_limit_remaining": remaining,
+                    "rate_limit_total": limit
+                }
+                if remaining < 10:
+                    health_status["dependencies"]["github"]["warning"] = "Low rate limit remaining"
+            elif response.status_code == 401:
+                health_status["dependencies"]["github"] = {
+                    "status": "unhealthy",
+                    "error": "Invalid or expired GitHub token"
+                }
+                health_status["status"] = "degraded"
+            else:
+                health_status["dependencies"]["github"] = {
+                    "status": "unhealthy",
+                    "error": f"Unexpected status code: {response.status_code}"
+                }
+                health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["dependencies"]["github"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+
+    # Check Terraform Registry connectivity using existing client
+    try:
+        async with TerraformClient(config) as tf_client:
+            # Test with a known stable module
+            response = await tf_client.client.get(
+                "/v1/modules/terraform-ibm-modules/landing-zone/ibm"
+            )
+            if response.status_code == 200:
+                health_status["dependencies"]["terraform_registry"] = {
+                    "status": "healthy"
+                }
+            else:
+                health_status["dependencies"]["terraform_registry"] = {
+                    "status": "unhealthy",
+                    "error": f"Unexpected status code: {response.status_code}"
+                }
+                health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["dependencies"]["terraform_registry"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+
+    # Return 200 for healthy/degraded, 503 for unhealthy
+    status_code = 200 if health_status["status"] in ["healthy", "degraded"] else 503
+    return JSONResponse(health_status, status_code=status_code)
 
 
 def main(transport_config=None):
