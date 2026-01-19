@@ -655,8 +655,9 @@ async def health_check(request: Request) -> JSONResponse:
     try:
         async with TerraformClient(config) as tf_client:
             # Test with a known stable module
+            # Note: base_url already includes /v1
             response = await tf_client.client.get(
-                "/v1/modules/terraform-ibm-modules/landing-zone/ibm"
+                "/modules/terraform-ibm-modules/landing-zone/ibm"
             )
             if response.status_code == 200:
                 health_status["dependencies"]["terraform_registry"] = {

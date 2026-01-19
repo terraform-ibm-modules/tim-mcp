@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM registry.access.redhat.com/ubi9/python-311:1-77 AS builder
+FROM python:3.14.2-slim AS builder
 WORKDIR /app
 
 # Install uv
@@ -19,7 +19,7 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime
-FROM registry.access.redhat.com/ubi9/python-311:1-77
+FROM python:3.14.2-slim
 WORKDIR /app
 
 # Copy uv binary

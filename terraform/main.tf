@@ -41,16 +41,17 @@ resource "ibm_code_engine_secret" "app_secrets" {
 
 # Create Code Engine build configuration
 resource "ibm_code_engine_build" "build" {
-  project_id    = ibm_code_engine_project.project.project_id
-  name          = "${var.app_name}-build"
-  output_image  = var.image_name
-  output_secret = ibm_code_engine_secret.icr_secret.name
-  source_url    = var.git_repo
+  project_id      = ibm_code_engine_project.project.project_id
+  name            = "${var.app_name}-build"
+  output_image    = var.image_name
+  output_secret   = ibm_code_engine_secret.icr_secret.name
+  source_url      = var.git_repo
   source_revision = var.git_branch
-  strategy_type = "dockerfile"
+  source_context_dir = "."
+  strategy_type   = "dockerfile"
   strategy_spec_file = "Dockerfile"
-  strategy_size = "medium"
-  timeout       = 900
+  strategy_size   = "medium"
+  timeout         = 900
 }
 
 # Note: Build runs must be triggered separately via CLI or API

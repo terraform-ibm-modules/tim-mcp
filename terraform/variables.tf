@@ -47,9 +47,9 @@ variable "cpu" {
 }
 
 variable "memory" {
-  description = "Memory allocation for the application (e.g., 512M, 1G)"
+  description = "Memory allocation for the application (e.g., 1G, 2G, 4G)"
   type        = string
-  default     = "512M"
+  default     = "1G"
 }
 
 variable "min_scale" {
