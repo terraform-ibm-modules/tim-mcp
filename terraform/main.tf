@@ -58,75 +58,7 @@ resource "ibm_code_engine_build" "build" {
 # as they are one-time operations. The terraform resource doesn't
 # support automatic build run triggers.
 
-# Create Code Engine application
-resource "ibm_code_engine_app" "app" {
-  project_id = ibm_code_engine_project.project.project_id
-  name       = var.app_name
-
-  image_reference = var.image_name
-  image_secret    = ibm_code_engine_secret.icr_secret.name
-
-  # Resource allocation
-  scale_cpu_limit      = var.cpu
-  scale_memory_limit   = var.memory
-  scale_min_instances  = var.min_scale
-  scale_max_instances  = var.max_scale
-
-  # Health probes
-  probe_liveness {
-    type             = "http"
-    path             = "/health"
-    port             = var.port
-    initial_delay    = 5
-    interval         = 30
-    timeout          = 10
-    failure_threshold = 3
-  }
-
-  probe_readiness {
-    type             = "http"
-    path             = "/health"
-    port             = var.port
-    initial_delay    = 5
-    interval         = 10
-    timeout          = 10
-    failure_threshold = 3
-  }
-
-  # Environment variables from secret
-  run_env_variables {
-    type      = "secret_full_reference"
-    reference = ibm_code_engine_secret.app_secrets.name
-  }
-
-  # Additional environment variables
-  run_env_variables {
-    type  = "literal"
-    name  = "TIM_LOG_LEVEL"
-    value = var.log_level
-  }
-
-  run_env_variables {
-    type  = "literal"
-    name  = "TIM_ALLOWED_NAMESPACES"
-    value = var.allowed_namespaces
-  }
-
-  # Ensure build is created first
-  depends_on = [
-    ibm_code_engine_build.build,
-    ibm_code_engine_secret.app_secrets,
-    ibm_code_engine_secret.icr_secret
-  ]
-
-  # Increase timeout to allow for image build
-  timeouts {
-    create = "5m"
-    update = "5m"
-  }
-
-  # Lifecycle: allow app to be created even if not immediately ready
-  lifecycle {
-    ignore_changes = [status, status_details]
-  }
-}
+# Note: App is managed via CLI in the deployment script instead of Terraform
+# due to Terraform provider issues with app creation timing and status polling.
+# The ibm_code_engine_app resource has been removed to avoid these issues.
+# The deployment script uses 'ibmcloud ce app create/update' instead.

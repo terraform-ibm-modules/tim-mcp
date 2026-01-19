@@ -63,15 +63,9 @@ if [ ! -d ".terraform" ]; then
   terraform init
 fi
 
-# Apply Terraform configuration in two phases
-# Phase 1: Create everything except the app (since app needs image to exist)
-echo "Deploying infrastructure with Terraform (Phase 1: project, build, secrets)..."
-terraform apply -auto-approve \
-  -target=ibm_cr_namespace.namespace \
-  -target=ibm_code_engine_project.project \
-  -target=ibm_code_engine_secret.icr_secret \
-  -target=ibm_code_engine_secret.app_secrets \
-  -target=ibm_code_engine_build.build
+# Apply Terraform configuration
+echo "Deploying infrastructure with Terraform..."
+terraform apply -auto-approve
 
 # Get values from Terraform output
 PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "tim-mcp")
@@ -127,12 +121,27 @@ echo ""
 echo "Step 3: Creating/updating application..."
 echo "=========================================="
 
-# Navigate back to Terraform directory
-cd "$TERRAFORM_DIR"
-
-# Phase 2: Create the app now that the image exists
-echo "Deploying application with Terraform (Phase 2: app)..."
-terraform apply -auto-approve
+# Create or update the app with the new image
+if ibmcloud ce app get --name "$APP_NAME" >/dev/null 2>&1; then
+  echo "Updating existing application..."
+  ibmcloud ce app update \
+    --name "$APP_NAME" \
+    --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+else
+  echo "Creating new application..."
+  ibmcloud ce app create \
+    --name "$APP_NAME" \
+    --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}" \
+    --registry-secret icr-secret \
+    --cpu 0.25 \
+    --memory 1G \
+    --min-scale 1 \
+    --max-scale 3 \
+    --port 8080 \
+    --env-from-secret "${APP_NAME}-secrets" \
+    --env TIM_LOG_LEVEL=INFO \
+    --env TIM_ALLOWED_NAMESPACES=terraform-ibm-modules
+fi
 
 # Get the application URL
 APP_URL=$(ibmcloud ce app get --name "$APP_NAME" --output url 2>/dev/null || echo "")
