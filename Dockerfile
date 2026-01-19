@@ -16,7 +16,7 @@ COPY static ./static
 # Set version for hatch-vcs since .git is not available in Docker
 ARG VERSION=1.8.10
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 # Stage 2: Runtime
 FROM python:3.14.2-slim
