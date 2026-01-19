@@ -1,5 +1,8 @@
 # Stage 1: Builder
 FROM registry.access.redhat.com/ubi8/python-312:latest AS builder
+
+# Run as root for build stage to avoid permission issues
+USER root
 WORKDIR /app
 
 # Install uv
@@ -12,14 +15,23 @@ COPY pyproject.toml README.md ./
 COPY tim_mcp ./tim_mcp
 COPY static ./static
 
+# Ensure all files are owned by default user (1001 in UBI)
+RUN chown -R 1001:0 /app && chmod -R g+w /app
+
 # Install dependencies
 # Set version for hatch-vcs since .git is not available in Docker
 ARG VERSION=1.8.10
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
+
+# Switch to default user for dependency installation
+USER 1001
 RUN uv sync --no-dev
 
 # Stage 2: Runtime
 FROM registry.access.redhat.com/ubi8/python-312:latest
+
+# Run as root to set up files
+USER root
 WORKDIR /app
 
 # Copy uv binary
@@ -33,11 +45,11 @@ COPY tim_mcp ./tim_mcp
 COPY static ./static
 COPY pyproject.toml ./
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash --uid 1000 timuser && \
-    chown -R timuser:timuser /app
+# Set ownership to default UBI user (1001) and group 0 (root group)
+RUN chown -R 1001:0 /app && chmod -R g+w /app
 
-USER timuser
+# Switch to default non-root user
+USER 1001
 
 # Environment variables
 ENV PATH="/app/.venv/bin:$PATH" \
