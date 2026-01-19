@@ -67,34 +67,74 @@ fi
 echo "Deploying infrastructure with Terraform..."
 terraform apply -auto-approve
 
-# Get project name from Terraform output
+# Get values from Terraform output
 PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "tim-mcp")
 BUILD_NAME=$(terraform output -raw build_name 2>/dev/null || echo "${APP_NAME}-build")
+REGION=${TF_VAR_region:-us-south}
+RESOURCE_GROUP=${TF_VAR_resource_group_name:-Default}
 
 echo ""
 echo "Infrastructure deployment complete!"
 echo ""
-echo "Next step: Trigger container build"
+echo "Step 2: Building container image..."
+echo "======================================"
+
+# Login to IBM Cloud and target the project
+ibmcloud login --apikey "$IBM_CLOUD_API_KEY" -r "$REGION" -g "$RESOURCE_GROUP" --quiet
+ibmcloud ce project select --name "$PROJECT_NAME"
+
+# Trigger the build
+BUILDRUN_NAME="${APP_NAME}-buildrun-$(date +%s)"
+echo "Submitting build run: $BUILDRUN_NAME"
+ibmcloud ce buildrun submit --build "$BUILD_NAME" --name "$BUILDRUN_NAME"
+
+# Wait for build to complete
+echo "Waiting for build to complete..."
+BUILD_STATUS="Unknown"
+MAX_WAIT=600  # 10 minutes
+ELAPSED=0
+INTERVAL=10
+
+while [ $ELAPSED -lt $MAX_WAIT ]; do
+  BUILD_STATUS=$(ibmcloud ce buildrun get -n "$BUILDRUN_NAME" --output json 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || echo "Unknown")
+
+  if [ "$BUILD_STATUS" = "succeeded" ]; then
+    echo "✓ Build completed successfully!"
+    break
+  elif [ "$BUILD_STATUS" = "failed" ]; then
+    echo "✗ Build failed!"
+    echo "View logs with: ibmcloud ce buildrun logs -n $BUILDRUN_NAME"
+    exit 1
+  fi
+
+  echo "  Build status: $BUILD_STATUS (${ELAPSED}s elapsed)"
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ "$BUILD_STATUS" != "succeeded" ]; then
+  echo "✗ Build did not complete within ${MAX_WAIT} seconds"
+  exit 1
+fi
+
+echo ""
+echo "Step 3: Updating application with new image..."
+echo "=============================================="
+
+# Update the application to use the new image
+ibmcloud ce app update --name "$APP_NAME" --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+
+# Get the application URL
+APP_URL=$(ibmcloud ce app get --name "$APP_NAME" --output url 2>/dev/null || echo "")
+
+echo ""
+echo "======================================"
+echo "🎉 Deployment Complete!"
 echo "======================================"
 echo ""
-echo "The Terraform configuration has created the build configuration,"
-echo "but you need to manually trigger the first build run:"
+echo "Application URL: $APP_URL"
+echo "Health endpoint: ${APP_URL}/health"
 echo ""
-echo "  # Login to IBM Cloud"
-echo "  ibmcloud login --apikey \$IBM_CLOUD_API_KEY"
+echo "Test the deployment:"
+echo "  curl ${APP_URL}/health"
 echo ""
-echo "  # Target the region and select the project"
-echo "  ibmcloud target -r ${TF_VAR_region:-us-south}"
-echo "  ibmcloud ce project select --name ${PROJECT_NAME}"
-echo ""
-echo "  # Submit build run"
-echo "  ibmcloud ce buildrun submit --build ${BUILD_NAME} --name ${APP_NAME}-buildrun-\$(date +%s)"
-echo ""
-echo "  # Follow the build logs"
-echo "  ibmcloud ce buildrun logs -f -n ${APP_NAME}-buildrun-<timestamp>"
-echo ""
-echo "After the build completes successfully, run 'terraform apply' again"
-echo "to update the application with the new image."
-echo ""
-echo "Terraform Outputs:"
-terraform output
