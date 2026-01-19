@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM registry.access.redhat.com/ubi8/python-312:1-77 AS builder
+FROM registry.redhat.io/ubi8/python-312:latest AS builder
 WORKDIR /app
 
 # Install uv
@@ -19,7 +19,7 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 RUN uv sync --no-dev
 
 # Stage 2: Runtime
-FROM registry.access.redhat.com/ubi8/python-312:1-77
+FROM registry.redhat.io/ubi8/python-312:latest
 WORKDIR /app
 
 # Copy uv binary
