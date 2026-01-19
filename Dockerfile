@@ -60,7 +60,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()"
+    CMD /app/.venv/bin/python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()"
 
 # Run in HTTP mode on all interfaces
-CMD ["python", "-m", "tim_mcp.main", "--http", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["/app/.venv/bin/python", "-m", "tim_mcp.main", "--http", "--host", "0.0.0.0", "--port", "8080"]
