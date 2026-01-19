@@ -1,9 +1,9 @@
 # Stage 1: Builder
-FROM registry.access.redhat.com/ubi9/python-311 AS builder
+FROM registry.access.redhat.com/ubi9/python-311:1-77 AS builder
 WORKDIR /app
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
 
 # Copy dependency files and README (required by pyproject.toml)
 COPY pyproject.toml uv.lock README.md ./
@@ -19,7 +19,7 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 RUN uv sync --frozen --no-dev
 
 # Stage 2: Runtime
-FROM registry.access.redhat.com/ubi9/python-311
+FROM registry.access.redhat.com/ubi9/python-311:1-77
 WORKDIR /app
 
 # Copy uv binary
