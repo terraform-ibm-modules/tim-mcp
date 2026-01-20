@@ -17,9 +17,7 @@ This guide covers deploying tim-mcp to IBM Code Engine as a containerized HTTP s
 5. **IBM Cloud API Key**
    - Create at: https://cloud.ibm.com/iam/apikeys
 
-## Deployment Methods
-
-### Option 1: Automated Deployment (Recommended)
+## Deployment
 
 Use the provided Terraform configuration and deployment script:
 
@@ -40,43 +38,11 @@ The script will:
 1. Initialize Terraform
 2. Create Code Engine project and build configuration
 3. Set up secrets for GitHub token
-4. Deploy the application
+4. Automatically trigger the container build
+5. Wait for the build to complete (up to 30 minutes for UBI8 builds)
+6. Create or update the application
 
-After the script completes, manually trigger the container build:
-
-```bash
-# Login and select project
-ibmcloud login --apikey $IBM_CLOUD_API_KEY
-ibmcloud target -r us-south
-ibmcloud ce project select --name tim-mcp
-
-# Trigger build
-ibmcloud ce buildrun submit --build tim-mcp-build --name tim-mcp-buildrun-$(date +%s)
-
-# Follow logs
-ibmcloud ce buildrun logs -f -n tim-mcp-buildrun-<timestamp>
-```
-
-See [Terraform README](../../terraform/README.md) for detailed configuration options.
-
-### Option 2: Manual Terraform Deployment
-
-For more control, use Terraform directly:
-
-```bash
-cd terraform
-
-# Set variables
-export TF_VAR_ibmcloud_api_key="<your-api-key>"
-export TF_VAR_github_token="<your-github-token>"
-
-# Initialize and apply
-terraform init
-terraform apply
-
-# Get outputs
-terraform output
-```
+The deployment is fully automated and will display progress with build status updates. See [Terraform README](../../terraform/README.md) for detailed configuration options.
 
 ## Verification
 
@@ -126,14 +92,16 @@ This reduces costs to ~$0-5/month with cold start latency.
 
 ### Build Failures
 
-Check build logs:
+The deployment script monitors build progress automatically. If a build fails, check the logs:
+
 ```bash
 ibmcloud ce buildrun logs -n tim-mcp-buildrun-<timestamp>
 ```
 
 Common issues:
-- Platform mismatch: Ensure using Code Engine build service or `--platform linux/amd64`
-- Authentication: Verify IBM Cloud API key has Container Registry access
+- **Build timeout**: UBI8 builds can take 20-25 minutes. The script allows up to 30 minutes.
+- **Registry quota**: If Container Registry exceeds 80% quota, consider cleaning old images.
+- **Authentication**: Verify IBM Cloud API key has Container Registry access.
 
 ### Application Not Starting
 
@@ -144,17 +112,41 @@ ibmcloud ce application logs --name tim-mcp
 
 Verify health endpoint status shows dependency connectivity.
 
-### Rate Limiting
+### Invalid GitHub Token
 
-If GitHub API rate limits are exceeded, the health check will show warnings. Ensure `GITHUB_TOKEN` is configured correctly.
+If the health check shows "unhealthy" status for GitHub:
+
+```json
+{
+  "status": "degraded",
+  "dependencies": {
+    "github": {
+      "status": "unhealthy",
+      "error": "Invalid or expired GitHub token"
+    }
+  }
+}
+```
+
+The GitHub token needs to be updated. Create a new token at https://github.com/settings/tokens (no special permissions needed), then update the secret:
+
+1. Via UI: Code Engine → Projects → tim-mcp → Secrets and configmaps → tim-mcp-secrets → Edit
+2. Via CLI:
+   ```bash
+   ibmcloud ce secret update --name tim-mcp-secrets --from-literal GITHUB_TOKEN=<new-token>
+   ibmcloud ce app update --name tim-mcp
+   ```
+3. Or re-run the deployment script with the new token exported.
 
 ## Updates
 
-To deploy a new version:
+To deploy a new version, simply re-run the deployment script:
 
-1. Trigger a new build run
-2. Wait for build to complete
-3. Run `terraform apply` to update the application
+```bash
+./scripts/deploy-code-engine.sh
+```
+
+The script will automatically trigger a new build and update the application with the latest code.
 
 ## Cleanup
 
