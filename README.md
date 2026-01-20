@@ -232,7 +232,7 @@ curl -X POST http://localhost:8080/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-For production deployments to IBM Code Engine, see [Deployment Guide](docs/deployment/README.md).
+For production deployments to IBM Code Engine, see [Deployment Guide](docs/deployment/code-engine.md).
 
 ## Version Pinning
 
