@@ -107,13 +107,16 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     exit 1
   fi
 
-  echo "  Build status: $BUILD_STATUS (${ELAPSED}s elapsed)"
+  MINUTES=$((ELAPSED / 60))
+  SECONDS=$((ELAPSED % 60))
+  echo "  Build status: $BUILD_STATUS (${MINUTES}m ${SECONDS}s elapsed)"
   sleep $INTERVAL
   ELAPSED=$((ELAPSED + INTERVAL))
 done
 
 if [ "$BUILD_STATUS" != "succeeded" ]; then
-  echo "✗ Build did not complete within ${MAX_WAIT} seconds"
+  MAX_MINUTES=$((MAX_WAIT / 60))
+  echo "✗ Build did not complete within ${MAX_MINUTES} minutes"
   exit 1
 fi
 
