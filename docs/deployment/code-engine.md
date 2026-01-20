@@ -39,7 +39,7 @@ The script will:
 2. Create Code Engine project and build configuration
 3. Set up secrets for GitHub token
 4. Automatically trigger the container build
-5. Wait for the build to complete (up to 30 minutes for UBI8 builds)
+5. Wait for the build to complete
 6. Create or update the application
 
 The deployment is fully automated and will display progress with build status updates. See [Terraform README](../../terraform/README.md) for detailed configuration options.
@@ -99,7 +99,6 @@ ibmcloud ce buildrun logs -n tim-mcp-buildrun-<timestamp>
 ```
 
 Common issues:
-- **Build timeout**: UBI8 builds can take 20-25 minutes. The script allows up to 30 minutes.
 - **Registry quota**: If Container Registry exceeds 80% quota, consider cleaning old images.
 - **Authentication**: Verify IBM Cloud API key has Container Registry access.
 
