@@ -29,7 +29,9 @@ export GITHUB_TOKEN="<your-github-token>"
 # Optional: customize deployment
 export IBM_CLOUD_REGION="us-south"           # Default: us-south
 export IBM_CLOUD_RESOURCE_GROUP="Default"    # Default: Default
+export REGISTRY="us.icr.io"                  # Default: us.icr.io (container registry server)
 export NAMESPACE="your-username"             # Default: tim-mcp (container registry namespace)
+export TAG="latest"                          # Default: latest (image tag)
 export GIT_BRANCH="main"                     # Default: main
 
 # Run deployment script

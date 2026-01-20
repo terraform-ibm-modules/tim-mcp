@@ -5,7 +5,7 @@ data "ibm_resource_group" "resource_group" {
 
 # Construct full image name
 locals {
-  image_name = "us.icr.io/${var.namespace}/${var.name}:latest"
+  image_name = "${var.registry}/${var.namespace}/${var.name}:${var.tag}"
 }
 
 # Create Code Engine project

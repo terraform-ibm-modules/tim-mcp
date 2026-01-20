@@ -22,13 +22,25 @@ variable "name" {
   default     = "tim-mcp"
 }
 
+variable "registry" {
+  description = "Container registry server"
+  type        = string
+  default     = "us.icr.io"
+}
+
 variable "namespace" {
   description = "Container registry organization/namespace (e.g., tim-mcp, your-username)"
   type        = string
   default     = "tim-mcp"
 }
 
-# Note: image_name is computed dynamically in main.tf as us.icr.io/{namespace}/{name}:latest
+variable "tag" {
+  description = "Container image tag"
+  type        = string
+  default     = "latest"
+}
+
+# Note: image_name is computed dynamically in main.tf as {registry}/{namespace}/{name}:{tag}
 
 variable "github_token" {
   description = "GitHub Personal Access Token for API access"

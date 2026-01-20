@@ -54,8 +54,16 @@ if [ -n "$GIT_BRANCH" ]; then
   export TF_VAR_git_branch="$GIT_BRANCH"
 fi
 
+if [ -n "$REGISTRY" ]; then
+  export TF_VAR_registry="$REGISTRY"
+fi
+
 if [ -n "$NAMESPACE" ]; then
   export TF_VAR_namespace="$NAMESPACE"
+fi
+
+if [ -n "$TAG" ]; then
+  export TF_VAR_tag="$TAG"
 fi
 
 # Navigate to Terraform directory
