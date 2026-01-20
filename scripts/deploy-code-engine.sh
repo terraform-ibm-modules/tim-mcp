@@ -91,12 +91,12 @@ ibmcloud ce buildrun submit --build "$BUILD_NAME" --name "$BUILDRUN_NAME"
 # Wait for build to complete
 echo "Waiting for build to complete..."
 BUILD_STATUS="Unknown"
-MAX_WAIT=1800  # 30 minutes (UBI8 builds can take 20-25 minutes)
+MAX_WAIT=600  # 10 minutes
 ELAPSED=0
 INTERVAL=10
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
-  BUILD_STATUS=$(ibmcloud ce buildrun get -n "$BUILDRUN_NAME" --output json 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || echo "Unknown")
+  BUILD_STATUS=$(ibmcloud ce buildrun get -n "$BUILDRUN_NAME" --output json 2>/dev/null | grep -o '"status": "[^"]*"' | cut -d'"' -f4 || echo "Unknown")
 
   if [ "$BUILD_STATUS" = "succeeded" ]; then
     echo "✓ Build completed successfully!"
