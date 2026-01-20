@@ -3,15 +3,29 @@ data "ibm_resource_group" "resource_group" {
   name = var.resource_group_name
 }
 
+# Data source for IAM account settings to get current user
+data "ibm_iam_account_settings" "account_settings" {
+}
+
+# Transform username to be registry-compliant
+locals {
+  # Convert user_name to lowercase and replace dots with hyphens for registry namespace
+  # Example: Jordan.Williams2 -> jordan-williams2
+  registry_namespace = lower(replace(data.ibm_iam_account_settings.account_settings.user_name, ".", "-"))
+
+  # Construct full image name using the computed namespace
+  image_name = "us.icr.io/${local.registry_namespace}/${var.name}:latest"
+}
+
 # Create Code Engine project
 resource "ibm_code_engine_project" "project" {
-  name              = var.project_name
+  name              = var.name
   resource_group_id = data.ibm_resource_group.resource_group.id
 }
 
-# Create Container Registry namespace
+# Create Container Registry namespace using current user's name
 resource "ibm_cr_namespace" "namespace" {
-  name              = var.container_registry_namespace
+  name              = local.registry_namespace
   resource_group_id = data.ibm_resource_group.resource_group.id
 }
 
@@ -31,7 +45,7 @@ resource "ibm_code_engine_secret" "icr_secret" {
 # Create secret for GitHub token
 resource "ibm_code_engine_secret" "app_secrets" {
   project_id = ibm_code_engine_project.project.project_id
-  name       = "${var.app_name}-secrets"
+  name       = "${var.name}-secrets"
   format     = "generic"
 
   data = {
@@ -42,8 +56,8 @@ resource "ibm_code_engine_secret" "app_secrets" {
 # Create Code Engine build configuration
 resource "ibm_code_engine_build" "build" {
   project_id      = ibm_code_engine_project.project.project_id
-  name            = "${var.app_name}-build"
-  output_image    = var.image_name
+  name            = "${var.name}-build"
+  output_image    = local.image_name
   output_secret   = ibm_code_engine_secret.icr_secret.name
   source_url      = var.git_repo
   source_revision = var.git_branch

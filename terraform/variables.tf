@@ -16,23 +16,14 @@ variable "resource_group_name" {
   default     = "Default"
 }
 
-variable "project_name" {
-  description = "Name of the Code Engine project"
+variable "name" {
+  description = "Name of the Code Engine project and application"
   type        = string
   default     = "tim-mcp"
 }
 
-variable "app_name" {
-  description = "Name of the Code Engine application"
-  type        = string
-  default     = "tim-mcp"
-}
-
-variable "image_name" {
-  description = "Full container image name"
-  type        = string
-  default     = "us.icr.io/tim-mcp/tim-mcp:latest"
-}
+# Note: image_name is now computed dynamically from user_name in main.tf
+# variable "image_name" removed - constructed as us.icr.io/{username}/{name}:latest
 
 variable "github_token" {
   description = "GitHub Personal Access Token for API access"
@@ -82,11 +73,8 @@ variable "git_branch" {
   default     = "feat/code-engine-deployment"
 }
 
-variable "container_registry_namespace" {
-  description = "IBM Container Registry namespace"
-  type        = string
-  default     = "tim-mcp"
-}
+# Note: container_registry_namespace is now computed dynamically from user_name in main.tf
+# variable "container_registry_namespace" removed - derived from IAM account settings
 
 variable "allowed_namespaces" {
   description = "Comma-separated list of allowed Terraform module namespaces"

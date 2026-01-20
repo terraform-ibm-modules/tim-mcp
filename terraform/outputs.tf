@@ -14,6 +14,11 @@ output "build_name" {
 }
 
 output "registry_namespace" {
-  description = "Container Registry namespace"
+  description = "Container Registry namespace (computed from user_name)"
   value       = ibm_cr_namespace.namespace.name
+}
+
+output "image_name" {
+  description = "Full container image name"
+  value       = local.image_name
 }

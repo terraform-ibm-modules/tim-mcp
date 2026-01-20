@@ -39,7 +39,7 @@ fi
 # Set Terraform variables
 export TF_VAR_ibmcloud_api_key="$IBM_CLOUD_API_KEY"
 export TF_VAR_github_token="$GITHUB_TOKEN"
-export TF_VAR_image_name="us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+# Note: image_name is computed dynamically from user_name in Terraform
 
 # Optional variables from environment
 if [ -n "$IBM_CLOUD_REGION" ]; then
@@ -68,10 +68,19 @@ echo "Deploying infrastructure with Terraform..."
 terraform apply -auto-approve
 
 # Get values from Terraform output
-PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "tim-mcp")
+PROJECT_NAME=$(terraform output -raw project_name 2>/dev/null || echo "$APP_NAME")
 BUILD_NAME=$(terraform output -raw build_name 2>/dev/null || echo "${APP_NAME}-build")
+IMAGE_NAME=$(terraform output -raw image_name 2>/dev/null)
 REGION=${TF_VAR_region:-us-south}
 RESOURCE_GROUP=${TF_VAR_resource_group_name:-Default}
+
+# Verify we got the image name
+if [ -z "$IMAGE_NAME" ]; then
+  echo "Error: Failed to get image name from Terraform output"
+  exit 1
+fi
+
+echo "Using container image: $IMAGE_NAME"
 
 echo ""
 echo "Infrastructure deployment complete!"
@@ -129,12 +138,12 @@ if ibmcloud ce app get --name "$APP_NAME" >/dev/null 2>&1; then
   echo "Updating existing application..."
   ibmcloud ce app update \
     --name "$APP_NAME" \
-    --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}"
+    --image "$IMAGE_NAME"
 else
   echo "Creating new application..."
   ibmcloud ce app create \
     --name "$APP_NAME" \
-    --image "us.icr.io/tim-mcp/tim-mcp:${VERSION}" \
+    --image "$IMAGE_NAME" \
     --registry-secret icr-secret \
     --cpu 0.25 \
     --memory 1G \
