@@ -29,7 +29,7 @@ resource "ibm_code_engine_secret" "icr_secret" {
   data = {
     username = "iamapikey"
     password = var.ibmcloud_api_key
-    server   = "us.icr.io"
+    server   = var.registry
   }
 }
 
