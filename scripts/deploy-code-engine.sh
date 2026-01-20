@@ -91,7 +91,7 @@ ibmcloud ce buildrun submit --build "$BUILD_NAME" --name "$BUILDRUN_NAME"
 # Wait for build to complete
 echo "Waiting for build to complete..."
 BUILD_STATUS="Unknown"
-MAX_WAIT=600  # 10 minutes
+MAX_WAIT=1200  # 20 minutes (builds typically take 10-15 minutes)
 ELAPSED=0
 INTERVAL=10
 
