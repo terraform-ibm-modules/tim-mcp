@@ -79,7 +79,7 @@ variable "git_repo" {
 variable "git_branch" {
   description = "Git branch to build from"
   type        = string
-  default     = "main"
+  default     = "feat/code-engine-deployment"
 }
 
 variable "container_registry_namespace" {
