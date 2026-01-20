@@ -3,18 +3,9 @@ data "ibm_resource_group" "resource_group" {
   name = var.resource_group_name
 }
 
-# Data source for IAM account settings to get current user
-data "ibm_iam_account_settings" "account_settings" {
-}
-
-# Transform username to be registry-compliant
+# Construct full image name
 locals {
-  # Convert user_name to lowercase and replace dots with hyphens for registry namespace
-  # Example: Jordan.Williams2 -> jordan-williams2
-  registry_namespace = lower(replace(data.ibm_iam_account_settings.account_settings.user_name, ".", "-"))
-
-  # Construct full image name using the computed namespace
-  image_name = "us.icr.io/${local.registry_namespace}/${var.name}:latest"
+  image_name = "us.icr.io/${var.namespace}/${var.name}:latest"
 }
 
 # Create Code Engine project
@@ -23,9 +14,9 @@ resource "ibm_code_engine_project" "project" {
   resource_group_id = data.ibm_resource_group.resource_group.id
 }
 
-# Create Container Registry namespace using current user's name
+# Create Container Registry namespace
 resource "ibm_cr_namespace" "namespace" {
-  name              = local.registry_namespace
+  name              = var.namespace
   resource_group_id = data.ibm_resource_group.resource_group.id
 }
 

@@ -26,9 +26,11 @@ Use the provided Terraform configuration and deployment script:
 export IBM_CLOUD_API_KEY="<your-ibm-cloud-api-key>"
 export GITHUB_TOKEN="<your-github-token>"
 
-# Optional: customize region/resource group
-export IBM_CLOUD_REGION="us-south"
-export IBM_CLOUD_RESOURCE_GROUP="Default"
+# Optional: customize deployment
+export IBM_CLOUD_REGION="us-south"           # Default: us-south
+export IBM_CLOUD_RESOURCE_GROUP="Default"    # Default: Default
+export NAMESPACE="your-username"             # Default: tim-mcp (container registry namespace)
+export GIT_BRANCH="main"                     # Default: main
 
 # Run deployment script
 ./scripts/deploy-code-engine.sh

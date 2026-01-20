@@ -14,7 +14,7 @@ output "build_name" {
 }
 
 output "registry_namespace" {
-  description = "Container Registry namespace (computed from user_name)"
+  description = "Container Registry namespace"
   value       = ibm_cr_namespace.namespace.name
 }
 

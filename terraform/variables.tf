@@ -22,8 +22,13 @@ variable "name" {
   default     = "tim-mcp"
 }
 
-# Note: image_name is now computed dynamically from user_name in main.tf
-# variable "image_name" removed - constructed as us.icr.io/{username}/{name}:latest
+variable "namespace" {
+  description = "Container registry organization/namespace (e.g., tim-mcp, your-username)"
+  type        = string
+  default     = "tim-mcp"
+}
+
+# Note: image_name is computed dynamically in main.tf as us.icr.io/{namespace}/{name}:latest
 
 variable "github_token" {
   description = "GitHub Personal Access Token for API access"
@@ -73,8 +78,7 @@ variable "git_branch" {
   default     = "feat/code-engine-deployment"
 }
 
-# Note: container_registry_namespace is now computed dynamically from user_name in main.tf
-# variable "container_registry_namespace" removed - derived from IAM account settings
+# Note: Container registry namespace is now set via the 'namespace' variable
 
 variable "allowed_namespaces" {
   description = "Comma-separated list of allowed Terraform module namespaces"
