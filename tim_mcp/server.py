@@ -643,7 +643,9 @@ def main(transport_config=None):
             window_seconds=config.rate_limit_window,
         )
 
-        mcp.add_middleware(
+        # Get the underlying Starlette app and add middleware
+        app = mcp.http_app()
+        app.add_middleware(
             PerIPRateLimitMiddleware,
             rate_limiter=per_ip_limiter,
             bypass_paths=["/health"],
