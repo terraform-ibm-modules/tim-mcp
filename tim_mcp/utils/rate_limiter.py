@@ -1,4 +1,12 @@
-"""Rate limiting using the 'limits' library (same as slowapi)."""
+"""
+Rate limiting using the 'limits' library with stale cache integration.
+
+Provides a wrapper around the 'limits' library (the same battle-tested library
+used by slowapi) for moving window rate limiting. This module adds a decorator
+that integrates rate limiting with stale cache fallback, allowing the application
+to serve expired cached data when rate limits are exceeded rather than returning
+errors to users.
+"""
 
 from functools import wraps
 from typing import Any, Callable, Optional
