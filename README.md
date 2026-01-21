@@ -209,19 +209,28 @@ claude mcp remove tim-mcp
 
 ### Environment Variables
 
-TIM-MCP can be configured using the following environment variables:
+#### Basic Configuration
+
+For most users running TIM-MCP locally, you only need:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `GITHUB_TOKEN` | No | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
+| `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
 | `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `TIM_CACHE_TTL` | No | 3600 | Cache TTL in seconds |
-| `TIM_CACHE_MAXSIZE` | No | 1000 | Maximum cache entries (LRU eviction when exceeded) |
-| `TIM_GLOBAL_RATE_LIMIT` | No | 30 | Global rate limit: max requests per minute across all clients |
-| `TIM_PER_IP_RATE_LIMIT` | No | 10 | Per-IP rate limit: max requests per minute per client IP (HTTP mode only) |
-| `TIM_RATE_LIMIT_WINDOW` | No | 60 | Rate limit time window in seconds |
-| `TIM_REQUEST_TIMEOUT` | No | 30 | External API timeout in seconds |
-| `TIM_ALLOWED_NAMESPACES` | No | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
+
+#### Advanced Configuration (Production/Hosting)
+
+These settings are for advanced users deploying TIM-MCP in production or HTTP mode:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TIM_CACHE_TTL` | 3600 | Cache TTL in seconds |
+| `TIM_CACHE_MAXSIZE` | 1000 | Maximum cache entries (LRU eviction when exceeded) |
+| `TIM_GLOBAL_RATE_LIMIT` | 30 | Global rate limit: max requests per minute across all clients |
+| `TIM_PER_IP_RATE_LIMIT` | 10 | Per-IP rate limit: max requests per minute per client IP (HTTP mode only) |
+| `TIM_RATE_LIMIT_WINDOW` | 60 | Rate limit time window in seconds |
+| `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
+| `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
 
 > **Note:** The `TIM_CACHE_DIR` environment variable has been removed. The service now uses in-memory caching with TTL and LRU eviction.
 
