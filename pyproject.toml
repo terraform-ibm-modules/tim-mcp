@@ -11,7 +11,7 @@ description = "Terraform IBM Modules MCP"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-    "cachetools==5.5.0",
+    "cachetools==6.2.4",
     "click==8.3.1",
     "fastmcp==2.14.3",
     "httpx==0.28.1",
