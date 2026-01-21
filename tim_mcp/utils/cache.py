@@ -1,19 +1,11 @@
 """
 Caching with cachetools + stale cache for graceful degradation.
 
-Why this module exists:
-- We need stale cache support for graceful degradation during rate limiting
-- cachetools (the de-facto standard) provides TTL+LRU but not stale cache
-- No actively maintained general-purpose library provides this feature:
-  * expirecache (2015, unmaintained)
-  * requests-cache (HTTP-specific, not general-purpose)
-
-What we provide:
-- 90% from cachetools.TTLCache: TTL expiration, LRU eviction, thread safety
-- 10% custom: Separate stale cache dict for serving expired entries
-
-This minimal wrapper (67 lines) prevents duplicating stale cache logic across
-all clients and provides a clean API for graceful degradation.
+Provides a thin wrapper around cachetools.TTLCache that adds stale cache support
+for serving expired entries during rate limiting. While cachetools handles TTL
+expiration and LRU eviction, this module maintains a separate stale cache that
+preserves expired entries, allowing the application to serve outdated data
+gracefully when fresh data is unavailable due to rate limits.
 """
 
 import threading
