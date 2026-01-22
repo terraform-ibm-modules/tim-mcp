@@ -128,9 +128,9 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     exit 1
   fi
 
-  MINUTES=$((ELAPSED / 60))
-  SECONDS=$((ELAPSED % 60))
-  echo "  Build status: $BUILD_STATUS (${MINUTES}m ${SECONDS}s elapsed)"
+  MINS=$((ELAPSED / 60))
+  SECS=$((ELAPSED % 60))
+  echo "  Build status: $BUILD_STATUS (${MINS}m ${SECS}s elapsed)"
   sleep $INTERVAL
   ELAPSED=$((ELAPSED + INTERVAL))
 done
