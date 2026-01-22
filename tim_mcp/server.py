@@ -656,6 +656,8 @@ def main(transport_config=None):
         )
 
         # Add per-IP rate limiting middleware for HTTP mode
+        import uvicorn
+        from starlette.middleware import Middleware
         from starlette.responses import JSONResponse
         from starlette.routing import Route
 
@@ -666,12 +668,16 @@ def main(transport_config=None):
             window_seconds=config.rate_limit_window,
         )
 
-        # Get the underlying Starlette app and add middleware
-        app = mcp.http_app()
-        app.add_middleware(
-            PerIPRateLimitMiddleware,
-            rate_limiter=per_ip_limiter,
-            bypass_paths=["/health", "/stats"],
+        # Get the app with middleware applied
+        app = mcp.http_app(
+            stateless_http=True,
+            middleware=[
+                Middleware(
+                    PerIPRateLimitMiddleware,
+                    rate_limiter=per_ip_limiter,
+                    bypass_paths=["/health", "/stats"],
+                )
+            ],
         )
 
         # Add stats endpoint
@@ -695,12 +701,11 @@ def main(transport_config=None):
             rate_limit_window=config.rate_limit_window,
         )
 
-        mcp.run(
-            transport="http",
+        # Run with uvicorn directly to use our configured app
+        uvicorn.run(
+            app,
             host=transport_config.host,
             port=transport_config.port,
-            stateless_http=True,
-            show_banner=False,
         )
     else:
         raise ValueError(f"Unsupported transport mode: {transport_config.mode}")
