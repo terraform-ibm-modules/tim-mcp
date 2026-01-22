@@ -684,6 +684,8 @@ def main(transport_config=None):
         async def stats_endpoint(request):
             """Return cache and rate limiter statistics."""
             stats = get_stats()
+            base_url = str(request.base_url).rstrip("/")
+            stats["cache"]["details"] = f"{base_url}/stats/cache"
             stats["rate_limiter"]["per_ip"] = {
                 "config": {
                     "max_requests": per_ip_limiter.max_requests,
