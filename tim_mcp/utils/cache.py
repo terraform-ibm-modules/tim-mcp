@@ -2,10 +2,10 @@
 Caching with cachetools + stale cache for graceful degradation.
 
 Provides a thin wrapper around cachetools.TTLCache that adds stale cache support
-for serving expired entries during rate limiting. While cachetools handles TTL
-expiration and LRU eviction, this module maintains a separate stale cache that
-preserves expired entries, allowing the application to serve outdated data
-gracefully when fresh data is unavailable due to rate limits.
+for serving expired entries during rate limiting. Both the primary cache and the
+stale cache use TTLCache with automatic TTL expiration and LRU eviction. The stale
+cache has a longer TTL (24x) to preserve entries for graceful degradation when
+fresh data is unavailable due to rate limits.
 """
 
 import threading
@@ -19,7 +19,8 @@ class InMemoryCache:
 
     def __init__(self, ttl: int = 3600, maxsize: int = 1000):
         self._cache = TTLCache(maxsize=maxsize, ttl=ttl)
-        self._stale_cache: dict[str, Any] = {}
+        # Stale cache: longer TTL (24x) and larger size (2x) for graceful degradation
+        self._stale_cache = TTLCache(maxsize=maxsize * 2, ttl=ttl * 24)
         self._lock = threading.RLock()
 
     def get(self, key: str, allow_stale: bool = False) -> Any:
@@ -68,7 +69,8 @@ class InMemoryCache:
                 "size": len(self._cache),
                 "maxsize": self._cache.maxsize,
                 "ttl": self._cache.ttl,
-                "stale_entries": len(self._stale_cache) - len(self._cache)
+                "stale_size": len(self._stale_cache),
+                "stale_maxsize": self._stale_cache.maxsize,
             }
 
 
