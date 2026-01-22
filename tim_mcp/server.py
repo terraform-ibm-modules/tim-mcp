@@ -680,11 +680,10 @@ def main(transport_config=None):
             ],
         )
 
-        # Add stats endpoint
+        # Add stats endpoints
         async def stats_endpoint(request):
             """Return cache and rate limiter statistics."""
             stats = get_stats()
-            # Add per-IP rate limiter stats
             stats["rate_limiter"]["per_ip"] = {
                 "config": {
                     "max_requests": per_ip_limiter.max_requests,
@@ -693,7 +692,13 @@ def main(transport_config=None):
             }
             return JSONResponse(stats)
 
+        async def cache_stats_endpoint(request):
+            """Return detailed cache statistics."""
+            top = int(request.query_params.get("top", 20))
+            return JSONResponse(shared_cache.get_detailed_stats(top=top))
+
         app.routes.append(Route("/stats", stats_endpoint, methods=["GET"]))
+        app.routes.append(Route("/stats/cache", cache_stats_endpoint, methods=["GET"]))
 
         logger.info(
             "Per-IP rate limiting enabled",

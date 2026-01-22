@@ -117,9 +117,9 @@ class TestInMemoryCache:
         stats = cache.get_stats()
         assert stats["size"] == 0
         assert stats["maxsize"] == 5
-        assert stats["fresh_ttl"] == 1
         assert stats["fresh_count"] == 0
         assert stats["stale_count"] == 0
+        assert stats["hit_rate"] == 0
 
         # Add entries
         cache.set("key1", "value1")
@@ -129,6 +129,13 @@ class TestInMemoryCache:
         assert stats["size"] == 2
         assert stats["fresh_count"] == 2
         assert stats["stale_count"] == 0
+
+        # Test hit rate
+        cache.get("key1")  # hit
+        cache.get("key1")  # hit
+        cache.get("missing")  # miss
+        stats = cache.get_stats()
+        assert stats["hit_rate"] == 0.67  # 2 hits / 3 total
 
         # Wait for fresh TTL to expire
         time.sleep(1.1)
