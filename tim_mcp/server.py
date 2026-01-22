@@ -42,8 +42,6 @@ global_rate_limiter = RateLimiter(
 shared_cache = InMemoryCache(
     ttl=config.cache_ttl,
     maxsize=config.cache_maxsize,
-    stale_ttl_multiplier=config.stale_cache_ttl_multiplier,
-    stale_size_multiplier=config.stale_cache_size_multiplier,
 )
 
 # Initialize shared context for tools

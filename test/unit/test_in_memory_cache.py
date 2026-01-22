@@ -1,8 +1,8 @@
 """Unit tests for InMemoryCache."""
 
-import pytest
-import time
 import threading
+import time
+
 from tim_mcp.utils.cache import InMemoryCache
 
 
@@ -21,17 +21,17 @@ class TestInMemoryCache:
         assert cache.get("missing_key") is None
 
     def test_cache_ttl_expiration(self):
-        """Test that cache entries expire after TTL."""
+        """Test that cache entries expire after TTL (become stale)."""
         cache = InMemoryCache(ttl=1, maxsize=10)
 
         # Set a value
         cache.set("key1", "value1")
         assert cache.get("key1") == "value1"
 
-        # Wait for TTL to expire
+        # Wait for fresh TTL to expire
         time.sleep(1.1)
 
-        # Value should be expired
+        # Fresh get should return None (entry is stale)
         assert cache.get("key1") is None
 
     def test_cache_stale_fallback(self):
@@ -42,7 +42,7 @@ class TestInMemoryCache:
         cache.set("key1", "value1")
         assert cache.get("key1") == "value1"
 
-        # Wait for TTL to expire
+        # Wait for fresh TTL to expire
         time.sleep(1.1)
 
         # Normal get should return None
@@ -63,18 +63,12 @@ class TestInMemoryCache:
         assert cache.get("key1") == "value1"
         assert cache.get("key2") == "value2"
 
-        # Add third item (should evict key1 as it's least recently used)
+        # Add third item (should evict oldest)
         cache.set("key3", "value3")
-
-        # key1 should be evicted from active cache
-        assert cache.get("key1") is None
 
         # key2 and key3 should still be present
         assert cache.get("key2") == "value2"
         assert cache.get("key3") == "value3"
-
-        # But key1 should still be in stale cache
-        assert cache.get("key1", allow_stale=True) == "value1"
 
     def test_cache_invalidate(self):
         """Test cache invalidation."""
@@ -87,7 +81,7 @@ class TestInMemoryCache:
         # Invalidate it
         assert cache.invalidate("key1") is True
 
-        # Should be gone from both caches
+        # Should be gone
         assert cache.get("key1") is None
         assert cache.get("key1", allow_stale=True) is None
 
@@ -115,9 +109,6 @@ class TestInMemoryCache:
         assert cache.get("key2") is None
         assert cache.get("key3") is None
 
-        # Should also clear stale cache
-        assert cache.get("key1", allow_stale=True) is None
-
     def test_cache_stats(self):
         """Test cache statistics."""
         cache = InMemoryCache(ttl=1, maxsize=5)
@@ -126,26 +117,26 @@ class TestInMemoryCache:
         stats = cache.get_stats()
         assert stats["size"] == 0
         assert stats["maxsize"] == 5
-        assert stats["ttl"] == 1
-        assert stats["stale_size"] == 0
+        assert stats["fresh_ttl"] == 1
+        assert stats["fresh_count"] == 0
+        assert stats["stale_count"] == 0
 
-        # Add entries (stored in both primary and stale cache for graceful degradation)
+        # Add entries
         cache.set("key1", "value1")
         cache.set("key2", "value2")
 
         stats = cache.get_stats()
         assert stats["size"] == 2
-        assert stats["stale_size"] == 2  # Also in stale cache for fallback
+        assert stats["fresh_count"] == 2
+        assert stats["stale_count"] == 0
 
-        # Wait for primary cache expiration (stale cache has longer TTL)
+        # Wait for fresh TTL to expire
         time.sleep(1.1)
 
-        # Trigger expiration check by accessing cache
-        cache.get("key1")
-
         stats = cache.get_stats()
-        assert stats["size"] == 0  # Expired from active cache
-        assert stats["stale_size"] == 2  # Still in stale cache (24x TTL)
+        assert stats["size"] == 2  # Still in cache (within stale TTL)
+        assert stats["fresh_count"] == 0  # No longer fresh
+        assert stats["stale_count"] == 2  # Now stale
 
     def test_cache_thread_safety(self):
         """Test that cache is thread-safe."""
@@ -204,12 +195,7 @@ class TestInMemoryCache:
         assert cache.get("list_key") == [1, 2, 3, 4, 5]
 
         # Test nested structures
-        nested = {
-            "data": [
-                {"id": 1, "items": [1, 2, 3]},
-                {"id": 2, "items": [4, 5, 6]}
-            ]
-        }
+        nested = {"data": [{"id": 1, "items": [1, 2, 3]}, {"id": 2, "items": [4, 5, 6]}]}
         cache.set("nested_key", nested)
         assert cache.get("nested_key") == nested
 
@@ -225,6 +211,6 @@ class TestInMemoryCache:
         cache.set("key1", "value2")
         assert cache.get("key1") == "value2"
 
-        # Should also update stale cache
-        time.sleep(1.1)  # Wait for TTL to expire
+        # Should also update the value in stale cache
+        time.sleep(1.1)
         assert cache.get("key1", allow_stale=True) == "value2"

@@ -35,16 +35,6 @@ class Config(BaseModel):
     cache_maxsize: int = Field(
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
     )
-    stale_cache_ttl_multiplier: int = Field(
-        24,
-        ge=1,
-        description="Stale cache TTL multiplier (stale_ttl = cache_ttl * multiplier)",
-    )
-    stale_cache_size_multiplier: int = Field(
-        2,
-        ge=1,
-        description="Stale cache size multiplier (stale_maxsize = cache_maxsize * multiplier)",
-    )
 
     # Request Configuration
     request_timeout: int = Field(30, ge=1, description="Request timeout in seconds")
@@ -117,14 +107,6 @@ def load_config() -> Config:
 
         if cache_maxsize := os.getenv("TIM_CACHE_MAXSIZE"):
             config_data["cache_maxsize"] = int(cache_maxsize)
-
-        if stale_cache_ttl_multiplier := os.getenv("TIM_STALE_CACHE_TTL_MULTIPLIER"):
-            config_data["stale_cache_ttl_multiplier"] = int(stale_cache_ttl_multiplier)
-
-        if stale_cache_size_multiplier := os.getenv("TIM_STALE_CACHE_SIZE_MULTIPLIER"):
-            config_data["stale_cache_size_multiplier"] = int(
-                stale_cache_size_multiplier
-            )
 
         # Request configuration
         if request_timeout := os.getenv("TIM_REQUEST_TIMEOUT"):
