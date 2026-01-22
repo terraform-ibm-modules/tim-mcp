@@ -12,11 +12,11 @@ from typing import Any
 import httpx
 
 from ..config import Config, get_github_auth_headers
-from ..exceptions import GitHubError, ModuleNotFoundError, RateLimitError
+from ..exceptions import GitHubError, ModuleNotFoundError
 from ..logging import get_logger, log_api_request
 from ..utils.cache import InMemoryCache
 from ..utils.rate_limiter import RateLimiter
-from .base import api_method
+from .base import api_method, check_rate_limit_response
 
 
 class GitHubClient:
@@ -62,15 +62,6 @@ class GitHubClient:
         """Update rate limit information from response headers."""
         self.rate_limit_remaining = response.headers.get("X-RateLimit-Remaining")
         self.rate_limit_reset = response.headers.get("X-RateLimit-Reset")
-
-    def _check_rate_limit(self, response: httpx.Response) -> None:
-        """Check for rate limiting and raise if limited."""
-        if response.status_code == 429:
-            raise RateLimitError(
-                "GitHub rate limit exceeded",
-                reset_time=int(self.rate_limit_reset) if self.rate_limit_reset else None,
-                api_name="GitHub",
-            )
 
     def _parse_module_id(self, module_id: str) -> tuple[str, str, str]:
         """Parse module ID into namespace, name, provider components."""
@@ -123,7 +114,7 @@ class GitHubClient:
             response = await self.client.get(f"/repos/{owner}/{repo}")
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}")
@@ -146,7 +137,7 @@ class GitHubClient:
             response = await self.client.get(url, params=params)
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             data = response.json()
@@ -172,7 +163,7 @@ class GitHubClient:
             response = await self.client.get(f"/repos/{owner}/{repo}/contents/{path}", params=params)
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             data = response.json()
@@ -201,7 +192,7 @@ class GitHubClient:
             response = await self.client.get(f"/repos/{owner}/{repo}/git/trees/{ref}", params=params)
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             tree_items = response.json().get("tree", [])
@@ -261,7 +252,7 @@ class GitHubClient:
             response = await self.client.get(f"/repos/{owner}/{repo}/releases/latest")
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             data = response.json()

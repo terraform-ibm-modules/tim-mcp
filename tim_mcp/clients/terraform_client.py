@@ -12,11 +12,11 @@ from typing import Any
 import httpx
 
 from ..config import Config, get_terraform_registry_headers
-from ..exceptions import RateLimitError, TerraformRegistryError
+from ..exceptions import TerraformRegistryError
 from ..logging import get_logger, log_api_request
 from ..utils.cache import InMemoryCache
 from ..utils.rate_limiter import RateLimiter
-from .base import api_method
+from .base import api_method, check_rate_limit_response
 
 
 def is_prerelease_version(version: str) -> bool:
@@ -59,16 +59,6 @@ class TerraformClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
-    def _check_rate_limit(self, response: httpx.Response) -> None:
-        """Check for rate limiting and raise if limited."""
-        if response.status_code == 429:
-            reset_time = response.headers.get("X-RateLimit-Reset")
-            raise RateLimitError(
-                "Terraform Registry rate limit exceeded",
-                reset_time=int(reset_time) if reset_time else None,
-                api_name="Terraform Registry",
-            )
-
     @api_method(cache_key_prefix="tf_module_search")
     async def search_modules(self, query: str, namespace: str | None = None, limit: int = 10, offset: int = 0) -> dict[str, Any]:
         """Search for modules in the Terraform Registry."""
@@ -80,7 +70,7 @@ class TerraformClient:
         try:
             response = await self.client.get("/modules/search", params=params)
             duration_ms = (time.time() - start_time) * 1000
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "Terraform Registry")
             response.raise_for_status()
 
             data = response.json()
@@ -106,7 +96,7 @@ class TerraformClient:
                 params = {"namespace": namespace, "limit": limit, "offset": offset}
                 response = await self.client.get("/modules", params=params)
                 duration_ms = (time.time() - start_time) * 1000
-                self._check_rate_limit(response)
+                check_rate_limit_response(response, "Terraform Registry")
                 response.raise_for_status()
 
                 data = response.json()
@@ -140,7 +130,7 @@ class TerraformClient:
 
             response = await self.client.get(url)
             duration_ms = (time.time() - start_time) * 1000
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "Terraform Registry")
             response.raise_for_status()
 
             data = response.json()
@@ -159,7 +149,7 @@ class TerraformClient:
         try:
             response = await self.client.get(f"/modules/{namespace}/{name}/{provider}/versions")
             duration_ms = (time.time() - start_time) * 1000
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "Terraform Registry")
             response.raise_for_status()
 
             data = response.json()
@@ -195,7 +185,7 @@ class TerraformClient:
         try:
             response = await self.client.get(f"/providers/{namespace}/{name}")
             duration_ms = (time.time() - start_time) * 1000
-            self._check_rate_limit(response)
+            check_rate_limit_response(response, "Terraform Registry")
             response.raise_for_status()
 
             data = response.json()

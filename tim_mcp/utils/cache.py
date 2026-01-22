@@ -41,6 +41,8 @@ class InMemoryCache:
         """Get value from cache, optionally including stale entries."""
         with self._lock:
             if key not in self._cache:
+                # Clean up orphaned timestamp if entry was evicted
+                self._timestamps.pop(key, None)
                 return None
             if allow_stale or self._is_fresh(key):
                 return self._cache[key]

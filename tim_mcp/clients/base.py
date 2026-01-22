@@ -26,6 +26,17 @@ from ..utils.rate_limiter import RateLimiter, with_rate_limit
 logger = get_logger(__name__)
 
 
+def check_rate_limit_response(response: httpx.Response, api_name: str) -> None:
+    """Check response for rate limiting and raise if limited."""
+    if response.status_code == 429:
+        reset_time = response.headers.get("X-RateLimit-Reset")
+        raise RateLimitError(
+            f"{api_name} rate limit exceeded",
+            reset_time=int(reset_time) if reset_time else None,
+            api_name=api_name,
+        )
+
+
 def make_cache_key(prefix: str) -> Callable[..., str]:
     """
     Create a cache key generator function for a given prefix.
@@ -39,7 +50,7 @@ def make_cache_key(prefix: str) -> Callable[..., str]:
 
     def cache_key_fn(_self: Any, *args, **kwargs) -> str:
         key_parts = [str(a) for a in args]
-        key_parts.extend(f"{v}" for k, v in sorted(kwargs.items()) if v is not None)
+        key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()) if v is not None)
         return f"{prefix}_{'_'.join(key_parts)}"
 
     return cache_key_fn

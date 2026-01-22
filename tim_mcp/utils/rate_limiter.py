@@ -76,6 +76,7 @@ def with_rate_limit(
     limiter_getter: Callable[[], RateLimiter | None] | None = None,
     cache_getter: Callable[..., Any] | None = None,
     cache_key_fn: Callable[..., str] | None = None,
+    rate_limit_key: str = "global",
 ):
     """Decorator for rate limiting with integrated caching.
 
@@ -89,6 +90,7 @@ def with_rate_limit(
         limiter_getter: Callable that returns a RateLimiter instance (or None to skip)
         cache_getter: Callable that returns a cache instance given the first arg (self)
         cache_key_fn: Callable that generates cache key from function args
+        rate_limit_key: Key for rate limiting bucket (default: "global")
 
     Note: When using this decorator with @retry, place @retry INSIDE (below) this
     decorator so rate limiting is checked before retries are attempted.
@@ -127,7 +129,7 @@ def with_rate_limit(
                     # Fallback for standalone functions without self
                     limiter = limiter_getter()
             if limiter:
-                acquired, reset_time = limiter.try_acquire("global")
+                acquired, reset_time = limiter.try_acquire(rate_limit_key)
 
                 if not acquired:
                     # Step 3: Rate limited - try stale cache fallback
