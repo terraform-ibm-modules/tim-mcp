@@ -20,66 +20,66 @@ from tenacity import (
 
 from ..config import Config, get_github_auth_headers
 from ..exceptions import GitHubError, ModuleNotFoundError, RateLimitError
-from ..logging import get_logger, log_api_request, log_cache_operation
+from ..logging import get_logger, log_api_request
 from ..utils.cache import InMemoryCache
 from ..utils.rate_limiter import RateLimiter, with_rate_limit
 
-# Module-level global rate limiter (shared across all GitHubClient instances)
-_global_limiter: RateLimiter | None = None
 
-
-def set_global_limiter(limiter: RateLimiter) -> None:
-    """
-    Set the global rate limiter for all GitHubClient instances.
-
-    Args:
-        limiter: RateLimiter instance to use
-    """
-    global _global_limiter
-    _global_limiter = limiter
-
-
-# Cache key generators - single source of truth for cache keys
-# Used by both @with_rate_limit decorator and method bodies
-def _cache_key_repo_info(owner: str, repo: str) -> str:
+# Cache key generators - centralized to ensure consistency
+def _cache_key_repo_info(_self: Any, owner: str, repo: str) -> str:
     return f"repo_info_{owner}_{repo}"
 
 
-def _cache_key_dir_contents(owner: str, repo: str, path: str, ref: str) -> str:
+def _cache_key_dir_contents(
+    _self: Any, owner: str, repo: str, path: str = "", ref: str = "HEAD"
+) -> str:
     return f"dir_contents_{owner}_{repo}_{path}_{ref}"
 
 
-def _cache_key_file_content(owner: str, repo: str, path: str, ref: str) -> str:
+def _cache_key_file_content(
+    _self: Any, owner: str, repo: str, path: str, ref: str = "HEAD"
+) -> str:
     return f"file_content_{owner}_{repo}_{path}_{ref}"
 
 
-def _cache_key_repo_tree(owner: str, repo: str, ref: str, recursive: bool) -> str:
+def _cache_key_repo_tree(
+    _self: Any, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
+) -> str:
     return f"repo_tree_{owner}_{repo}_{ref}_{recursive}"
 
 
-def _cache_key_latest_release(owner: str, repo: str) -> str:
+def _cache_key_latest_release(_self: Any, owner: str, repo: str) -> str:
     return f"latest_release_{owner}_{repo}"
 
 
-def _cache_key_resolve_version(owner: str, repo: str, version: str) -> str:
+def _cache_key_resolve_version(
+    _self: Any, owner: str, repo: str, version: str = "latest"
+) -> str:
     return f"resolve_version_{owner}_{repo}_{version}"
 
 
 class GitHubClient:
     """Async client for interacting with GitHub API."""
 
-    def __init__(self, config: Config, cache: InMemoryCache | None = None):
+    def __init__(
+        self,
+        config: Config,
+        cache: InMemoryCache | None = None,
+        rate_limiter: RateLimiter | None = None,
+    ):
         """
         Initialize the GitHub client.
 
         Args:
             config: Configuration instance
             cache: Cache instance, or None to create a new one
+            rate_limiter: Rate limiter instance for request throttling
         """
         self.config = config
         self.cache = cache or InMemoryCache(
             ttl=config.cache_ttl, maxsize=config.cache_maxsize
         )
+        self.rate_limiter = rate_limiter
         self.logger = get_logger(__name__, client="github")
 
         # Configure HTTP client
@@ -91,7 +91,7 @@ class GitHubClient:
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
-        # Track rate limits
+        # Track rate limits from GitHub API responses
         self.rate_limit_remaining = None
         self.rate_limit_reset = None
 
@@ -204,15 +204,15 @@ class GitHubClient:
             )
             return None
 
+    @with_rate_limit(
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_repo_info,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
-    )
-    @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo: _cache_key_repo_info(owner, repo),
     )
     async def get_repository_info(self, owner: str, repo: str) -> dict[str, Any]:
         """
@@ -229,16 +229,6 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = _cache_key_repo_info(owner, repo)
-
-        # Check cache first
-        cached = self.cache.get(cache_key)
-        if cached:
-            log_cache_operation(self.logger, "get", cache_key, hit=True)
-            return cached
-
-        log_cache_operation(self.logger, "get", cache_key, hit=False)
-
         start_time = time.time()
 
         try:
@@ -247,7 +237,7 @@ class GitHubClient:
 
             self._update_rate_limit_info(response)
 
-            # Handle rate limiting
+            # Handle rate limiting from GitHub API
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
@@ -260,7 +250,6 @@ class GitHubClient:
             response.raise_for_status()
             data = response.json()
 
-            # Log successful request
             log_api_request(
                 self.logger,
                 "GET",
@@ -269,10 +258,6 @@ class GitHubClient:
                 duration_ms,
                 repo=f"{owner}/{repo}",
             )
-
-            # Cache the result
-            self.cache.set(cache_key, data)
-            log_cache_operation(self.logger, "set", cache_key)
 
             return data
 
@@ -302,15 +287,15 @@ class GitHubClient:
             self.logger.error("Request error getting repository info", error=str(e))
             raise GitHubError(f"Request error getting repository info: {e}") from e
 
+    @with_rate_limit(
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_dir_contents,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
-    )
-    @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo, path="", ref="HEAD": _cache_key_dir_contents(owner, repo, path, ref),
     )
     async def get_directory_contents(
         self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
@@ -331,16 +316,6 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = _cache_key_dir_contents(owner, repo, path, ref)
-
-        # Check cache first
-        cached = self.cache.get(cache_key)
-        if cached:
-            log_cache_operation(self.logger, "get", cache_key, hit=True)
-            return cached
-
-        log_cache_operation(self.logger, "get", cache_key, hit=False)
-
         start_time = time.time()
 
         try:
@@ -354,7 +329,6 @@ class GitHubClient:
 
             self._update_rate_limit_info(response)
 
-            # Handle rate limiting
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
@@ -371,7 +345,6 @@ class GitHubClient:
             if not isinstance(data, list):
                 data = [data]
 
-            # Log successful request
             log_api_request(
                 self.logger,
                 "GET",
@@ -382,10 +355,6 @@ class GitHubClient:
                 path=path,
                 item_count=len(data),
             )
-
-            # Cache the result
-            self.cache.set(cache_key, data)
-            log_cache_operation(self.logger, "set", cache_key)
 
             return data
 
@@ -412,15 +381,15 @@ class GitHubClient:
             self.logger.error("Request error getting directory contents", error=str(e))
             raise GitHubError(f"Request error getting directory contents: {e}") from e
 
+    @with_rate_limit(
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_file_content,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
-    )
-    @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo, path, ref="HEAD": _cache_key_file_content(owner, repo, path, ref),
     )
     async def get_file_content(
         self, owner: str, repo: str, path: str, ref: str = "HEAD"
@@ -441,16 +410,6 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = _cache_key_file_content(owner, repo, path, ref)
-
-        # Check cache first
-        cached = self.cache.get(cache_key)
-        if cached:
-            log_cache_operation(self.logger, "get", cache_key, hit=True)
-            return cached
-
-        log_cache_operation(self.logger, "get", cache_key, hit=False)
-
         start_time = time.time()
 
         try:
@@ -462,7 +421,6 @@ class GitHubClient:
 
             self._update_rate_limit_info(response)
 
-            # Handle rate limiting
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
@@ -483,7 +441,6 @@ class GitHubClient:
                 except Exception as e:
                     self.logger.warning("Failed to decode base64 content", error=str(e))
 
-            # Log successful request
             log_api_request(
                 self.logger,
                 "GET",
@@ -494,10 +451,6 @@ class GitHubClient:
                 path=path,
                 size=data.get("size", 0),
             )
-
-            # Cache the result
-            self.cache.set(cache_key, data)
-            log_cache_operation(self.logger, "set", cache_key)
 
             return data
 
@@ -527,15 +480,15 @@ class GitHubClient:
             self.logger.error("Request error getting file content", error=str(e))
             raise GitHubError(f"Request error getting file content: {e}") from e
 
+    @with_rate_limit(
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_repo_tree,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
-    )
-    @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo, ref="HEAD", recursive=True: _cache_key_repo_tree(owner, repo, ref, recursive),
     )
     async def get_repository_tree(
         self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
@@ -556,16 +509,6 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = _cache_key_repo_tree(owner, repo, ref, recursive)
-
-        # Check cache first
-        cached = self.cache.get(cache_key)
-        if cached:
-            log_cache_operation(self.logger, "get", cache_key, hit=True)
-            return cached
-
-        log_cache_operation(self.logger, "get", cache_key, hit=False)
-
         start_time = time.time()
 
         try:
@@ -577,7 +520,6 @@ class GitHubClient:
 
             self._update_rate_limit_info(response)
 
-            # Handle rate limiting
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
@@ -591,7 +533,6 @@ class GitHubClient:
             data = response.json()
             tree_items = data.get("tree", [])
 
-            # Log successful request
             log_api_request(
                 self.logger,
                 "GET",
@@ -601,10 +542,6 @@ class GitHubClient:
                 repo=f"{owner}/{repo}",
                 tree_size=len(tree_items),
             )
-
-            # Cache the result
-            self.cache.set(cache_key, tree_items)
-            log_cache_operation(self.logger, "set", cache_key)
 
             return tree_items
 
@@ -743,15 +680,15 @@ class GitHubClient:
         ref = ref or "HEAD"
         return await self.get_file_content(owner, repo, path, ref)
 
+    @with_rate_limit(
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_latest_release,
+    )
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
-    )
-    @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo: _cache_key_latest_release(owner, repo),
     )
     async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any]:
         """
@@ -769,16 +706,6 @@ class GitHubClient:
             RateLimitError: If rate limited
             ModuleNotFoundError: If no releases exist
         """
-        cache_key = _cache_key_latest_release(owner, repo)
-
-        # Check cache first
-        cached = self.cache.get(cache_key)
-        if cached:
-            log_cache_operation(self.logger, "get", cache_key, hit=True)
-            return cached
-
-        log_cache_operation(self.logger, "get", cache_key, hit=False)
-
         start_time = time.time()
 
         try:
@@ -787,7 +714,6 @@ class GitHubClient:
 
             self._update_rate_limit_info(response)
 
-            # Handle rate limiting
             if response.status_code == 429:
                 raise RateLimitError(
                     "GitHub rate limit exceeded",
@@ -800,7 +726,6 @@ class GitHubClient:
             response.raise_for_status()
             data = response.json()
 
-            # Log successful request
             log_api_request(
                 self.logger,
                 "GET",
@@ -810,10 +735,6 @@ class GitHubClient:
                 repo=f"{owner}/{repo}",
                 tag_name=data.get("tag_name"),
             )
-
-            # Cache the result
-            self.cache.set(cache_key, data)
-            log_cache_operation(self.logger, "set", cache_key)
 
             return data
 
@@ -844,9 +765,14 @@ class GitHubClient:
             raise GitHubError(f"Request error getting latest release: {e}") from e
 
     @with_rate_limit(
-        global_limiter=lambda: _global_limiter,
-        cache=lambda self: self.cache,
-        cache_key_fn=lambda _, owner, repo, version="latest": _cache_key_resolve_version(owner, repo, version),
+        limiter_getter=lambda self: self.rate_limiter,
+        cache_getter=lambda self: self.cache,
+        cache_key_fn=_cache_key_resolve_version,
+    )
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
     )
     async def resolve_version(
         self, owner: str, repo: str, version: str = "latest"

@@ -15,6 +15,7 @@ from fastmcp import FastMCP
 from pydantic import ValidationError
 
 from .config import Config, load_config
+from .context import init_context
 from .exceptions import TIMError
 from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
@@ -24,6 +25,7 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
+from .utils.cache import InMemoryCache
 from .utils.rate_limiter import RateLimiter
 
 # Global configuration and logger
@@ -31,22 +33,28 @@ config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
 
-# Initialize global rate limiter
+# Initialize global rate limiter and shared cache
 global_rate_limiter = RateLimiter(
     max_requests=config.global_rate_limit,
     window_seconds=config.rate_limit_window,
 )
 
-# Set rate limiters for client modules
-from .clients import github_client, terraform_client
+shared_cache = InMemoryCache(
+    ttl=config.cache_ttl,
+    maxsize=config.cache_maxsize,
+    stale_ttl_multiplier=config.stale_cache_ttl_multiplier,
+    stale_size_multiplier=config.stale_cache_size_multiplier,
+)
 
-github_client.set_global_limiter(global_rate_limiter)
-terraform_client.set_global_limiter(global_rate_limiter)
+# Initialize shared context for tools
+init_context(global_rate_limiter, shared_cache)
 
 logger.info(
-    "Rate limiter initialized",
+    "Rate limiter and cache initialized",
     global_rate_limit=config.global_rate_limit,
     rate_limit_window=config.rate_limit_window,
+    cache_ttl=config.cache_ttl,
+    cache_maxsize=config.cache_maxsize,
 )
 
 
@@ -614,6 +622,20 @@ async def module_index():
         )
 
 
+def get_stats() -> dict:
+    """Get cache and rate limiter statistics."""
+    return {
+        "cache": shared_cache.get_stats(),
+        "rate_limiter": {
+            "global": global_rate_limiter.get_stats("global"),
+            "config": {
+                "max_requests": global_rate_limiter.max_requests,
+                "window_seconds": global_rate_limiter.window_seconds,
+            },
+        },
+    }
+
+
 def main(transport_config=None):
     """
     Run the MCP server with specified transport configuration.
@@ -636,6 +658,9 @@ def main(transport_config=None):
         )
 
         # Add per-IP rate limiting middleware for HTTP mode
+        from starlette.responses import JSONResponse
+        from starlette.routing import Route
+
         from .middleware import PerIPRateLimitMiddleware
 
         per_ip_limiter = RateLimiter(
@@ -648,8 +673,23 @@ def main(transport_config=None):
         app.add_middleware(
             PerIPRateLimitMiddleware,
             rate_limiter=per_ip_limiter,
-            bypass_paths=["/health"],
+            bypass_paths=["/health", "/stats"],
         )
+
+        # Add stats endpoint
+        async def stats_endpoint(request):
+            """Return cache and rate limiter statistics."""
+            stats = get_stats()
+            # Add per-IP rate limiter stats
+            stats["rate_limiter"]["per_ip"] = {
+                "config": {
+                    "max_requests": per_ip_limiter.max_requests,
+                    "window_seconds": per_ip_limiter.window_seconds,
+                }
+            }
+            return JSONResponse(stats)
+
+        app.routes.append(Route("/stats", stats_endpoint, methods=["GET"]))
 
         logger.info(
             "Per-IP rate limiting enabled",

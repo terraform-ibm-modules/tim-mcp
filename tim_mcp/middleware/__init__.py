@@ -1,7 +1,7 @@
 """Per-IP rate limiting middleware using limits library."""
 
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -29,7 +29,9 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
         - Consider using X-Forwarded-For with a known number of trusted proxies
     """
 
-    def __init__(self, app, rate_limiter: RateLimiter, bypass_paths: list[str] | None = None):
+    def __init__(
+        self, app, rate_limiter: RateLimiter, bypass_paths: list[str] | None = None
+    ):
         super().__init__(app)
         self.rate_limiter = rate_limiter
         self.bypass_paths = bypass_paths or ["/health"]
@@ -75,7 +77,9 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
                     "X-RateLimit-Limit": str(stats["limit"]),
                     "X-RateLimit-Remaining": str(stats["remaining"]),
                     "X-RateLimit-Reset": str(reset_time) if reset_time else "",
-                    "Retry-After": str(max(1, reset_time - int(time.time()))) if reset_time else "60",
+                    "Retry-After": str(max(1, reset_time - int(time.time())))
+                    if reset_time
+                    else "60",
                 },
             )
 

@@ -3,6 +3,7 @@
 import pytest
 import time
 import threading
+from freezegun import freeze_time
 from tim_mcp.utils.rate_limiter import RateLimiter
 from tim_mcp.exceptions import RateLimitError
 
@@ -36,7 +37,11 @@ class TestRateLimiter:
         assert isinstance(reset_time, int)
 
     def test_rate_limiter_sliding_window(self):
-        """Test that sliding window expires old requests."""
+        """Test that sliding window expires old requests.
+
+        Note: The limits library uses internal time tracking, so we use
+        a short window with real sleep to test expiration behavior.
+        """
         limiter = RateLimiter(max_requests=2, window_seconds=1)
 
         # Make 2 requests (at limit)
@@ -47,7 +52,7 @@ class TestRateLimiter:
         allowed, _ = limiter.check_limit("test_key")
         assert allowed is False
 
-        # Wait for window to expire
+        # Wait for window to expire (limits library requires real time)
         time.sleep(1.1)
 
         # Should be allowed again
@@ -117,7 +122,7 @@ class TestRateLimiter:
         def make_requests(count):
             """Make rate limit requests."""
             try:
-                for i in range(count):
+                for _ in range(count):
                     allowed, _ = limiter.check_limit("test_key")
                     if allowed:
                         limiter.record_request("test_key")
@@ -126,7 +131,7 @@ class TestRateLimiter:
 
         # Create multiple threads
         threads = []
-        for i in range(5):
+        for _ in range(5):
             thread = threading.Thread(target=make_requests, args=(20,))
             threads.append(thread)
 
@@ -146,18 +151,22 @@ class TestRateLimiter:
         assert stats["used"] == 100
 
     def test_rate_limiter_cleanup_old_timestamps(self):
-        """Test that old timestamps are cleaned up."""
+        """Test that old timestamps are cleaned up.
+
+        Note: The limits library uses internal time tracking, so we use
+        a short window with real sleep to test cleanup behavior.
+        """
         limiter = RateLimiter(max_requests=5, window_seconds=1)
 
         # Make some requests
-        for i in range(3):
+        for _ in range(3):
             limiter.record_request("test_key")
 
         # Check that requests are tracked
         stats = limiter.get_stats("test_key")
         assert stats["used"] == 3
 
-        # Wait for window to expire
+        # Wait for window to expire (limits library requires real time)
         time.sleep(1.1)
 
         # Get stats (should trigger cleanup)
@@ -188,7 +197,7 @@ class TestRateLimiter:
         limiter = RateLimiter(max_requests=3, window_seconds=60)
 
         # Make exactly 3 requests
-        for i in range(3):
+        for _ in range(3):
             allowed, _ = limiter.check_limit("test_key")
             assert allowed is True
             limiter.record_request("test_key")
@@ -207,6 +216,25 @@ class TestRateLimiter:
         assert stats["remaining"] == 10
         assert stats["reset_time"] is None
 
+    def test_try_acquire_atomic(self):
+        """Test that try_acquire is atomic."""
+        limiter = RateLimiter(max_requests=2, window_seconds=60)
+
+        # First acquire should succeed
+        acquired, reset_time = limiter.try_acquire("test_key")
+        assert acquired is True
+        assert reset_time is None
+
+        # Second acquire should succeed
+        acquired, reset_time = limiter.try_acquire("test_key")
+        assert acquired is True
+        assert reset_time is None
+
+        # Third should fail
+        acquired, reset_time = limiter.try_acquire("test_key")
+        assert acquired is False
+        assert reset_time is not None
+
 
 @pytest.mark.asyncio
 class TestRateLimitDecorator:
@@ -216,7 +244,7 @@ class TestRateLimitDecorator:
         """Test decorator passes through when no limiter configured."""
         from tim_mcp.utils.rate_limiter import with_rate_limit
 
-        @with_rate_limit(global_limiter=None)
+        @with_rate_limit(limiter_getter=None)
         async def test_func():
             return "success"
 
@@ -229,12 +257,12 @@ class TestRateLimitDecorator:
 
         limiter = RateLimiter(max_requests=5, window_seconds=60)
 
-        @with_rate_limit(global_limiter=lambda: limiter)
+        @with_rate_limit(limiter_getter=lambda: limiter)
         async def test_func():
             return "success"
 
         # Should succeed 5 times
-        for i in range(5):
+        for _ in range(5):
             result = await test_func()
             assert result == "success"
 
@@ -244,7 +272,7 @@ class TestRateLimitDecorator:
 
         limiter = RateLimiter(max_requests=1, window_seconds=60)
 
-        @with_rate_limit(global_limiter=lambda: limiter)
+        @with_rate_limit(limiter_getter=lambda: limiter)
         async def test_func():
             return "success"
 
@@ -259,35 +287,105 @@ class TestRateLimitDecorator:
         assert "Global rate limit exceeded" in str(exc_info.value)
 
     async def test_decorator_serves_stale_cache(self):
-        """Test decorator serves stale cache when rate limited."""
+        """Test decorator serves stale cache when rate limited.
+
+        Note: Cache TTL uses time.monotonic() internally, requiring real sleep
+        for accurate expiration testing.
+        """
         from tim_mcp.utils.rate_limiter import with_rate_limit
         from tim_mcp.utils.cache import InMemoryCache
 
+        # Use 0 rate limit slots to immediately trigger rate limiting
         limiter = RateLimiter(max_requests=1, window_seconds=60)
         cache = InMemoryCache(ttl=1, maxsize=10)
 
         # Pre-populate cache with stale data
         cache.set("test_key", "stale_value")
-        time.sleep(1.1)  # Wait for expiration
+        time.sleep(1.1)  # Wait for primary cache expiration (stale cache retains it)
+
+        # Exhaust the rate limit before calling the decorated function
+        limiter.record_request("global")
 
         call_count = 0
 
-        @with_rate_limit(
-            global_limiter=lambda: limiter,
-            cache=lambda: cache,
-            cache_key_fn=lambda: "test_key"
-        )
-        async def test_func():
-            nonlocal call_count
-            call_count += 1
-            return "fresh_value"
+        class Wrapper:
+            """Wrapper class to simulate method with self."""
 
-        # First call should execute function
-        result = await test_func()
+            @with_rate_limit(
+                limiter_getter=lambda self: limiter,
+                cache_getter=lambda self: cache,
+                cache_key_fn=lambda self: "test_key"
+            )
+            async def test_func(self):
+                nonlocal call_count
+                call_count += 1
+                return "fresh_value"
+
+        wrapper = Wrapper()
+
+        # Call should be rate limited but serve stale cache
+        result = await wrapper.test_func()
+        assert result == "stale_value"
+        assert call_count == 0  # Function never called due to rate limit
+
+    async def test_decorator_caches_fresh_results(self):
+        """Test decorator caches fresh results after successful calls."""
+        from tim_mcp.utils.rate_limiter import with_rate_limit
+        from tim_mcp.utils.cache import InMemoryCache
+
+        limiter = RateLimiter(max_requests=10, window_seconds=60)
+        cache = InMemoryCache(ttl=3600, maxsize=10)
+
+        call_count = 0
+
+        class Wrapper:
+            """Wrapper class to simulate method with self."""
+
+            @with_rate_limit(
+                limiter_getter=lambda self: limiter,
+                cache_getter=lambda self: cache,
+                cache_key_fn=lambda self: "test_key"
+            )
+            async def test_func(self):
+                nonlocal call_count
+                call_count += 1
+                return "fresh_value"
+
+        wrapper = Wrapper()
+
+        # First call should execute function and cache result
+        result = await wrapper.test_func()
         assert result == "fresh_value"
         assert call_count == 1
 
-        # Second call should be rate limited but serve stale cache
-        result = await test_func()
-        assert result == "stale_value"
-        assert call_count == 1  # Function not called again
+        # Second call should return cached result without executing function
+        result = await wrapper.test_func()
+        assert result == "fresh_value"
+        assert call_count == 1  # Still 1, function not called again
+
+    async def test_decorator_with_cache_getter_receiving_self(self):
+        """Test decorator properly passes self to cache_getter."""
+        from tim_mcp.utils.rate_limiter import with_rate_limit
+        from tim_mcp.utils.cache import InMemoryCache
+
+        class MockClient:
+            def __init__(self):
+                self.cache = InMemoryCache(ttl=3600, maxsize=10)
+                self.rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
+            @with_rate_limit(
+                limiter_getter=lambda self: self.rate_limiter,
+                cache_getter=lambda self: self.cache,
+                cache_key_fn=lambda self, arg: f"key_{arg}"
+            )
+            async def fetch_data(self, arg: str):
+                return f"data_{arg}"
+
+        client = MockClient()
+
+        # First call caches result
+        result = await client.fetch_data("test")
+        assert result == "data_test"
+
+        # Verify it's cached
+        assert client.cache.get("key_test") == "data_test"

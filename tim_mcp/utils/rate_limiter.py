@@ -1,19 +1,24 @@
 """
-Rate limiting using the 'limits' library with stale cache integration.
+Rate limiting using the 'limits' library with cache integration.
 
 Provides a wrapper around the 'limits' library for moving window rate limiting.
-This module adds a decorator that integrates rate limiting with stale cache
-fallback, allowing the application to serve expired cached data when rate limits
-are exceeded rather than returning errors to users.
+This module adds a decorator that integrates rate limiting with caching:
+- Fresh cache lookup (skip rate limit entirely if cached)
+- Stale cache fallback when rate limited
+- Automatic cache population after successful API calls
 """
 
+import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from limits import parse, storage
 from limits.strategies import MovingWindowRateLimiter
 
 from ..exceptions import RateLimitError
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
@@ -23,20 +28,23 @@ class RateLimiter:
         self._storage = storage.MemoryStorage()
         self._limiter = MovingWindowRateLimiter(self._storage)
         self._rate_limit = parse(f"{max_requests} per {window_seconds} second")
+        self.max_requests = max_requests
         self.window_seconds = window_seconds
 
-    def check_limit(self, key: str) -> tuple[bool, Optional[int]]:
+    def check_limit(self, key: str) -> tuple[bool, int | None]:
         """Check if request allowed without recording. Returns (allowed, reset_time)."""
         allowed = self._limiter.test(self._rate_limit, key)
         stats = self._limiter.get_window_stats(self._rate_limit, key)
-        reset_time = None if allowed else int(stats.reset_time) if stats.reset_time else None
+        reset_time = (
+            None if allowed else int(stats.reset_time) if stats.reset_time else None
+        )
         return allowed, reset_time
 
     def record_request(self, key: str) -> None:
         """Record a request (non-atomic, use try_acquire for atomic check+record)."""
         self._limiter.hit(self._rate_limit, key)
 
-    def try_acquire(self, key: str) -> tuple[bool, Optional[int]]:
+    def try_acquire(self, key: str) -> tuple[bool, int | None]:
         """Atomically check and record a request. Returns (acquired, reset_time).
 
         This method is atomic - it checks if a slot is available and records
@@ -57,56 +65,122 @@ class RateLimiter:
             "limit": self._rate_limit.amount,
             "remaining": stats.remaining,
             "used": used,
-            "reset_time": int(stats.reset_time) if used > 0 and stats.reset_time else None,
-            "window_seconds": self.window_seconds
+            "reset_time": int(stats.reset_time)
+            if used > 0 and stats.reset_time
+            else None,
+            "window_seconds": self.window_seconds,
         }
 
 
-def _get_stale_cache(cache, cache_key_fn, args, kwargs):
-    """Helper to retrieve stale cache data."""
-    if not (cache and cache_key_fn):
-        return None
-    try:
-        cache_instance = cache(args[0]) if args else cache()
-        cache_key = cache_key_fn(*args, **kwargs)
-        return cache_instance.get(cache_key, allow_stale=True)
-    except Exception:
-        return None
-
-
 def with_rate_limit(
-    global_limiter: Optional[Callable[[], Optional[RateLimiter]]] = None,
-    cache: Optional[Callable[..., Any]] = None,
-    cache_key_fn: Optional[Callable[..., str]] = None
+    limiter_getter: Callable[[], RateLimiter | None] | None = None,
+    cache_getter: Callable[..., Any] | None = None,
+    cache_key_fn: Callable[..., str] | None = None,
 ):
-    """Decorator for rate limiting with stale cache fallback."""
+    """Decorator for rate limiting with integrated caching.
+
+    This decorator handles the complete caching workflow:
+    1. Check fresh cache first (return immediately if hit, no rate limit consumed)
+    2. If cache miss, check rate limit
+    3. If rate limited, try stale cache fallback
+    4. If not rate limited, call the function and cache the result
+
+    Args:
+        limiter_getter: Callable that returns a RateLimiter instance (or None to skip)
+        cache_getter: Callable that returns a cache instance given the first arg (self)
+        cache_key_fn: Callable that generates cache key from function args
+
+    Note: When using this decorator with @retry, place @retry INSIDE (below) this
+    decorator so rate limiting is checked before retries are attempted.
+    """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            limiter = global_limiter() if global_limiter else None
-            if not limiter:
-                return await func(*args, **kwargs)
+            cache_instance = None
+            cache_key = None
 
-            # Atomic check-and-record to prevent race conditions
-            acquired, reset_time = limiter.try_acquire("global")
+            # Try to get cache instance and key
+            # Note: args[0] is typically 'self' when decorating methods
+            if cache_getter and cache_key_fn:
+                try:
+                    cache_instance = cache_getter(args[0]) if args else None
+                    cache_key = cache_key_fn(*args, **kwargs)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to get cache instance or key: %s", str(e), exc_info=True
+                    )
 
-            if not acquired:
-                stale_data = _get_stale_cache(cache, cache_key_fn, args, kwargs)
-                if stale_data is not None:
-                    return stale_data
-                raise RateLimitError(
-                    "Global rate limit exceeded. Please try again later.",
-                    reset_time=reset_time,
-                    api_name="TIM-MCP Global"
-                )
+            # Step 1: Check fresh cache first (no rate limit consumed)
+            if cache_instance and cache_key:
+                cached = cache_instance.get(cache_key, allow_stale=False)
+                if cached is not None:
+                    return cached
 
+            # Step 2: Check rate limit
+            # Note: limiter_getter receives args[0] (self) when decorating methods
+            limiter = None
+            if limiter_getter:
+                try:
+                    limiter = limiter_getter(args[0]) if args else limiter_getter()
+                except TypeError:
+                    # Fallback for standalone functions without self
+                    limiter = limiter_getter()
+            if limiter:
+                acquired, reset_time = limiter.try_acquire("global")
+
+                if not acquired:
+                    # Step 3: Rate limited - try stale cache fallback
+                    if cache_instance and cache_key:
+                        try:
+                            stale_data = cache_instance.get(cache_key, allow_stale=True)
+                            if stale_data is not None:
+                                logger.debug("Serving stale cache for %s", cache_key)
+                                return stale_data
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to get stale cache for %s: %s",
+                                cache_key,
+                                str(e),
+                            )
+                    raise RateLimitError(
+                        "Global rate limit exceeded. Please try again later.",
+                        reset_time=reset_time,
+                        api_name="TIM-MCP Global",
+                    )
+
+            # Step 4: Call the function
             try:
-                return await func(*args, **kwargs)
+                result = await func(*args, **kwargs)
+
+                # Cache the result
+                if cache_instance and cache_key and result is not None:
+                    try:
+                        cache_instance.set(cache_key, result)
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to cache result for %s: %s", cache_key, str(e)
+                        )
+
+                return result
+
             except RateLimitError:
-                stale_data = _get_stale_cache(cache, cache_key_fn, args, kwargs)
-                if stale_data is not None:
-                    return stale_data
+                # Upstream API rate limited - try stale cache
+                if cache_instance and cache_key:
+                    try:
+                        stale_data = cache_instance.get(cache_key, allow_stale=True)
+                        if stale_data is not None:
+                            logger.debug(
+                                "Serving stale cache after upstream rate limit for %s",
+                                cache_key,
+                            )
+                            return stale_data
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to get stale cache for %s: %s", cache_key, str(e)
+                        )
                 raise
 
         return wrapper
+
     return decorator
