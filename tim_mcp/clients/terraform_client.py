@@ -38,6 +38,28 @@ def set_global_limiter(limiter: RateLimiter) -> None:
     _global_limiter = limiter
 
 
+# Cache key generators - single source of truth for cache keys
+# Used by both @with_rate_limit decorator and method bodies
+def _cache_key_module_search(query: str, namespace: str | None, limit: int, offset: int) -> str:
+    return f"module_search_{query}_{namespace}_{limit}_{offset}"
+
+
+def _cache_key_list_all_modules(namespace: str) -> str:
+    return f"list_all_modules_{namespace}"
+
+
+def _cache_key_module_details(namespace: str, name: str, provider: str, version: str) -> str:
+    return f"module_details_{namespace}_{name}_{provider}_{version}"
+
+
+def _cache_key_module_versions(namespace: str, name: str, provider: str) -> str:
+    return f"module_versions_{namespace}_{name}_{provider}"
+
+
+def _cache_key_provider_info(namespace: str, name: str) -> str:
+    return f"provider_info_{namespace}_{name}"
+
+
 def is_prerelease_version(version: str) -> bool:
     """
     Check if a version string is a pre-release version.
@@ -107,7 +129,7 @@ class TerraformClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, query, namespace=None, limit=10, offset=0: f"module_search_{query}_{namespace}_{limit}_{offset}",
+        cache_key_fn=lambda _, query, namespace=None, limit=10, offset=0: _cache_key_module_search(query, namespace, limit, offset),
     )
     async def search_modules(
         self,
@@ -132,8 +154,7 @@ class TerraformClient:
             TerraformRegistryError: If the API request fails
             RateLimitError: If rate limited
         """
-        # Build cache key
-        cache_key = f"module_search_{query}_{namespace}_{limit}_{offset}"
+        cache_key = _cache_key_module_search(query, namespace, limit, offset)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -212,7 +233,7 @@ class TerraformClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, namespace: f"list_all_modules_{namespace}",
+        cache_key_fn=lambda _, namespace: _cache_key_list_all_modules(namespace),
     )
     async def list_all_modules(
         self,
@@ -231,8 +252,7 @@ class TerraformClient:
             TerraformRegistryError: If the API request fails
             RateLimitError: If rate limited
         """
-        # Build cache key
-        cache_key = f"list_all_modules_{namespace}"
+        cache_key = _cache_key_list_all_modules(namespace)
 
         # Check cache first (with shorter TTL since this is comprehensive)
         cached = self.cache.get(cache_key)
@@ -338,7 +358,7 @@ class TerraformClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, namespace, name, provider, version="latest": f"module_details_{namespace}_{name}_{provider}_{version}",
+        cache_key_fn=lambda _, namespace, name, provider, version="latest": _cache_key_module_details(namespace, name, provider, version),
     )
     async def get_module_details(
         self, namespace: str, name: str, provider: str, version: str = "latest"
@@ -359,8 +379,7 @@ class TerraformClient:
             TerraformRegistryError: If the API request fails
             RateLimitError: If rate limited
         """
-        # Build cache key
-        cache_key = f"module_details_{namespace}_{name}_{provider}_{version}"
+        cache_key = _cache_key_module_details(namespace, name, provider, version)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -440,7 +459,7 @@ class TerraformClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, namespace, name, provider: f"module_versions_{namespace}_{name}_{provider}",
+        cache_key_fn=lambda _, namespace, name, provider: _cache_key_module_versions(namespace, name, provider),
     )
     async def get_module_versions(
         self, namespace: str, name: str, provider: str
@@ -460,8 +479,7 @@ class TerraformClient:
             TerraformRegistryError: If the API request fails
             RateLimitError: If rate limited
         """
-        # Build cache key
-        cache_key = f"module_versions_{namespace}_{name}_{provider}"
+        cache_key = _cache_key_module_versions(namespace, name, provider)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -564,7 +582,7 @@ class TerraformClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, namespace, name: f"provider_info_{namespace}_{name}",
+        cache_key_fn=lambda _, namespace, name: _cache_key_provider_info(namespace, name),
     )
     async def get_provider_info(self, namespace: str, name: str) -> dict[str, Any]:
         """
@@ -581,8 +599,7 @@ class TerraformClient:
             TerraformRegistryError: If the API request fails
             RateLimitError: If rate limited
         """
-        # Build cache key
-        cache_key = f"provider_info_{namespace}_{name}"
+        cache_key = _cache_key_provider_info(namespace, name)
 
         # Check cache first
         cached = self.cache.get(cache_key)

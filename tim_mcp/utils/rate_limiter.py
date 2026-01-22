@@ -26,15 +26,28 @@ class RateLimiter:
         self.window_seconds = window_seconds
 
     def check_limit(self, key: str) -> tuple[bool, Optional[int]]:
-        """Check if request allowed. Returns (allowed, reset_time)."""
+        """Check if request allowed without recording. Returns (allowed, reset_time)."""
         allowed = self._limiter.test(self._rate_limit, key)
         stats = self._limiter.get_window_stats(self._rate_limit, key)
         reset_time = None if allowed else int(stats.reset_time) if stats.reset_time else None
         return allowed, reset_time
 
     def record_request(self, key: str) -> None:
-        """Record a request."""
+        """Record a request (non-atomic, use try_acquire for atomic check+record)."""
         self._limiter.hit(self._rate_limit, key)
+
+    def try_acquire(self, key: str) -> tuple[bool, Optional[int]]:
+        """Atomically check and record a request. Returns (acquired, reset_time).
+
+        This method is atomic - it checks if a slot is available and records
+        the request in a single operation, avoiding race conditions.
+        """
+        acquired = self._limiter.hit(self._rate_limit, key)
+        if acquired:
+            return True, None
+        stats = self._limiter.get_window_stats(self._rate_limit, key)
+        reset_time = int(stats.reset_time) if stats.reset_time else None
+        return False, reset_time
 
     def get_stats(self, key: str) -> dict[str, Any]:
         """Get rate limit statistics."""
@@ -74,9 +87,10 @@ def with_rate_limit(
             if not limiter:
                 return await func(*args, **kwargs)
 
-            allowed, reset_time = limiter.check_limit("global")
+            # Atomic check-and-record to prevent race conditions
+            acquired, reset_time = limiter.try_acquire("global")
 
-            if not allowed:
+            if not acquired:
                 stale_data = _get_stale_cache(cache, cache_key_fn, args, kwargs)
                 if stale_data is not None:
                     return stale_data
@@ -85,8 +99,6 @@ def with_rate_limit(
                     reset_time=reset_time,
                     api_name="TIM-MCP Global"
                 )
-
-            limiter.record_request("global")
 
             try:
                 return await func(*args, **kwargs)

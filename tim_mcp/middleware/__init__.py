@@ -58,9 +58,11 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client_ip = self._get_client_ip(request)
-        allowed, reset_time = self.rate_limiter.check_limit(client_ip)
 
-        if not allowed:
+        # Atomic check-and-record to prevent race conditions
+        acquired, reset_time = self.rate_limiter.try_acquire(client_ip)
+
+        if not acquired:
             stats = self.rate_limiter.get_stats(client_ip)
             return JSONResponse(
                 status_code=429,
@@ -77,7 +79,6 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        self.rate_limiter.record_request(client_ip)
         response = await call_next(request)
         stats = self.rate_limiter.get_stats(client_ip)
         response.headers["X-RateLimit-Limit"] = str(stats["limit"])

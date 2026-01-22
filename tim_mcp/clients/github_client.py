@@ -39,6 +39,32 @@ def set_global_limiter(limiter: RateLimiter) -> None:
     _global_limiter = limiter
 
 
+# Cache key generators - single source of truth for cache keys
+# Used by both @with_rate_limit decorator and method bodies
+def _cache_key_repo_info(owner: str, repo: str) -> str:
+    return f"repo_info_{owner}_{repo}"
+
+
+def _cache_key_dir_contents(owner: str, repo: str, path: str, ref: str) -> str:
+    return f"dir_contents_{owner}_{repo}_{path}_{ref}"
+
+
+def _cache_key_file_content(owner: str, repo: str, path: str, ref: str) -> str:
+    return f"file_content_{owner}_{repo}_{path}_{ref}"
+
+
+def _cache_key_repo_tree(owner: str, repo: str, ref: str, recursive: bool) -> str:
+    return f"repo_tree_{owner}_{repo}_{ref}_{recursive}"
+
+
+def _cache_key_latest_release(owner: str, repo: str) -> str:
+    return f"latest_release_{owner}_{repo}"
+
+
+def _cache_key_resolve_version(owner: str, repo: str, version: str) -> str:
+    return f"resolve_version_{owner}_{repo}_{version}"
+
+
 class GitHubClient:
     """Async client for interacting with GitHub API."""
 
@@ -186,7 +212,7 @@ class GitHubClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo: f"repo_info_{owner}_{repo}",
+        cache_key_fn=lambda _, owner, repo: _cache_key_repo_info(owner, repo),
     )
     async def get_repository_info(self, owner: str, repo: str) -> dict[str, Any]:
         """
@@ -203,7 +229,7 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = f"repo_info_{owner}_{repo}"
+        cache_key = _cache_key_repo_info(owner, repo)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -284,7 +310,7 @@ class GitHubClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo, path="", ref="HEAD": f"dir_contents_{owner}_{repo}_{path}_{ref}",
+        cache_key_fn=lambda _, owner, repo, path="", ref="HEAD": _cache_key_dir_contents(owner, repo, path, ref),
     )
     async def get_directory_contents(
         self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
@@ -305,7 +331,7 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = f"dir_contents_{owner}_{repo}_{path}_{ref}"
+        cache_key = _cache_key_dir_contents(owner, repo, path, ref)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -394,7 +420,7 @@ class GitHubClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo, path, ref="HEAD": f"file_content_{owner}_{repo}_{path}_{ref}",
+        cache_key_fn=lambda _, owner, repo, path, ref="HEAD": _cache_key_file_content(owner, repo, path, ref),
     )
     async def get_file_content(
         self, owner: str, repo: str, path: str, ref: str = "HEAD"
@@ -415,7 +441,7 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = f"file_content_{owner}_{repo}_{path}_{ref}"
+        cache_key = _cache_key_file_content(owner, repo, path, ref)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -501,10 +527,15 @@ class GitHubClient:
             self.logger.error("Request error getting file content", error=str(e))
             raise GitHubError(f"Request error getting file content: {e}") from e
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    )
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo, ref="HEAD", recursive=True: f"repo_tree_{owner}_{repo}_{ref}_{recursive}",
+        cache_key_fn=lambda _, owner, repo, ref="HEAD", recursive=True: _cache_key_repo_tree(owner, repo, ref, recursive),
     )
     async def get_repository_tree(
         self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
@@ -525,7 +556,7 @@ class GitHubClient:
             GitHubError: If the API request fails
             RateLimitError: If rate limited
         """
-        cache_key = f"repo_tree_{owner}_{repo}_{ref}_{recursive}"
+        cache_key = _cache_key_repo_tree(owner, repo, ref, recursive)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -720,7 +751,7 @@ class GitHubClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo: f"latest_release_{owner}_{repo}",
+        cache_key_fn=lambda _, owner, repo: _cache_key_latest_release(owner, repo),
     )
     async def get_latest_release(self, owner: str, repo: str) -> dict[str, Any]:
         """
@@ -738,7 +769,7 @@ class GitHubClient:
             RateLimitError: If rate limited
             ModuleNotFoundError: If no releases exist
         """
-        cache_key = f"latest_release_{owner}_{repo}"
+        cache_key = _cache_key_latest_release(owner, repo)
 
         # Check cache first
         cached = self.cache.get(cache_key)
@@ -815,7 +846,7 @@ class GitHubClient:
     @with_rate_limit(
         global_limiter=lambda: _global_limiter,
         cache=lambda self: self.cache,
-        cache_key_fn=lambda self, owner, repo, version="latest": f"resolve_version_{owner}_{repo}_{version}",
+        cache_key_fn=lambda _, owner, repo, version="latest": _cache_key_resolve_version(owner, repo, version),
     )
     async def resolve_version(
         self, owner: str, repo: str, version: str = "latest"

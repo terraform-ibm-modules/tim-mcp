@@ -215,7 +215,7 @@ class TestInMemoryCache:
 
     def test_cache_update_existing_key(self):
         """Test updating an existing cache entry."""
-        cache = InMemoryCache(ttl=10, maxsize=10)
+        cache = InMemoryCache(ttl=1, maxsize=10)
 
         # Set initial value
         cache.set("key1", "value1")
@@ -226,5 +226,5 @@ class TestInMemoryCache:
         assert cache.get("key1") == "value2"
 
         # Should also update stale cache
-        time.sleep(11)  # Wait for TTL to expire
+        time.sleep(1.1)  # Wait for TTL to expire
         assert cache.get("key1", allow_stale=True) == "value2"
