@@ -135,6 +135,7 @@ class InMemoryCache:
                     "total_hits": self._total_hits,
                     "total_misses": self._total_misses,
                     "hit_rate": round(self._total_hits / total, 2) if total > 0 else 0,
+                    "timezone": "UTC",
                 },
                 "keys": keys[:top],
             }
