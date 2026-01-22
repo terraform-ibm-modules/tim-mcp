@@ -47,7 +47,7 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
                     "X-RateLimit-Limit": str(stats["limit"]),
                     "X-RateLimit-Remaining": str(stats["remaining"]),
                     "X-RateLimit-Reset": str(reset_time) if reset_time else "",
-                    "Retry-After": str(reset_time - int(time.time())) if reset_time else "60",
+                    "Retry-After": str(max(1, reset_time - int(time.time()))) if reset_time else "60",
                 },
             )
 

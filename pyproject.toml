@@ -19,7 +19,6 @@ dependencies = [
     "packaging==25.0",
     "pydantic==2.12.5",
     "pyyaml==6.0.3",
-    "slowapi==0.1.9",
     "structlog==25.5.0",
     "tenacity==9.1.2",
 ]
