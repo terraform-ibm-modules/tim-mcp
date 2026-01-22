@@ -113,7 +113,7 @@ class InMemoryCache:
         from datetime import datetime, timezone
 
         def to_iso(ts: float) -> str:
-            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         with self._lock:
             now = time.time()
