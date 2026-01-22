@@ -675,7 +675,7 @@ def main(transport_config=None):
                 Middleware(
                     PerIPRateLimitMiddleware,
                     rate_limiter=per_ip_limiter,
-                    bypass_paths=["/health", "/stats"],
+                    bypass_paths=["/health", "/stats", "/stats/cache"],
                 )
             ],
         )
