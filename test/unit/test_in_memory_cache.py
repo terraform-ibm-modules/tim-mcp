@@ -127,17 +127,17 @@ class TestInMemoryCache:
         assert stats["size"] == 0
         assert stats["maxsize"] == 5
         assert stats["ttl"] == 1
-        assert stats["stale_entries"] == 0
+        assert stats["stale_size"] == 0
 
-        # Add entries
+        # Add entries (stored in both primary and stale cache for graceful degradation)
         cache.set("key1", "value1")
         cache.set("key2", "value2")
 
         stats = cache.get_stats()
         assert stats["size"] == 2
-        assert stats["stale_entries"] == 0
+        assert stats["stale_size"] == 2  # Also in stale cache for fallback
 
-        # Wait for expiration
+        # Wait for primary cache expiration (stale cache has longer TTL)
         time.sleep(1.1)
 
         # Trigger expiration check by accessing cache
@@ -145,7 +145,7 @@ class TestInMemoryCache:
 
         stats = cache.get_stats()
         assert stats["size"] == 0  # Expired from active cache
-        assert stats["stale_entries"] == 2  # Still in stale cache
+        assert stats["stale_size"] == 2  # Still in stale cache (24x TTL)
 
     def test_cache_thread_safety(self):
         """Test that cache is thread-safe."""

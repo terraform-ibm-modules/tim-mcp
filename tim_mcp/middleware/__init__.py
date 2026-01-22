@@ -11,7 +11,23 @@ from ..utils.rate_limiter import RateLimiter
 
 
 class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
-    """Per-IP rate limiting middleware."""
+    """Per-IP rate limiting middleware.
+
+    This middleware applies per-IP rate limiting for HTTP mode deployments.
+    It extracts the client IP from request headers and enforces rate limits
+    independently for each IP address.
+
+    Security Note:
+        This middleware trusts the X-Forwarded-For and X-Real-IP headers for
+        client IP extraction. These headers can be spoofed by clients unless
+        your deployment includes a trusted reverse proxy (e.g., nginx, Cloudflare,
+        AWS ALB) that overwrites these headers with the actual client IP.
+
+        For production deployments:
+        - Ensure a reverse proxy sits in front of this service
+        - Configure the proxy to set X-Forwarded-For or X-Real-IP
+        - Consider using X-Forwarded-For with a known number of trusted proxies
+    """
 
     def __init__(self, app, rate_limiter: RateLimiter, bypass_paths: list[str] | None = None):
         super().__init__(app)
@@ -19,7 +35,17 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
         self.bypass_paths = bypass_paths or ["/health"]
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extract client IP from headers."""
+        """Extract client IP from headers.
+
+        Priority order:
+        1. X-Forwarded-For (first IP in the chain)
+        2. X-Real-IP
+        3. Direct connection IP
+
+        Warning:
+            These headers can be spoofed. Only trust them when behind a
+            properly configured reverse proxy that sets these headers.
+        """
         if forwarded := request.headers.get("X-Forwarded-For"):
             return forwarded.split(",")[0].strip()
         if real_ip := request.headers.get("X-Real-IP"):
@@ -51,6 +77,7 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
                 },
             )
 
+        self.rate_limiter.record_request(client_ip)
         response = await call_next(request)
         stats = self.rate_limiter.get_stats(client_ip)
         response.headers["X-RateLimit-Limit"] = str(stats["limit"])
