@@ -110,6 +110,11 @@ class InMemoryCache:
 
     def get_detailed_stats(self, top: int = 20) -> dict[str, Any]:
         """Get detailed cache statistics with per-key info."""
+        from datetime import datetime, timezone
+
+        def to_iso(ts: float) -> str:
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
         with self._lock:
             now = time.time()
             keys = []
@@ -118,8 +123,8 @@ class InMemoryCache:
                 keys.append({
                     "key": key,
                     "hits": self._hits.get(key, 0),
-                    "created": int(created),
-                    "last_accessed": int(self._last_accessed.get(key, created)),
+                    "created": to_iso(created),
+                    "last_accessed": to_iso(self._last_accessed.get(key, created)),
                     "is_fresh": (now - created) < self._fresh_ttl,
                 })
             keys.sort(key=lambda x: x["hits"], reverse=True)
