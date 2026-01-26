@@ -13,7 +13,8 @@ This guide covers deploying tim-mcp to IBM Code Engine as a containerized HTTP s
 3. **Terraform** >= 1.6 (for automated deployment)
 4. **GitHub Personal Access Token** (optional, recommended for higher rate limits)
    - Create at: https://github.com/settings/tokens
-   - No special permissions needed (public repos only)
+   - For classic tokens: `public_repo` scope
+   - For fine-grained tokens: `Public Repositories (read-only)` access
 5. **IBM Cloud API Key**
    - Create at: https://cloud.ibm.com/iam/apikeys
 
@@ -131,7 +132,7 @@ If the health check shows "unhealthy" status for GitHub:
 }
 ```
 
-The GitHub token needs to be updated. Create a new token at https://github.com/settings/tokens (no special permissions needed), then update the secret:
+The GitHub token needs to be updated. Create a new token at https://github.com/settings/tokens with `public_repo` scope (for classic tokens) or `Public Repositories (read-only)` access (for fine-grained tokens), then update the secret:
 
 1. Via UI: Code Engine → Projects → tim-mcp → Secrets and configmaps → tim-mcp-secrets → Edit
 2. Via CLI:
