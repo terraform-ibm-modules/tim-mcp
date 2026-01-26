@@ -46,7 +46,7 @@ The script will:
 5. Wait for the build to complete
 6. Create or update the application
 
-The deployment is fully automated and will display progress with build status updates. See [Terraform README](../../terraform/README.md) for detailed configuration options.
+The deployment is fully automated and will display progress with build status updates. See `terraform/variables.tf` for all configurable options.
 
 ## Verification
 

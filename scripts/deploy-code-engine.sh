@@ -8,7 +8,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="${SCRIPT_DIR}/../terraform"
 APP_NAME="tim-mcp"
-VERSION=${1:-latest}
 
 # Validate prerequisites
 echo "Validating prerequisites..."
@@ -112,7 +111,7 @@ ibmcloud ce buildrun submit --build "$BUILD_NAME" --name "$BUILDRUN_NAME"
 # Wait for build to complete
 echo "Waiting for build to complete..."
 BUILD_STATUS="Unknown"
-MAX_WAIT=600  # 10 minutes
+MAX_WAIT=1800  # 30 minutes for UBI8 builds
 ELAPSED=0
 INTERVAL=10
 

@@ -56,7 +56,7 @@ resource "ibm_code_engine_build" "build" {
   strategy_type   = "dockerfile"
   strategy_spec_file = "Dockerfile"
   strategy_size   = "medium"
-  timeout         = 900
+  timeout         = 1800  # 30 minutes for UBI8 builds
 }
 
 # Note: Build runs must be triggered separately via CLI or API
