@@ -2,7 +2,8 @@
 Async GitHub client for TIM-MCP.
 
 Provides an async client for interacting with the GitHub API with retry logic,
-caching, and comprehensive error handling. Supports both GitHub.com and GitHub Enterprise.
+caching, and comprehensive error handling. Supports GitHub.com and GitHub
+Enterprise.
 """
 
 import base64
@@ -37,7 +38,9 @@ class GitHubClient:
             rate_limiter: Rate limiter instance for request throttling
         """
         self.config = config
-        self.cache = cache or InMemoryCache(ttl=config.cache_ttl, maxsize=config.cache_maxsize)
+        self.cache = cache or InMemoryCache(
+            ttl=config.cache_ttl, maxsize=config.cache_maxsize
+        )
         self.rate_limiter = rate_limiter
         self.logger = get_logger(__name__, client="github")
 
@@ -67,7 +70,9 @@ class GitHubClient:
         """Parse module ID into namespace, name, provider components."""
         parts = module_id.split("/")
         if len(parts) != 3:
-            raise ModuleNotFoundError(module_id, details={"reason": "Invalid module ID format"})
+            raise ModuleNotFoundError(
+                module_id, details={"reason": "Invalid module ID format"}
+            )
         return parts[0], parts[1], parts[2]
 
     def _extract_repo_from_module_id(self, module_id: str) -> tuple[str, str]:
@@ -103,7 +108,9 @@ class GitHubClient:
 
             return path_parts[0], path_parts[1]
         except Exception as e:
-            self.logger.warning("Failed to parse GitHub URL", url=source_url, error=str(e))
+            self.logger.warning(
+                "Failed to parse GitHub URL", url=source_url, error=str(e)
+            )
             return None
 
     @api_method(cache_key_prefix="gh_repo_info")
@@ -117,23 +124,42 @@ class GitHubClient:
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
-            log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}")
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+            )
             return response.json()
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise ModuleNotFoundError(f"{owner}/{repo}", details={"reason": "Repository not found"}) from e
-            raise GitHubError(f"HTTP error getting repository info: {e}", status_code=e.response.status_code, response_body=e.response.text) from e
+                raise ModuleNotFoundError(
+                    f"{owner}/{repo}", details={"reason": "Repository not found"}
+                ) from e
+            raise GitHubError(
+                f"HTTP error getting repository info: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting repository info: {e}") from e
 
     @api_method(cache_key_prefix="gh_dir_contents")
-    async def get_directory_contents(self, owner: str, repo: str, path: str = "", ref: str = "HEAD") -> list[dict[str, Any]]:
+    async def get_directory_contents(
+        self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
+    ) -> list[dict[str, Any]]:
         """Get directory contents from repository."""
         start_time = time.time()
         try:
             params = {"ref": ref} if ref != "HEAD" else {}
-            url = f"/repos/{owner}/{repo}/contents/{path}" if path else f"/repos/{owner}/{repo}/contents"
+            url = (
+                f"/repos/{owner}/{repo}/contents/{path}"
+                if path
+                else f"/repos/{owner}/{repo}/contents"
+            )
             response = await self.client.get(url, params=params)
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
@@ -144,23 +170,40 @@ class GitHubClient:
             if not isinstance(data, list):
                 data = [data]
 
-            log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}", path=path, item_count=len(data))
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+                path=path,
+                item_count=len(data),
+            )
             return data
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return []
-            raise GitHubError(f"HTTP error getting directory contents: {e}", status_code=e.response.status_code, response_body=e.response.text) from e
+            raise GitHubError(
+                f"HTTP error getting directory contents: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting directory contents: {e}") from e
 
     @api_method(cache_key_prefix="gh_file_content")
-    async def get_file_content(self, owner: str, repo: str, path: str, ref: str = "HEAD") -> dict[str, Any]:
+    async def get_file_content(
+        self, owner: str, repo: str, path: str, ref: str = "HEAD"
+    ) -> dict[str, Any]:
         """Get file content from repository."""
         start_time = time.time()
         try:
             params = {"ref": ref} if ref != "HEAD" else {}
-            response = await self.client.get(f"/repos/{owner}/{repo}/contents/{path}", params=params)
+            response = await self.client.get(
+                f"/repos/{owner}/{repo}/contents/{path}", params=params
+            )
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
@@ -169,44 +212,85 @@ class GitHubClient:
             data = response.json()
             if data.get("encoding") == "base64" and data.get("content"):
                 try:
-                    data["decoded_content"] = base64.b64decode(data["content"]).decode("utf-8")
+                    data["decoded_content"] = base64.b64decode(data["content"]).decode(
+                        "utf-8"
+                    )
                 except Exception as e:
                     self.logger.warning("Failed to decode base64 content", error=str(e))
 
-            log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}", path=path, size=data.get("size", 0))
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+                path=path,
+                size=data.get("size", 0),
+            )
             return data
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise ModuleNotFoundError(f"{owner}/{repo}/{path}", details={"reason": "File not found"}) from e
-            raise GitHubError(f"HTTP error getting file content: {e}", status_code=e.response.status_code, response_body=e.response.text) from e
+                raise ModuleNotFoundError(
+                    f"{owner}/{repo}/{path}", details={"reason": "File not found"}
+                ) from e
+            raise GitHubError(
+                f"HTTP error getting file content: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting file content: {e}") from e
 
     @api_method(cache_key_prefix="gh_repo_tree")
-    async def get_repository_tree(self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True) -> list[dict[str, Any]]:
+    async def get_repository_tree(
+        self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
+    ) -> list[dict[str, Any]]:
         """Get repository tree (all files and directories)."""
         start_time = time.time()
         try:
             params = {"recursive": "1"} if recursive else {}
-            response = await self.client.get(f"/repos/{owner}/{repo}/git/trees/{ref}", params=params)
+            response = await self.client.get(
+                f"/repos/{owner}/{repo}/git/trees/{ref}", params=params
+            )
             duration_ms = (time.time() - start_time) * 1000
             self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
             tree_items = response.json().get("tree", [])
-            log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}", tree_size=len(tree_items))
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+                tree_size=len(tree_items),
+            )
             return tree_items
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise ModuleNotFoundError(f"{owner}/{repo}", details={"reason": "Repository or reference not found"}) from e
-            raise GitHubError(f"HTTP error getting repository tree: {e}", status_code=e.response.status_code, response_body=e.response.text) from e
+                raise ModuleNotFoundError(
+                    f"{owner}/{repo}",
+                    details={"reason": "Repository or reference not found"},
+                ) from e
+            raise GitHubError(
+                f"HTTP error getting repository tree: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting repository tree: {e}") from e
 
-    def match_file_patterns(self, file_path: str, include_patterns: list[str] | None = None, exclude_patterns: list[str] | None = None) -> bool:
+    def match_file_patterns(
+        self,
+        file_path: str,
+        include_patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
+    ) -> bool:
         """Check if file matches include/exclude glob patterns."""
         from pathlib import Path
 
@@ -219,7 +303,9 @@ class GitHubClient:
             return any(path.match(pattern) for pattern in include_patterns)
         return True
 
-    def clone_repository(self, repo_url: str, target_dir: str, branch: str | None = None) -> bool:
+    def clone_repository(
+        self, repo_url: str, target_dir: str, branch: str | None = None
+    ) -> bool:
         """Clone a GitHub repository."""
         try:
             import os
@@ -231,16 +317,25 @@ class GitHubClient:
             cmd.extend([repo_url, target_dir])
             os.makedirs(os.path.dirname(target_dir), exist_ok=True)
             subprocess.run(cmd, capture_output=True, text=True, check=True)
-            self.logger.info(f"Successfully cloned repository {repo_url} to {target_dir}", branch=branch)
+            self.logger.info(
+                f"Successfully cloned repository {repo_url} to {target_dir}",
+                branch=branch,
+            )
             return True
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to clone repository {repo_url}", error=str(e), stderr=e.stderr)
+            self.logger.error(
+                f"Failed to clone repository {repo_url}", error=str(e), stderr=e.stderr
+            )
             return False
         except Exception as e:
-            self.logger.error(f"Unexpected error cloning repository {repo_url}", error=str(e))
+            self.logger.error(
+                f"Unexpected error cloning repository {repo_url}", error=str(e)
+            )
             return False
 
-    async def get_content(self, owner: str, repo: str, path: str, ref: str | None = None) -> dict[str, Any]:
+    async def get_content(
+        self, owner: str, repo: str, path: str, ref: str | None = None
+    ) -> dict[str, Any]:
         """Get content from a repository (wrapper around get_file_content)."""
         return await self.get_file_content(owner, repo, path, ref or "HEAD")
 
@@ -256,18 +351,34 @@ class GitHubClient:
             response.raise_for_status()
 
             data = response.json()
-            log_api_request(self.logger, "GET", str(response.url), response.status_code, duration_ms, repo=f"{owner}/{repo}", tag_name=data.get("tag_name"))
+            log_api_request(
+                self.logger,
+                "GET",
+                str(response.url),
+                response.status_code,
+                duration_ms,
+                repo=f"{owner}/{repo}",
+                tag_name=data.get("tag_name"),
+            )
             return data
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                raise ModuleNotFoundError(f"{owner}/{repo}", details={"reason": "No releases found"}) from e
-            raise GitHubError(f"HTTP error getting latest release: {e}", status_code=e.response.status_code, response_body=e.response.text) from e
+                raise ModuleNotFoundError(
+                    f"{owner}/{repo}", details={"reason": "No releases found"}
+                ) from e
+            raise GitHubError(
+                f"HTTP error getting latest release: {e}",
+                status_code=e.response.status_code,
+                response_body=e.response.text,
+            ) from e
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting latest release: {e}") from e
 
     @api_method(cache_key_prefix="gh_resolve_version")
-    async def resolve_version(self, owner: str, repo: str, version: str = "latest") -> str:
+    async def resolve_version(
+        self, owner: str, repo: str, version: str = "latest"
+    ) -> str:
         """Resolve version to actual git reference."""
         if version != "latest":
             return version
@@ -275,11 +386,21 @@ class GitHubClient:
         try:
             release_data = await self.get_latest_release(owner, repo)
             resolved = release_data.get("tag_name", "HEAD")
-            self.logger.info("Resolved latest version to release tag", repo=f"{owner}/{repo}", resolved_version=resolved)
+            self.logger.info(
+                "Resolved latest version to release tag",
+                repo=f"{owner}/{repo}",
+                resolved_version=resolved,
+            )
             return resolved
         except ModuleNotFoundError:
-            self.logger.warning("No releases found, falling back to HEAD", repo=f"{owner}/{repo}")
+            self.logger.warning(
+                "No releases found, falling back to HEAD", repo=f"{owner}/{repo}"
+            )
             return "HEAD"
         except Exception as e:
-            self.logger.warning("Failed to resolve latest version, falling back to HEAD", repo=f"{owner}/{repo}", error=str(e))
+            self.logger.warning(
+                "Failed to resolve latest version, falling back to HEAD",
+                repo=f"{owner}/{repo}",
+                error=str(e),
+            )
             return "HEAD"

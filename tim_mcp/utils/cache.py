@@ -8,6 +8,7 @@ supporting graceful degradation when rate limited.
 
 import threading
 import time
+from datetime import UTC
 from typing import Any
 
 from cachetools import TTLCache
@@ -16,14 +17,19 @@ from cachetools import TTLCache
 class InMemoryCache:
     """Thread-safe cache with stale fallback using a single TTLCache."""
 
-    def __init__(self, ttl: int = 3600, maxsize: int = 1000, stale_ttl_multiplier: int = 24):
+    def __init__(
+        self, ttl: int = 3600, maxsize: int = 1000, stale_ttl_multiplier: int = 24
+    ):
         """
         Initialize the cache.
 
         Args:
             ttl: Fresh cache TTL in seconds (entries older than this are "stale")
             maxsize: Maximum cache entries
-            stale_ttl_multiplier: Total TTL = ttl * multiplier (entries expire completely after this)
+            stale_ttl_multiplier: Multiplier for stale TTL. Total TTL = ttl *
+                multiplier. Default 24 means stale entries persist for 24 hours
+                (with 1 hour fresh TTL), enabling graceful degradation when
+                upstream APIs are rate-limited or unavailable.
         """
         self._fresh_ttl = ttl
         self._stale_ttl = ttl * stale_ttl_multiplier
@@ -61,43 +67,37 @@ class InMemoryCache:
     def set(self, key: str, value: Any) -> bool:
         """Set value in cache."""
         with self._lock:
-            try:
-                self._cache[key] = value
-                self._timestamps[key] = time.time()
-                return True
-            except Exception:
-                return False
+            self._cache[key] = value
+            self._timestamps[key] = time.time()
+            return True
 
     def invalidate(self, key: str) -> bool:
         """Invalidate cache entry."""
         with self._lock:
-            try:
-                self._cache.pop(key, None)
-                self._timestamps.pop(key, None)
-                self._hits.pop(key, None)
-                self._last_accessed.pop(key, None)
-                return True
-            except Exception:
-                return False
+            self._cache.pop(key, None)
+            self._timestamps.pop(key, None)
+            self._hits.pop(key, None)
+            self._last_accessed.pop(key, None)
+            return True
 
     def clear(self) -> bool:
         """Clear all cache entries."""
         with self._lock:
-            try:
-                self._cache.clear()
-                self._timestamps.clear()
-                self._hits.clear()
-                self._last_accessed.clear()
-                return True
-            except Exception:
-                return False
+            self._cache.clear()
+            self._timestamps.clear()
+            self._hits.clear()
+            self._last_accessed.clear()
+            return True
 
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             now = time.time()
             fresh_count = sum(
-                1 for k in self._cache if k in self._timestamps and (now - self._timestamps[k]) < self._fresh_ttl
+                1
+                for k in self._cache
+                if k in self._timestamps
+                and (now - self._timestamps[k]) < self._fresh_ttl
             )
             total = self._total_hits + self._total_misses
             return {
@@ -110,23 +110,27 @@ class InMemoryCache:
 
     def get_detailed_stats(self, top: int = 20) -> dict[str, Any]:
         """Get detailed cache statistics with per-key info."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         def to_iso(ts: float) -> str:
-            return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            return datetime.fromtimestamp(ts, tz=UTC).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
 
         with self._lock:
             now = time.time()
             keys = []
             for key in self._cache:
                 created = self._timestamps.get(key, now)
-                keys.append({
-                    "key": key,
-                    "hits": self._hits.get(key, 0),
-                    "created": to_iso(created),
-                    "last_accessed": to_iso(self._last_accessed.get(key, created)),
-                    "is_fresh": (now - created) < self._fresh_ttl,
-                })
+                keys.append(
+                    {
+                        "key": key,
+                        "hits": self._hits.get(key, 0),
+                        "created": to_iso(created),
+                        "last_accessed": to_iso(self._last_accessed.get(key, created)),
+                        "is_fresh": (now - created) < self._fresh_ttl,
+                    }
+                )
             keys.sort(key=lambda x: x["hits"], reverse=True)
             total = self._total_hits + self._total_misses
             return {
