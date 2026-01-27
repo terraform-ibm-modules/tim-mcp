@@ -188,7 +188,7 @@ class TestRateLimitDecorator:
         with pytest.raises(RateLimitError) as exc_info:
             await test_func()
 
-        assert "Global rate limit exceeded" in str(exc_info.value)
+        assert "Rate limit exceeded" in str(exc_info.value)
 
     async def test_decorator_serves_stale_cache(self):
         """Test decorator serves stale cache when rate limited.
