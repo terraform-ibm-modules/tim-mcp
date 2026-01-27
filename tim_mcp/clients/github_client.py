@@ -39,7 +39,9 @@ class GitHubClient:
         """
         self.config = config
         self.cache = cache or InMemoryCache(
-            ttl=config.cache_ttl, maxsize=config.cache_maxsize
+            fresh_ttl=config.cache_fresh_ttl,
+            evict_ttl=config.cache_evict_ttl,
+            maxsize=config.cache_maxsize,
         )
         self.rate_limiter = rate_limiter
         self.logger = get_logger(__name__, client="github")

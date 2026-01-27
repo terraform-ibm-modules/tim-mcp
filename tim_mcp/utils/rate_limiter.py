@@ -31,19 +31,6 @@ class RateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
 
-    def check_limit(self, key: str) -> tuple[bool, int | None]:
-        """Check if request allowed without recording. Returns (allowed, reset_time)."""
-        allowed = self._limiter.test(self._rate_limit, key)
-        stats = self._limiter.get_window_stats(self._rate_limit, key)
-        reset_time = (
-            None if allowed else int(stats.reset_time) if stats.reset_time else None
-        )
-        return allowed, reset_time
-
-    def record_request(self, key: str) -> None:
-        """Record a request (non-atomic, use try_acquire for atomic check+record)."""
-        self._limiter.hit(self._rate_limit, key)
-
     def try_acquire(self, key: str) -> tuple[bool, int | None]:
         """Atomically check and record a request. Returns (acquired, reset_time).
 
@@ -56,20 +43,6 @@ class RateLimiter:
         stats = self._limiter.get_window_stats(self._rate_limit, key)
         reset_time = int(stats.reset_time) if stats.reset_time else None
         return False, reset_time
-
-    def get_stats(self, key: str) -> dict[str, Any]:
-        """Get rate limit statistics."""
-        stats = self._limiter.get_window_stats(self._rate_limit, key)
-        used = self._rate_limit.amount - stats.remaining
-        return {
-            "limit": self._rate_limit.amount,
-            "remaining": stats.remaining,
-            "used": used,
-            "reset_time": int(stats.reset_time)
-            if used > 0 and stats.reset_time
-            else None,
-            "window_seconds": self.window_seconds,
-        }
 
 
 def with_rate_limit(

@@ -31,7 +31,12 @@ class Config(BaseModel):
     )
 
     # Cache Configuration
-    cache_ttl: int = Field(3600, ge=60, description="Cache TTL in seconds")
+    cache_fresh_ttl: int = Field(
+        3600, ge=60, description="Fresh cache TTL in seconds"
+    )
+    cache_evict_ttl: int = Field(
+        86400, ge=60, description="Eviction TTL in seconds (stale entries persist until this)"
+    )
     cache_maxsize: int = Field(
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
     )
@@ -102,8 +107,11 @@ def load_config() -> Config:
             config_data["terraform_registry_url"] = terraform_registry_url
 
         # Cache configuration
-        if cache_ttl := os.getenv("TIM_CACHE_TTL"):
-            config_data["cache_ttl"] = int(cache_ttl)
+        if cache_fresh_ttl := os.getenv("TIM_CACHE_FRESH_TTL"):
+            config_data["cache_fresh_ttl"] = int(cache_fresh_ttl)
+
+        if cache_evict_ttl := os.getenv("TIM_CACHE_EVICT_TTL"):
+            config_data["cache_evict_ttl"] = int(cache_evict_ttl)
 
         if cache_maxsize := os.getenv("TIM_CACHE_MAXSIZE"):
             config_data["cache_maxsize"] = int(cache_maxsize)
