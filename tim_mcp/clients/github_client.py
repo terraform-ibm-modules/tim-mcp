@@ -54,19 +54,11 @@ class GitHubClient:
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
-        self.rate_limit_remaining = None
-        self.rate_limit_reset = None
-
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
-
-    def _update_rate_limit_info(self, response: httpx.Response) -> None:
-        """Update rate limit information from response headers."""
-        self.rate_limit_remaining = response.headers.get("X-RateLimit-Remaining")
-        self.rate_limit_reset = response.headers.get("X-RateLimit-Reset")
 
     def _parse_module_id(self, module_id: str) -> tuple[str, str, str]:
         """Parse module ID into namespace, name, provider components."""
@@ -122,7 +114,6 @@ class GitHubClient:
         try:
             response = await self.client.get(f"/repos/{owner}/{repo}")
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
@@ -164,7 +155,6 @@ class GitHubClient:
             )
             response = await self.client.get(url, params=params)
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
@@ -207,7 +197,6 @@ class GitHubClient:
                 f"/repos/{owner}/{repo}/contents/{path}", params=params
             )
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
@@ -257,7 +246,6 @@ class GitHubClient:
                 f"/repos/{owner}/{repo}/git/trees/{ref}", params=params
             )
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
@@ -348,7 +336,6 @@ class GitHubClient:
         try:
             response = await self.client.get(f"/repos/{owner}/{repo}/releases/latest")
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
