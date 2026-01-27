@@ -1,9 +1,13 @@
 """
-In-memory caching with TTL and stale fallback using cachetools.
+In-memory caching with TTL, stale fallback, and ETag support using cachetools.
 
 Uses a single TTLCache with the stale TTL for storage, and tracks insertion
 timestamps to determine freshness. This avoids storing data twice while still
 supporting graceful degradation when rate limited.
+
+ETag support enables conditional requests - when cached data has an ETag, clients
+can send If-None-Match headers. A 304 response means data hasn't changed, avoiding
+re-transfer and not counting against rate limits.
 """
 
 import threading
@@ -15,7 +19,7 @@ from cachetools import TTLCache
 
 
 class InMemoryCache:
-    """Thread-safe cache with stale fallback using a single TTLCache."""
+    """Thread-safe cache with stale fallback and ETag support."""
 
     def __init__(
         self, ttl: int = 3600, maxsize: int = 1000, stale_ttl_multiplier: int = 24
@@ -35,10 +39,12 @@ class InMemoryCache:
         self._stale_ttl = ttl * stale_ttl_multiplier
         self._cache = TTLCache(maxsize=maxsize, ttl=self._stale_ttl)
         self._timestamps: dict[str, float] = {}
+        self._etags: dict[str, str] = {}
         self._hits: dict[str, int] = {}
         self._last_accessed: dict[str, float] = {}
         self._total_hits = 0
         self._total_misses = 0
+        self._etag_hits = 0
         self._lock = threading.RLock()
 
     def _is_fresh(self, key: str) -> bool:
@@ -52,6 +58,7 @@ class InMemoryCache:
         with self._lock:
             if key not in self._cache:
                 self._timestamps.pop(key, None)
+                self._etags.pop(key, None)
                 self._hits.pop(key, None)
                 self._last_accessed.pop(key, None)
                 self._total_misses += 1
@@ -64,11 +71,36 @@ class InMemoryCache:
             self._total_misses += 1
             return None
 
-    def set(self, key: str, value: Any) -> bool:
-        """Set value in cache."""
+    def set(self, key: str, value: Any, etag: str | None = None) -> bool:
+        """Set value in cache with optional ETag."""
         with self._lock:
             self._cache[key] = value
             self._timestamps[key] = time.time()
+            if etag:
+                self._etags[key] = etag
+            return True
+
+    def get_etag(self, key: str) -> str | None:
+        """Get ETag for a cached key (if available)."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            return self._etags.get(key)
+
+    def refresh(self, key: str, etag: str | None = None) -> bool:
+        """
+        Refresh TTL for a key (used on 304 Not Modified responses).
+
+        This resets the timestamp to make the entry fresh again without
+        changing the cached value. Optionally updates the ETag.
+        """
+        with self._lock:
+            if key not in self._cache:
+                return False
+            self._timestamps[key] = time.time()
+            self._etag_hits += 1
+            if etag:
+                self._etags[key] = etag
             return True
 
     def invalidate(self, key: str) -> bool:
@@ -76,6 +108,7 @@ class InMemoryCache:
         with self._lock:
             self._cache.pop(key, None)
             self._timestamps.pop(key, None)
+            self._etags.pop(key, None)
             self._hits.pop(key, None)
             self._last_accessed.pop(key, None)
             return True
@@ -85,6 +118,7 @@ class InMemoryCache:
         with self._lock:
             self._cache.clear()
             self._timestamps.clear()
+            self._etags.clear()
             self._hits.clear()
             self._last_accessed.clear()
             return True
@@ -106,6 +140,7 @@ class InMemoryCache:
                 "stale_count": len(self._cache) - fresh_count,
                 "maxsize": self._cache.maxsize,
                 "hit_rate": round(self._total_hits / total, 2) if total > 0 else 0,
+                "etag_hits": self._etag_hits,
             }
 
     def get_detailed_stats(self, top: int = 20) -> dict[str, Any]:
@@ -129,6 +164,7 @@ class InMemoryCache:
                         "created": to_iso(created),
                         "last_accessed": to_iso(self._last_accessed.get(key, created)),
                         "is_fresh": (now - created) < self._fresh_ttl,
+                        "has_etag": key in self._etags,
                     }
                 )
             keys.sort(key=lambda x: x["hits"], reverse=True)
@@ -139,6 +175,7 @@ class InMemoryCache:
                     "total_hits": self._total_hits,
                     "total_misses": self._total_misses,
                     "hit_rate": round(self._total_hits / total, 2) if total > 0 else 0,
+                    "etag_hits": self._etag_hits,
                     "timezone": "UTC",
                 },
                 "keys": keys[:top],

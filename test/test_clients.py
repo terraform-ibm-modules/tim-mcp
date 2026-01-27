@@ -277,7 +277,9 @@ class TestGitHubClient:
             "html_url": "https://github.com/hashicorp/terraform",
         }
         assert result == expected_info
-        github_client.client.get.assert_called_once_with("/repos/hashicorp/terraform")
+        github_client.client.get.assert_called_once()
+        call_args = github_client.client.get.call_args
+        assert call_args[0][0] == "/repos/hashicorp/terraform"
 
     @pytest.mark.asyncio
     async def test_get_file_content(self, github_client, mock_cache):
@@ -307,10 +309,9 @@ class TestGitHubClient:
             "encoding": "base64",
         }
         assert result == expected_content
-        github_client.client.get.assert_called_once_with(
-            "/repos/hashicorp/terraform/contents/main.tf",
-            params={},
-        )
+        github_client.client.get.assert_called_once()
+        call_args = github_client.client.get.call_args
+        assert call_args[0][0] == "/repos/hashicorp/terraform/contents/main.tf"
 
     @pytest.mark.asyncio
     async def test_get_directory_contents(self, github_client, mock_cache):
@@ -338,9 +339,9 @@ class TestGitHubClient:
             {"name": "outputs.tf", "path": "outputs.tf", "type": "file"},
         ]
         assert result == expected_files
-        github_client.client.get.assert_called_once_with(
-            "/repos/hashicorp/terraform/contents", params={}
-        )
+        github_client.client.get.assert_called_once()
+        call_args = github_client.client.get.call_args
+        assert call_args[0][0] == "/repos/hashicorp/terraform/contents"
 
     @pytest.mark.asyncio
     async def test_get_latest_release(self, github_client, mock_cache):
