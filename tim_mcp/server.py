@@ -33,26 +33,41 @@ config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
 
-# Initialize global rate limiter and shared cache
+# Initialize global rate limiter
 global_rate_limiter = RateLimiter(
     max_requests=config.global_rate_limit,
     window_seconds=config.rate_limit_window,
 )
 
+# Initialize Redis cache if enabled (connection happens async in main())
+redis_cache = None
+if config.redis_enabled:
+    from .utils.redis_cache import RedisCache
+
+    redis_cache = RedisCache(
+        url=config.redis_url,
+        ttl=config.cache_ttl,
+        key_prefix=config.redis_key_prefix,
+    )
+
+# L1 cache with shorter TTL when Redis is enabled
+l1_ttl = config.l1_cache_ttl if config.redis_enabled else config.cache_ttl
 shared_cache = InMemoryCache(
-    ttl=config.cache_ttl,
+    ttl=l1_ttl,
     maxsize=config.cache_maxsize,
 )
 
 # Initialize shared context for tools
-init_context(global_rate_limiter, shared_cache)
+init_context(global_rate_limiter, shared_cache, redis_cache)
 
 logger.info(
     "Rate limiter and cache initialized",
     global_rate_limit=config.global_rate_limit,
     rate_limit_window=config.rate_limit_window,
     cache_ttl=config.cache_ttl,
+    l1_cache_ttl=l1_ttl,
     cache_maxsize=config.cache_maxsize,
+    redis_enabled=config.redis_enabled,
 )
 
 
@@ -634,6 +649,23 @@ def get_stats() -> dict:
     }
 
 
+async def _startup():
+    """Async startup tasks."""
+    if redis_cache:
+        connected = await redis_cache.connect()
+        if connected:
+            logger.info("Redis L2 cache enabled and connected")
+        else:
+            logger.warning("Redis connection failed, using L1 only")
+
+
+async def _shutdown():
+    """Async shutdown tasks."""
+    if redis_cache:
+        await redis_cache.close()
+        logger.info("Redis connection closed")
+
+
 def main(transport_config=None):
     """
     Run the MCP server with specified transport configuration.
@@ -656,6 +688,8 @@ def main(transport_config=None):
         )
 
         # Add per-IP rate limiting middleware for HTTP mode
+        from contextlib import asynccontextmanager
+
         import uvicorn
         from starlette.middleware import Middleware
         from starlette.responses import JSONResponse
@@ -668,6 +702,13 @@ def main(transport_config=None):
             window_seconds=config.rate_limit_window,
         )
 
+        @asynccontextmanager
+        async def lifespan(app):
+            """Manage async resources lifecycle."""
+            await _startup()
+            yield
+            await _shutdown()
+
         # Get the app with middleware applied
         app = mcp.http_app(
             stateless_http=True,
@@ -679,6 +720,9 @@ def main(transport_config=None):
                 )
             ],
         )
+
+        # Apply lifespan to the app
+        app.router.lifespan_context = lifespan
 
         # Add stats endpoints
         async def stats_endpoint(request):

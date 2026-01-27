@@ -36,6 +36,18 @@ class Config(BaseModel):
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
     )
 
+    # Redis Configuration
+    redis_enabled: bool = Field(False, description="Enable Redis as L2 cache")
+    redis_url: str = Field(
+        "redis://localhost:6379", description="Redis connection URL"
+    )
+    redis_key_prefix: str = Field(
+        "tim:cache:", description="Prefix for Redis cache keys"
+    )
+    l1_cache_ttl: int = Field(
+        300, ge=60, description="L1 (memory) cache TTL in seconds when Redis is enabled"
+    )
+
     # Request Configuration
     request_timeout: int = Field(30, ge=1, description="Request timeout in seconds")
     max_retries: int = Field(3, ge=0, description="Maximum retry attempts")
@@ -107,6 +119,16 @@ def load_config() -> Config:
 
         if cache_maxsize := os.getenv("TIM_CACHE_MAXSIZE"):
             config_data["cache_maxsize"] = int(cache_maxsize)
+
+        # Redis configuration
+        if redis_enabled := os.getenv("TIM_REDIS_ENABLED"):
+            config_data["redis_enabled"] = redis_enabled.lower() == "true"
+        if redis_url := os.getenv("TIM_REDIS_URL"):
+            config_data["redis_url"] = redis_url
+        if redis_key_prefix := os.getenv("TIM_REDIS_KEY_PREFIX"):
+            config_data["redis_key_prefix"] = redis_key_prefix
+        if l1_cache_ttl := os.getenv("TIM_L1_CACHE_TTL"):
+            config_data["l1_cache_ttl"] = int(l1_cache_ttl)
 
         # Request configuration
         if request_timeout := os.getenv("TIM_REQUEST_TIMEOUT"):
