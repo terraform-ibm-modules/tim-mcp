@@ -112,6 +112,54 @@ module "observability_instances" {
 - AI incorrectly assumed `terraform-ibm-modules/log-analysis/ibm` must also exist
 - This module does NOT exist - always verify first
 
+### Verification Applies to All Statements
+
+The verification rules above apply to ALL module and submodule statements, not just code generation:
+
+**ALWAYS verify before stating:**
+- Submodule counts or names
+- Module versions or capabilities
+- Available examples or features
+- Any factual claim about module data
+
+**Process for answering questions:**
+1. Use MCP tools to verify data
+2. Base response ONLY on tool results
+3. If uncertain, check with tools first, then respond
+
+**Never rely on:**
+- Memory from earlier conversation
+- Training data or assumptions
+- Pattern matching or inference
+
+## Comprehensive Module Discovery
+
+When a user asks about a capability (e.g., "reserved IPs", "load balancing"), explore all options before presenting results. Present 1-3 most relevant solutions based on what actually fits the user's specific use case.
+
+### Discovery Process
+
+**1. Search module index metadata** (descriptions, README excerpts, submodule descriptions)
+
+**2. Search with varied terminology**:
+- User's exact request + related terms + broader category terms
+
+**3. List content for top candidates**:
+- Check main module and **ALL submodules** 
+- Review examples demonstrating the use case
+
+### Presenting Results
+
+Present curated options with clear guidance on when to use each:
+- **Multiple fits**: Show 2-3 options with trade-offs
+- **Single fit**: Present one option (after verifying alternatives don't fit)
+- **Always explain**: When/why to use each approach
+
+**DON'T:**
+- Give exhaustive lists of all possible modules
+- Present one option without exploring alternatives first
+- Assume you've found all options after first search
+- Present multiple options when only one fits the use case
+
 ## Workflow by Intent
 
 The server supports two distinct workflows based on user intent:
