@@ -26,24 +26,24 @@ from tim_mcp.clients.terraform_client import TerraformClient
 from tim_mcp.config import load_config
 from tim_mcp.utils.redis_cache import RedisCache
 
+# Concurrency limit + throttle to stay under GitHub's 5000 req/hour limit
+# 5 concurrent * 2 req/module * 0.2s delay = ~50 req/sec max burst, well under limit
+MAX_CONCURRENT = 5
+
 
 async def sync_cache():
     """Pre-warm Redis cache with all module data."""
     print("Starting cache sync...")
 
-    # Validate environment
     if not os.environ.get("GITHUB_TOKEN"):
         print("ERROR: GITHUB_TOKEN environment variable required")
         sys.exit(1)
 
     redis_url = os.environ.get("TIM_REDIS_URL", "redis://localhost:6379")
-
-    # Initialize
     config = load_config()
     redis = RedisCache(url=redis_url, ttl=3600, stale_ttl_multiplier=48)
 
-    connected = await redis.connect()
-    if not connected:
+    if not await redis.connect():
         print("ERROR: Failed to connect to Redis")
         sys.exit(1)
 
@@ -52,64 +52,51 @@ async def sync_cache():
             TerraformClient(config) as tf_client,
             GitHubClient(config) as gh_client,
         ):
-            # Fetch all modules for each namespace
-            all_modules = []
-            for namespace in config.allowed_namespaces:
-                print(f"Fetching modules from {namespace}...")
-                modules = await tf_client.list_all_modules(namespace)
-                all_modules.extend(modules)
-                print(f"  Found {len(modules)} modules in {namespace}")
-
+            # Fetch all namespaces in parallel
+            print("Fetching modules from all namespaces...")
+            namespace_results = await asyncio.gather(
+                *[tf_client.list_all_modules(ns) for ns in config.allowed_namespaces]
+            )
+            all_modules = [m for modules in namespace_results for m in modules]
             print(f"Total modules to process: {len(all_modules)}")
 
-            # Pre-warm cache for each module
-            success_count = 0
-            error_count = 0
-            skipped_count = 0
+            # Process modules with controlled concurrency
+            semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+            results = {"success": 0, "error": 0, "skipped": 0}
 
-            for i, module in enumerate(all_modules):
-                module_id = module.get("id", "")
+            async def process_module(module: dict) -> None:
                 source = module.get("source", "")
+                owner_repo = gh_client.parse_github_url(source)
+                if not owner_repo:
+                    results["skipped"] += 1
+                    return
 
-                try:
-                    # Parse GitHub URL
-                    owner_repo = gh_client.parse_github_url(source)
-                    if not owner_repo:
-                        skipped_count += 1
-                        continue
+                owner, repo = owner_repo
+                async with semaphore:
+                    try:
+                        # Fetch both in parallel, then cache
+                        repo_info, tree = await asyncio.gather(
+                            gh_client.get_repository_info(owner, repo),
+                            gh_client.get_repository_tree(owner, repo),
+                        )
+                        await asyncio.gather(
+                            redis.set(f"gh_repo_info_{owner}_{repo}", repo_info),
+                            redis.set(f"gh_repo_tree_{owner}_{repo}_HEAD_True", tree),
+                        )
+                        results["success"] += 1
+                        # Throttle to stay under GitHub's 5000 req/hour limit
+                        await asyncio.sleep(0.2)
+                    except Exception as e:
+                        results["error"] += 1
+                        print(f"  Error: {owner}/{repo}: {e}")
 
-                    owner, repo = owner_repo
-
-                    # Fetch and cache repo info
-                    repo_info = await gh_client.get_repository_info(owner, repo)
-                    await redis.set(f"gh_repo_info_{owner}_{repo}", repo_info)
-
-                    # Fetch and cache repo tree
-                    tree = await gh_client.get_repository_tree(owner, repo)
-                    await redis.set(f"gh_repo_tree_{owner}_{repo}_HEAD_True", tree)
-
-                    success_count += 1
-
-                    # Rate limit: ~2 requests per module, stay under 5000/hour
-                    # With 100 modules = 200 requests, safe margin
-                    await asyncio.sleep(0.5)
-
-                except Exception as e:
-                    error_count += 1
-                    print(f"  Error caching {module_id}: {e}")
-
-                # Progress
-                if (i + 1) % 10 == 0:
-                    print(f"  Progress: {i + 1}/{len(all_modules)}")
+            # Process all modules concurrently (semaphore limits parallelism)
+            await asyncio.gather(*[process_module(m) for m in all_modules])
 
             print("\nSync complete!")
-            print(f"  Success: {success_count}")
-            print(f"  Errors: {error_count}")
-            print(f"  Skipped (no GitHub URL): {skipped_count}")
-
-            # Print stats
-            stats = await redis.get_stats()
-            print(f"  Redis keys: {stats.get('keys', 'unknown')}")
+            print(f"  Success: {results['success']}")
+            print(f"  Errors: {results['error']}")
+            print(f"  Skipped: {results['skipped']}")
 
     finally:
         await redis.close()

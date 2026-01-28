@@ -58,14 +58,22 @@ else:
     l1_fresh_ttl = config.cache_fresh_ttl
     l1_evict_ttl = config.cache_evict_ttl
 
-shared_cache = InMemoryCache(
+l1_cache = InMemoryCache(
     fresh_ttl=l1_fresh_ttl,
     evict_ttl=l1_evict_ttl,
     maxsize=config.cache_maxsize,
 )
 
+# Wrap L1 with L2 Redis if enabled
+if config.redis_enabled and redis_cache:
+    from .utils.tiered_cache import AsyncTieredCache
+
+    shared_cache = AsyncTieredCache(l1=l1_cache, l2=redis_cache)
+else:
+    shared_cache = l1_cache
+
 # Initialize shared context for tools
-init_context(global_rate_limiter, shared_cache, redis_cache)
+init_context(global_rate_limiter, shared_cache)
 
 logger.info(
     "Rate limiter and cache initialized",
