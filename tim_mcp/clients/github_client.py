@@ -60,6 +60,48 @@ class GitHubClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.client.aclose()
 
+    async def _get_with_etag(
+        self,
+        url: str,
+        cache_key: str,
+        params: dict | None = None,
+    ) -> tuple[httpx.Response | None, Any | None, bool]:
+        """
+        Make GET request with ETag validation support.
+
+        Returns:
+            Tuple of (response, cached_data, was_not_modified)
+            - On 304: (None, cached_data, True)
+            - On other response: (response, None, False)
+        """
+        headers = {}
+        cached_data = None
+
+        if self.cache:
+            etag = self.cache.get_etag(cache_key)
+            if etag:
+                headers["If-None-Match"] = etag
+                cached_data = self.cache.get(cache_key, allow_stale=True)
+
+        response = await self.client.get(url, params=params, headers=headers)
+
+        if response.status_code == 304 and cached_data is not None:
+            if self.cache:
+                new_etag = response.headers.get("ETag")
+                self.cache.refresh(cache_key, etag=new_etag)
+            self.logger.debug("ETag cache hit (304)", cache_key=cache_key)
+            return None, cached_data, True
+
+        return response, None, False
+
+    def _store_with_etag(
+        self, cache_key: str, data: Any, response: httpx.Response
+    ) -> None:
+        """Store data in cache with ETag from response headers."""
+        if self.cache:
+            etag = response.headers.get("ETag")
+            self.cache.set(cache_key, data, etag=etag)
+
     def _parse_module_id(self, module_id: str) -> tuple[str, str, str]:
         """Parse module ID into namespace, name, provider components."""
         parts = module_id.split("/")
@@ -107,15 +149,31 @@ class GitHubClient:
             )
             return None
 
-    @api_method(cache_key_prefix="gh_repo_info")
+    @api_method(cache_key_prefix=None)  # Caching handled manually for ETag support
     async def get_repository_info(self, owner: str, repo: str) -> dict[str, Any]:
         """Get repository information."""
         start_time = time.time()
+        cache_key = f"gh_repo_info_{owner}_{repo}"
+
         try:
-            response = await self.client.get(f"/repos/{owner}/{repo}")
-            duration_ms = (time.time() - start_time) * 1000
+            if self.cache:
+                cached = self.cache.get(cache_key, allow_stale=False)
+                if cached is not None:
+                    return cached
+
+            response, cached_data, not_modified = await self._get_with_etag(
+                f"/repos/{owner}/{repo}", cache_key
+            )
+
+            if not_modified:
+                return cached_data
+
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
+
+            duration_ms = (time.time() - start_time) * 1000
+            data = response.json()
+            self._store_with_etag(cache_key, data, response)
 
             log_api_request(
                 self.logger,
@@ -125,7 +183,7 @@ class GitHubClient:
                 duration_ms,
                 repo=f"{owner}/{repo}",
             )
-            return response.json()
+            return data
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
@@ -140,27 +198,42 @@ class GitHubClient:
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting repository info: {e}") from e
 
-    @api_method(cache_key_prefix="gh_dir_contents")
+    @api_method(cache_key_prefix=None)  # Caching handled manually for ETag support
     async def get_directory_contents(
         self, owner: str, repo: str, path: str = "", ref: str = "HEAD"
     ) -> list[dict[str, Any]]:
         """Get directory contents from repository."""
         start_time = time.time()
+        cache_key = f"gh_dir_contents_{owner}_{repo}_{path}_ref={ref}"
+        params = {"ref": ref} if ref != "HEAD" else {}
+        url = (
+            f"/repos/{owner}/{repo}/contents/{path}"
+            if path
+            else f"/repos/{owner}/{repo}/contents"
+        )
+
         try:
-            params = {"ref": ref} if ref != "HEAD" else {}
-            url = (
-                f"/repos/{owner}/{repo}/contents/{path}"
-                if path
-                else f"/repos/{owner}/{repo}/contents"
+            if self.cache:
+                cached = self.cache.get(cache_key, allow_stale=False)
+                if cached is not None:
+                    return cached
+
+            response, cached_data, not_modified = await self._get_with_etag(
+                url, cache_key, params=params if params else None
             )
-            response = await self.client.get(url, params=params)
-            duration_ms = (time.time() - start_time) * 1000
+
+            if not_modified:
+                return cached_data
+
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
+            duration_ms = (time.time() - start_time) * 1000
             data = response.json()
             if not isinstance(data, list):
                 data = [data]
+
+            self._store_with_etag(cache_key, data, response)
 
             log_api_request(
                 self.logger,
@@ -185,21 +258,33 @@ class GitHubClient:
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting directory contents: {e}") from e
 
-    @api_method(cache_key_prefix="gh_file_content")
+    @api_method(cache_key_prefix=None)  # Caching handled manually for ETag support
     async def get_file_content(
         self, owner: str, repo: str, path: str, ref: str = "HEAD"
     ) -> dict[str, Any]:
         """Get file content from repository."""
         start_time = time.time()
+        cache_key = f"gh_file_content_{owner}_{repo}_{path}_ref={ref}"
+        params = {"ref": ref} if ref != "HEAD" else {}
+        url = f"/repos/{owner}/{repo}/contents/{path}"
+
         try:
-            params = {"ref": ref} if ref != "HEAD" else {}
-            response = await self.client.get(
-                f"/repos/{owner}/{repo}/contents/{path}", params=params
+            if self.cache:
+                cached = self.cache.get(cache_key, allow_stale=False)
+                if cached is not None:
+                    return cached
+
+            response, cached_data, not_modified = await self._get_with_etag(
+                url, cache_key, params=params if params else None
             )
-            duration_ms = (time.time() - start_time) * 1000
+
+            if not_modified:
+                return cached_data
+
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
+            duration_ms = (time.time() - start_time) * 1000
             data = response.json()
             if data.get("encoding") == "base64" and data.get("content"):
                 try:
@@ -208,6 +293,8 @@ class GitHubClient:
                     )
                 except Exception as e:
                     self.logger.warning("Failed to decode base64 content", error=str(e))
+
+            self._store_with_etag(cache_key, data, response)
 
             log_api_request(
                 self.logger,
@@ -234,22 +321,36 @@ class GitHubClient:
         except httpx.RequestError as e:
             raise GitHubError(f"Request error getting file content: {e}") from e
 
-    @api_method(cache_key_prefix="gh_repo_tree")
+    @api_method(cache_key_prefix=None)  # Caching handled manually for ETag support
     async def get_repository_tree(
         self, owner: str, repo: str, ref: str = "HEAD", recursive: bool = True
     ) -> list[dict[str, Any]]:
         """Get repository tree (all files and directories)."""
         start_time = time.time()
+        cache_key = f"gh_repo_tree_{owner}_{repo}_{ref}_{recursive}"
+        params = {"recursive": "1"} if recursive else {}
+        url = f"/repos/{owner}/{repo}/git/trees/{ref}"
+
         try:
-            params = {"recursive": "1"} if recursive else {}
-            response = await self.client.get(
-                f"/repos/{owner}/{repo}/git/trees/{ref}", params=params
+            if self.cache:
+                cached = self.cache.get(cache_key, allow_stale=False)
+                if cached is not None:
+                    return cached
+
+            response, cached_data, not_modified = await self._get_with_etag(
+                url, cache_key, params=params
             )
-            duration_ms = (time.time() - start_time) * 1000
+
+            if not_modified:
+                return cached_data
+
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 
+            duration_ms = (time.time() - start_time) * 1000
             tree_items = response.json().get("tree", [])
+            self._store_with_etag(cache_key, tree_items, response)
+
             log_api_request(
                 self.logger,
                 "GET",
