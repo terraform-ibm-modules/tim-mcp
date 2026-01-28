@@ -39,7 +39,9 @@ class GitHubClient:
         """
         self.config = config
         self.cache = cache or InMemoryCache(
-            ttl=config.cache_ttl, maxsize=config.cache_maxsize
+            fresh_ttl=config.cache_fresh_ttl,
+            evict_ttl=config.cache_evict_ttl,
+            maxsize=config.cache_maxsize,
         )
         self.rate_limiter = rate_limiter
         self.logger = get_logger(__name__, client="github")
@@ -51,9 +53,6 @@ class GitHubClient:
             headers=headers,
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
-
-        self.rate_limit_remaining = None
-        self.rate_limit_reset = None
 
     async def __aenter__(self):
         return self
@@ -466,7 +465,6 @@ class GitHubClient:
         try:
             response = await self.client.get(f"/repos/{owner}/{repo}/releases/latest")
             duration_ms = (time.time() - start_time) * 1000
-            self._update_rate_limit_info(response)
             check_rate_limit_response(response, "GitHub")
             response.raise_for_status()
 

@@ -218,13 +218,15 @@ For most users running TIM-MCP locally, you only need:
 | `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
 | `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
-#### Advanced Configuration (Production/Hosting)
+<details>
+<summary><strong>Advanced Configuration (Production/Hosting)</strong></summary>
 
 These settings are for advanced users deploying TIM-MCP in production or HTTP mode:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TIM_CACHE_TTL` | 3600 | Cache TTL in seconds |
+| `TIM_CACHE_FRESH_TTL` | 3600 | Fresh cache TTL in seconds |
+| `TIM_CACHE_EVICT_TTL` | 86400 | Eviction TTL in seconds (stale entries persist until this) |
 | `TIM_CACHE_MAXSIZE` | 1000 | Maximum cache entries (LRU eviction when exceeded) |
 | `TIM_GLOBAL_RATE_LIMIT` | 30 | Global rate limit: max requests per minute across all clients |
 | `TIM_PER_IP_RATE_LIMIT` | 10 | Per-IP rate limit: max requests per minute per client IP (HTTP mode only) |
@@ -232,7 +234,7 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 | `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
 | `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
 
-> **Note:** The `TIM_CACHE_DIR` environment variable has been removed. The service now uses in-memory caching with TTL and LRU eviction.
+</details>
 
 ## Version Pinning
 

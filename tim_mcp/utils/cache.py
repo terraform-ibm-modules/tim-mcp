@@ -22,21 +22,18 @@ class InMemoryCache:
     """Thread-safe cache with stale fallback and ETag support."""
 
     def __init__(
-        self, ttl: int = 3600, maxsize: int = 1000, stale_ttl_multiplier: int = 24
+        self, fresh_ttl: int = 3600, evict_ttl: int = 86400, maxsize: int = 1000
     ):
         """
         Initialize the cache.
 
         Args:
-            ttl: Fresh cache TTL in seconds (entries older than this are "stale")
-            maxsize: Maximum cache entries
-            stale_ttl_multiplier: Multiplier for stale TTL. Total TTL = ttl *
-                multiplier. Default 24 means stale entries persist for 24 hours
-                (with 1 hour fresh TTL), enabling graceful degradation when
-                upstream APIs are rate-limited or unavailable.
+            fresh_ttl: TTL for fresh entries in seconds (default: 1 hour)
+            evict_ttl: TTL before eviction in seconds (default: 24 hours)
+            maxsize: Maximum cache entries per cache
         """
-        self._fresh_ttl = ttl
-        self._stale_ttl = ttl * stale_ttl_multiplier
+        self._fresh_ttl = fresh_ttl
+        self._stale_ttl = evict_ttl
         self._cache = TTLCache(maxsize=maxsize, ttl=self._stale_ttl)
         self._timestamps: dict[str, float] = {}
         self._etags: dict[str, str] = {}
