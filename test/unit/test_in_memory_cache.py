@@ -11,7 +11,7 @@ class TestInMemoryCache:
 
     def test_cache_get_set(self):
         """Test basic get/set operations."""
-        cache = InMemoryCache(ttl=10, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=10, maxsize=10)
 
         # Test set and get
         assert cache.set("key1", "value1") is True
@@ -22,7 +22,7 @@ class TestInMemoryCache:
 
     def test_cache_ttl_expiration(self):
         """Test that cache entries expire after TTL (become stale)."""
-        cache = InMemoryCache(ttl=1, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=1, maxsize=10)
 
         # Set a value
         cache.set("key1", "value1")
@@ -36,7 +36,7 @@ class TestInMemoryCache:
 
     def test_cache_stale_fallback(self):
         """Test that allow_stale returns expired entries."""
-        cache = InMemoryCache(ttl=1, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=1, evict_ttl=10, maxsize=10)
 
         # Set a value
         cache.set("key1", "value1")
@@ -53,7 +53,7 @@ class TestInMemoryCache:
 
     def test_cache_lru_eviction(self):
         """Test that LRU eviction works when maxsize exceeded."""
-        cache = InMemoryCache(ttl=100, maxsize=2)
+        cache = InMemoryCache(fresh_ttl=100, maxsize=2)
 
         # Fill cache to capacity
         cache.set("key1", "value1")
@@ -72,7 +72,7 @@ class TestInMemoryCache:
 
     def test_cache_invalidate(self):
         """Test cache invalidation."""
-        cache = InMemoryCache(ttl=10, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=10, maxsize=10)
 
         # Set a value
         cache.set("key1", "value1")
@@ -90,7 +90,7 @@ class TestInMemoryCache:
 
     def test_cache_clear(self):
         """Test clearing all cache entries."""
-        cache = InMemoryCache(ttl=10, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=10, maxsize=10)
 
         # Add multiple entries
         cache.set("key1", "value1")
@@ -109,45 +109,9 @@ class TestInMemoryCache:
         assert cache.get("key2") is None
         assert cache.get("key3") is None
 
-    def test_cache_stats(self):
-        """Test cache statistics."""
-        cache = InMemoryCache(ttl=1, maxsize=5)
-
-        # Empty cache stats
-        stats = cache.get_stats()
-        assert stats["size"] == 0
-        assert stats["maxsize"] == 5
-        assert stats["fresh_count"] == 0
-        assert stats["stale_count"] == 0
-        assert stats["hit_rate"] == 0
-
-        # Add entries
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-
-        stats = cache.get_stats()
-        assert stats["size"] == 2
-        assert stats["fresh_count"] == 2
-        assert stats["stale_count"] == 0
-
-        # Test hit rate
-        cache.get("key1")  # hit
-        cache.get("key1")  # hit
-        cache.get("missing")  # miss
-        stats = cache.get_stats()
-        assert stats["hit_rate"] == 0.67  # 2 hits / 3 total
-
-        # Wait for fresh TTL to expire
-        time.sleep(1.1)
-
-        stats = cache.get_stats()
-        assert stats["size"] == 2  # Still in cache (within stale TTL)
-        assert stats["fresh_count"] == 0  # No longer fresh
-        assert stats["stale_count"] == 2  # Now stale
-
     def test_cache_thread_safety(self):
         """Test that cache is thread-safe."""
-        cache = InMemoryCache(ttl=10, maxsize=100)
+        cache = InMemoryCache(fresh_ttl=10, maxsize=100)
         errors = []
 
         def write_values(start, end):
@@ -184,13 +148,9 @@ class TestInMemoryCache:
         # No errors should have occurred
         assert len(errors) == 0
 
-        # Cache should have entries
-        stats = cache.get_stats()
-        assert stats["size"] > 0
-
     def test_cache_complex_values(self):
         """Test caching complex data types."""
-        cache = InMemoryCache(ttl=10, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=10, maxsize=10)
 
         # Test dict
         cache.set("dict_key", {"name": "test", "value": 123})
@@ -208,7 +168,7 @@ class TestInMemoryCache:
 
     def test_cache_update_existing_key(self):
         """Test updating an existing cache entry."""
-        cache = InMemoryCache(ttl=1, maxsize=10)
+        cache = InMemoryCache(fresh_ttl=1, evict_ttl=10, maxsize=10)
 
         # Set initial value
         cache.set("key1", "value1")

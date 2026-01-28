@@ -46,14 +46,21 @@ if config.redis_enabled:
 
     redis_cache = RedisCache(
         url=config.redis_url,
-        ttl=config.cache_ttl,
+        ttl=config.cache_evict_ttl,  # Use evict TTL for Redis persistence
         key_prefix=config.redis_key_prefix,
     )
 
-# L1 cache with shorter TTL when Redis is enabled
-l1_ttl = config.l1_cache_ttl if config.redis_enabled else config.cache_ttl
+# L1 cache: shorter TTL when Redis L2 is enabled, otherwise use configured TTLs
+if config.redis_enabled:
+    l1_fresh_ttl = config.l1_cache_ttl
+    l1_evict_ttl = config.l1_cache_ttl
+else:
+    l1_fresh_ttl = config.cache_fresh_ttl
+    l1_evict_ttl = config.cache_evict_ttl
+
 shared_cache = InMemoryCache(
-    ttl=l1_ttl,
+    fresh_ttl=l1_fresh_ttl,
+    evict_ttl=l1_evict_ttl,
     maxsize=config.cache_maxsize,
 )
 
@@ -64,8 +71,8 @@ logger.info(
     "Rate limiter and cache initialized",
     global_rate_limit=config.global_rate_limit,
     rate_limit_window=config.rate_limit_window,
-    cache_ttl=config.cache_ttl,
-    l1_cache_ttl=l1_ttl,
+    l1_fresh_ttl=l1_fresh_ttl,
+    l1_evict_ttl=l1_evict_ttl,
     cache_maxsize=config.cache_maxsize,
     redis_enabled=config.redis_enabled,
 )
@@ -635,20 +642,6 @@ async def module_index():
         )
 
 
-def get_stats() -> dict:
-    """Get cache and rate limiter statistics."""
-    return {
-        "cache": shared_cache.get_stats(),
-        "rate_limiter": {
-            "global": global_rate_limiter.get_stats("global"),
-            "config": {
-                "max_requests": global_rate_limiter.max_requests,
-                "window_seconds": global_rate_limiter.window_seconds,
-            },
-        },
-    }
-
-
 async def _startup():
     """Async startup tasks."""
     if redis_cache:
@@ -664,6 +657,7 @@ async def _shutdown():
     if redis_cache:
         await redis_cache.close()
         logger.info("Redis connection closed")
+
 
 
 def main(transport_config=None):
@@ -692,8 +686,6 @@ def main(transport_config=None):
 
         import uvicorn
         from starlette.middleware import Middleware
-        from starlette.responses import JSONResponse
-        from starlette.routing import Route
 
         from .middleware import PerIPRateLimitMiddleware
 
@@ -716,35 +708,14 @@ def main(transport_config=None):
                 Middleware(
                     PerIPRateLimitMiddleware,
                     rate_limiter=per_ip_limiter,
-                    bypass_paths=["/health", "/stats", "/stats/cache"],
+                    bypass_paths=["/health"],
                 )
             ],
         )
 
-        # Apply lifespan to the app
+        # Apply lifespan to the app for Redis lifecycle management
         app.router.lifespan_context = lifespan
 
-        # Add stats endpoints
-        async def stats_endpoint(request):
-            """Return cache and rate limiter statistics."""
-            stats = get_stats()
-            base_url = str(request.base_url).rstrip("/")
-            stats["cache"]["details"] = f"{base_url}/stats/cache"
-            stats["rate_limiter"]["per_ip"] = {
-                "config": {
-                    "max_requests": per_ip_limiter.max_requests,
-                    "window_seconds": per_ip_limiter.window_seconds,
-                }
-            }
-            return JSONResponse(stats)
-
-        async def cache_stats_endpoint(request):
-            """Return detailed cache statistics."""
-            top = int(request.query_params.get("top", 20))
-            return JSONResponse(shared_cache.get_detailed_stats(top=top))
-
-        app.routes.append(Route("/stats", stats_endpoint, methods=["GET"]))
-        app.routes.append(Route("/stats/cache", cache_stats_endpoint, methods=["GET"]))
 
         logger.info(
             "Per-IP rate limiting enabled",

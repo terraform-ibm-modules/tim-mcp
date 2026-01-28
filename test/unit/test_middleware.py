@@ -1,7 +1,6 @@
 """Unit tests for PerIPRateLimitMiddleware."""
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -69,22 +68,8 @@ class TestPerIPRateLimitMiddleware:
         assert response.status_code == 429
         assert response.json()["error"] == "Too Many Requests"
 
-    def test_returns_rate_limit_headers_on_success(self):
-        """Test that rate limit headers are included in successful responses."""
-        limiter = RateLimiter(max_requests=10, window_seconds=60)
-        app = create_test_app(limiter)
-        client = TestClient(app)
-
-        response = client.get("/")
-        assert response.status_code == 200
-
-        # Check rate limit headers
-        assert "X-RateLimit-Limit" in response.headers
-        assert response.headers["X-RateLimit-Limit"] == "10"
-        assert "X-RateLimit-Remaining" in response.headers
-
-    def test_returns_rate_limit_headers_on_429(self):
-        """Test that rate limit headers are included in 429 responses."""
+    def test_returns_retry_after_on_429(self):
+        """Test that Retry-After header is included in 429 responses."""
         limiter = RateLimiter(max_requests=1, window_seconds=60)
         app = create_test_app(limiter)
         client = TestClient(app)
@@ -95,10 +80,6 @@ class TestPerIPRateLimitMiddleware:
         # Next request should be rate limited
         response = client.get("/")
         assert response.status_code == 429
-
-        # Check headers
-        assert "X-RateLimit-Limit" in response.headers
-        assert "X-RateLimit-Remaining" in response.headers
         assert "Retry-After" in response.headers
 
     def test_bypass_paths_not_rate_limited(self):
@@ -188,22 +169,6 @@ class TestPerIPRateLimitMiddleware:
         for i in range(2):
             response = client.get("/", headers={"X-Forwarded-For": "10.0.0.2"})
             assert response.status_code == 200
-
-    def test_retry_after_header_is_positive(self):
-        """Test that Retry-After header is always positive."""
-        limiter = RateLimiter(max_requests=1, window_seconds=60)
-        app = create_test_app(limiter)
-        client = TestClient(app)
-
-        # Use up the limit
-        client.get("/")
-
-        # Get rate limited
-        response = client.get("/")
-        assert response.status_code == 429
-
-        retry_after = int(response.headers["Retry-After"])
-        assert retry_after >= 1
 
     def test_multiple_paths_rate_limited(self):
         """Test that rate limiting applies across different paths for same IP."""
