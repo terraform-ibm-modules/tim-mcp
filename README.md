@@ -205,6 +205,37 @@ claude mcp remove tim-mcp
 ```
 
 
+## Configuration
+
+### Environment Variables
+
+#### Basic Configuration
+
+For most users running TIM-MCP locally, you only need:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
+| `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+<details>
+<summary><strong>Advanced Configuration (Production/Hosting)</strong></summary>
+
+These settings are for advanced users deploying TIM-MCP in production or HTTP mode:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TIM_CACHE_FRESH_TTL` | 3600 | Fresh cache TTL in seconds |
+| `TIM_CACHE_EVICT_TTL` | 86400 | Eviction TTL in seconds (stale entries persist until this) |
+| `TIM_CACHE_MAXSIZE` | 1000 | Maximum cache entries (LRU eviction when exceeded) |
+| `TIM_GLOBAL_RATE_LIMIT` | 30 | Global rate limit: max requests per minute across all clients |
+| `TIM_PER_IP_RATE_LIMIT` | 10 | Per-IP rate limit: max requests per minute per client IP (HTTP mode only) |
+| `TIM_RATE_LIMIT_WINDOW` | 60 | Rate limit time window in seconds |
+| `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
+| `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
+
+</details>
+
 ## Version Pinning
 
 For production use, pin to a specific version to ensure consistent behavior (using the same format as in the [Claude Desktop](#claude-desktop) section):

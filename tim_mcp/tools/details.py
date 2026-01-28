@@ -10,6 +10,7 @@ from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
+from ..context import get_cache, get_rate_limiter
 from ..exceptions import ModuleNotFoundError, TerraformRegistryError, ValidationError
 from ..types import ModuleDetailsRequest
 from ..utils.module_id import parse_module_id_with_version
@@ -271,7 +272,11 @@ async def get_module_details_impl(request: ModuleDetailsRequest, config: Config)
         raise TerraformRegistryError(f"Module ID validation failed: {e}") from e
 
     # Initialize Terraform client and fetch data
-    async with TerraformClient(config) as terraform_client:
+    cache = get_cache()
+    rate_limiter = get_rate_limiter()
+    async with TerraformClient(
+        config, cache=cache, rate_limiter=rate_limiter
+    ) as terraform_client:
         try:
             # Fetch module details and versions concurrently for better performance
             # Note: We could use asyncio.gather here, but sequential is fine for this use case

@@ -12,6 +12,7 @@ from typing import Any
 
 from ..clients.github_client import GitHubClient
 from ..config import Config
+from ..context import get_cache, get_rate_limiter
 from ..logging import get_logger
 from ..types import GetContentRequest
 from ..utils.module_id import parse_module_id_with_version, transform_version_for_github
@@ -40,7 +41,11 @@ async def get_content_impl(
         GitHubError: If GitHub API request fails
     """
     if github_client is None:
-        async with GitHubClient(config) as github_client:
+        cache = get_cache()
+        rate_limiter = get_rate_limiter()
+        async with GitHubClient(
+            config, cache=cache, rate_limiter=rate_limiter
+        ) as github_client:
             return await _get_content_with_client(request, github_client)
     else:
         return await _get_content_with_client(request, github_client)
