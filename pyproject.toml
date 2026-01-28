@@ -9,7 +9,7 @@ name = "tim-mcp"
 dynamic = ["version"]
 description = "Terraform IBM Modules MCP"
 readme = "README.md"
-requires-python = ">= 3.10.0"
+requires-python = ">= 3.11.0"
 dependencies = [
     "httpx==0.28.1",
     "fastmcp==2.14.4",
