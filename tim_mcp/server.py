@@ -33,17 +33,44 @@ config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
 
-# Initialize global rate limiter and shared cache
+# Initialize global rate limiter
 global_rate_limiter = RateLimiter(
     max_requests=config.global_rate_limit,
     window_seconds=config.rate_limit_window,
 )
 
-shared_cache = InMemoryCache(
-    fresh_ttl=config.cache_fresh_ttl,
-    evict_ttl=config.cache_evict_ttl,
+# Initialize Redis cache if enabled (connection happens async in main())
+redis_cache = None
+if config.redis_enabled:
+    from .utils.redis_cache import RedisCache
+
+    redis_cache = RedisCache(
+        url=config.redis_url,
+        ttl=config.cache_evict_ttl,  # Use evict TTL for Redis persistence
+        key_prefix=config.redis_key_prefix,
+    )
+
+# L1 cache: shorter TTL when Redis L2 is enabled, otherwise use configured TTLs
+if config.redis_enabled:
+    l1_fresh_ttl = config.l1_cache_ttl
+    l1_evict_ttl = config.l1_cache_ttl
+else:
+    l1_fresh_ttl = config.cache_fresh_ttl
+    l1_evict_ttl = config.cache_evict_ttl
+
+l1_cache = InMemoryCache(
+    fresh_ttl=l1_fresh_ttl,
+    evict_ttl=l1_evict_ttl,
     maxsize=config.cache_maxsize,
 )
+
+# Wrap L1 with L2 Redis if enabled
+if config.redis_enabled and redis_cache:
+    from .utils.tiered_cache import AsyncTieredCache
+
+    shared_cache = AsyncTieredCache(l1=l1_cache, l2=redis_cache)
+else:
+    shared_cache = l1_cache
 
 # Initialize shared context for tools
 init_context(global_rate_limiter, shared_cache)
@@ -52,9 +79,10 @@ logger.info(
     "Rate limiter and cache initialized",
     global_rate_limit=config.global_rate_limit,
     rate_limit_window=config.rate_limit_window,
-    cache_fresh_ttl=config.cache_fresh_ttl,
-    cache_evict_ttl=config.cache_evict_ttl,
+    l1_fresh_ttl=l1_fresh_ttl,
+    l1_evict_ttl=l1_evict_ttl,
     cache_maxsize=config.cache_maxsize,
+    redis_enabled=config.redis_enabled,
 )
 
 
@@ -622,6 +650,24 @@ async def module_index():
         )
 
 
+async def _startup():
+    """Async startup tasks."""
+    if redis_cache:
+        connected = await redis_cache.connect()
+        if connected:
+            logger.info("Redis L2 cache enabled and connected")
+        else:
+            logger.warning("Redis connection failed, using L1 only")
+
+
+async def _shutdown():
+    """Async shutdown tasks."""
+    if redis_cache:
+        await redis_cache.close()
+        logger.info("Redis connection closed")
+
+
+
 def main(transport_config=None):
     """
     Run the MCP server with specified transport configuration.
@@ -644,6 +690,8 @@ def main(transport_config=None):
         )
 
         # Add per-IP rate limiting middleware for HTTP mode
+        from contextlib import asynccontextmanager
+
         import uvicorn
         from starlette.middleware import Middleware
 
@@ -653,6 +701,13 @@ def main(transport_config=None):
             max_requests=config.per_ip_rate_limit,
             window_seconds=config.rate_limit_window,
         )
+
+        @asynccontextmanager
+        async def lifespan(app):
+            """Manage async resources lifecycle."""
+            await _startup()
+            yield
+            await _shutdown()
 
         # Get the app with middleware applied
         app = mcp.http_app(
@@ -665,6 +720,10 @@ def main(transport_config=None):
                 )
             ],
         )
+
+        # Apply lifespan to the app for Redis lifecycle management
+        app.router.lifespan_context = lifespan
+
 
         logger.info(
             "Per-IP rate limiting enabled",
