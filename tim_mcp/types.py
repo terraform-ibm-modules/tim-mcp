@@ -211,3 +211,32 @@ class ErrorDetail(BaseModel):
     code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
     details: dict[str, Any] | None = Field(None, description="Additional details")
+
+
+class ModuleDependencySuggestion(BaseModel):
+    """Suggested module dependency from mappings.yaml."""
+
+    source_module: str = Field(..., description="Source module identifier")
+    source_output: str = Field(..., description="Output from source module")
+    target_input: str = Field(..., description="Input in target module")
+
+
+class SuggestModuleDependenciesRequest(BaseModel):
+    """Request model for suggesting module dependencies."""
+
+    module_path: str = Field(
+        ..., description="Git repository URL or local path to the module"
+    )
+    ref: str = Field(
+        "main", description="Git reference (branch, tag, or commit) to use"
+    )
+
+
+class SuggestModuleDependenciesResponse(BaseModel):
+    """Response model for module dependency suggestions."""
+
+    module: str | None = Field(None, description="Module identifier from mappings.yaml")
+    ref: str = Field(..., description="Git reference used")
+    required_dependencies: list[ModuleDependencySuggestion] = Field(
+        ..., description="List of required module dependencies"
+    )

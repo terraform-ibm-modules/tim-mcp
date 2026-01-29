@@ -23,6 +23,7 @@ from .types import (
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
+    SuggestModuleDependenciesRequest,
 )
 
 # Global configuration and logger
@@ -523,6 +524,91 @@ async def get_content(
             error=str(e),
         )
         logger.exception("Unexpected error in get_content")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def suggest_module_dependencies(
+    module_path: str,
+    ref: str = "main",
+) -> str:
+    """
+    Read mappings.hcl from a Git repository to suggest module dependencies.
+
+    This tool analyzes a module's mappings.hcl file to identify required dependencies
+    and their connections. It helps understand which modules need to be deployed together
+    and how their outputs/inputs should be connected.
+
+    USE CASES:
+    - Understanding module dependencies before deployment
+    - Planning multi-module infrastructure deployments
+    - Identifying required input/output connections between modules
+
+    Args:
+        module_path: Git repository URL (http/https/git@) or local path to the module
+        ref: Git reference (branch, tag, or commit) to use (default: "main")
+
+    Returns:
+        JSON formatted dependency suggestions with source modules, outputs, and target inputs
+    """
+    start_time = time.time()
+
+    try:
+        # Validate request
+        request = SuggestModuleDependenciesRequest(module_path=module_path, ref=ref)
+
+        # Import here to avoid circular imports
+        from .tools.suggestions import suggest_module_dependencies_impl
+
+        # Execute dependency suggestion
+        response = await suggest_module_dependencies_impl(request, config)
+
+        # Log successful execution
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "suggest_module_dependencies",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "suggest_module_dependencies",
+            {"module_path": module_path, "ref": ref},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "suggest_module_dependencies",
+            {"module_path": module_path, "ref": ref},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "suggest_module_dependencies",
+            {"module_path": module_path, "ref": ref},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in suggest_module_dependencies")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
