@@ -496,14 +496,14 @@ wheels = [
 
 [[package]]
 name = "hypothesis"
-version = "6.151.0"
+version = "6.151.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/51/f29b1d3d83685a7aef3b397af9aa14ff34ee38880a64f1cd070becab28e6/hypothesis-6.151.0.tar.gz", hash = "sha256:25c7f1105fa5f46bbf499d7204f128e26278073efc2adf15939f40b8fbdc4fad", size = 475516, upload-time = "2026-01-25T19:46:23.778Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/03/9fd03d5db09029250e69745c1600edab16fe90947636f77a12ba92d79939/hypothesis-6.151.4.tar.gz", hash = "sha256:658a62da1c3ccb36746ac2f7dc4bb1a6e76bd314e0dc54c4e1aaba2503d5545c", size = 475706, upload-time = "2026-01-29T01:30:14.985Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/03/7dc99f137d64e6f2ad85c88ecf8af42f301da5a6c8f06a05ae3b9e0627da/hypothesis-6.151.0-py3-none-any.whl", hash = "sha256:e5d2a9d178192d00f7a7fa6717cc1c63883acb918ac8d3a2604a1cea45b3e89b", size = 542965, upload-time = "2026-01-25T19:46:20.652Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/6d/01ad1b6c3b8cb2bb47eeaa9765dabc27cbe68e3b59f6cff83d5668f57780/hypothesis-6.151.4-py3-none-any.whl", hash = "sha256:a1cf7e0fdaa296d697a68ff3c0b3912c0050f07aa37e7d2ff33a966749d1d9b4", size = 543146, upload-time = "2026-01-29T01:30:12.805Z" },
 ]
 
 [[package]]
@@ -1601,7 +1601,7 @@ requires-dist = [
     { name = "click", specifier = "==8.3.1" },
     { name = "fastmcp", specifier = "==2.14.4" },
     { name = "httpx", specifier = "==0.28.1" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = "==6.151.0" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = "==6.151.4" },
     { name = "packaging", specifier = "==26.0" },
     { name = "pydantic", specifier = "==2.12.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==9.0.2" },
