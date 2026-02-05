@@ -19,7 +19,14 @@ class InMemoryCache:
             fresh_ttl: TTL for fresh entries in seconds (default: 1 hour)
             evict_ttl: TTL before eviction in seconds (default: 24 hours)
             maxsize: Maximum cache entries per cache
+        
+        Raises:
+            ValueError: If evict_ttl is not greater than fresh_ttl
         """
+        if evict_ttl <= fresh_ttl:
+            raise ValueError(
+                f"evict_ttl ({evict_ttl}) must be greater than fresh_ttl ({fresh_ttl})"
+            )
         self._fresh = TTLCache(maxsize=maxsize, ttl=fresh_ttl)
         self._stale = TTLCache(maxsize=maxsize, ttl=evict_ttl)
         self._lock = RLock()
