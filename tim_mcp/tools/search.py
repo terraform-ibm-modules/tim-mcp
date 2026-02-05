@@ -17,6 +17,7 @@ from typing import Any
 from ..clients.github_client import GitHubClient
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
+from ..context import get_cache, get_rate_limiter
 from ..exceptions import TIMError
 from ..exceptions import ValidationError as TIMValidationError
 from ..types import ModuleInfo, ModuleSearchRequest, ModuleSearchResponse
@@ -88,9 +89,15 @@ async def search_modules_impl(
     namespace = config.allowed_namespaces[0] if config.allowed_namespaces else None
 
     # Create and use both Terraform and GitHub clients as async context managers
+    # Use shared cache and rate limiter from context
+    cache = get_cache()
+    rate_limiter = get_rate_limiter()
+
     async with (
-        TerraformClient(config) as terraform_client,
-        GitHubClient(config) as github_client,
+        TerraformClient(
+            config, cache=cache, rate_limiter=rate_limiter
+        ) as terraform_client,
+        GitHubClient(config, cache=cache, rate_limiter=rate_limiter) as github_client,
     ):
         try:
             # We need to fetch and validate modules until we have enough valid ones
