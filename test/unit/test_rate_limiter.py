@@ -3,6 +3,7 @@
 import pytest
 import time
 import threading
+from freezegun import freeze_time
 from tim_mcp.utils.rate_limiter import RateLimiter
 from tim_mcp.exceptions import RateLimitError
 
@@ -37,8 +38,9 @@ class TestRateLimiter:
     def test_rate_limiter_sliding_window(self):
         """Test that sliding window expires old requests.
 
-        Note: The limits library uses internal time tracking, so we use
-        a short window with real sleep to test expiration behavior.
+        Note: Using real sleep here as the limits library uses internal time tracking
+        that doesn't work well with freezegun. This is acceptable for a single test
+        validating time-based expiration behavior.
         """
         limiter = RateLimiter(max_requests=2, window_seconds=1)
 
