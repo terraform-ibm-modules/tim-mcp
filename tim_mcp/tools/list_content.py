@@ -18,10 +18,10 @@ from tenacity import (
 
 from ..clients.github_client import GitHubClient
 from ..config import Config
+from ..context import get_cache, get_rate_limiter
 from ..exceptions import GitHubError, ModuleNotFoundError, RateLimitError
 from ..logging import get_logger
 from ..types import ListContentRequest
-from ..utils.cache import Cache
 from ..utils.module_id import (
     parse_module_id_with_version,
     transform_version_for_github,
@@ -53,9 +53,10 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     # Extract repository information from base module ID
     owner, repo_name = _extract_repo_from_module_id(base_module_id)
 
-    # Initialize GitHub client
-    cache = Cache(ttl=config.cache_ttl)
-    github_client = GitHubClient(config, cache)
+    # Initialize GitHub client with shared cache and rate limiter
+    cache = get_cache()
+    rate_limiter = get_rate_limiter()
+    github_client = GitHubClient(config, cache=cache, rate_limiter=rate_limiter)
 
     try:
         # Get repository information
