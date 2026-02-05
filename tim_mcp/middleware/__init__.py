@@ -6,6 +6,9 @@ from starlette.responses import JSONResponse, Response
 
 from ..utils.rate_limiter import RateLimiter
 
+# Default retry-after value when reset_time is not available (in seconds)
+DEFAULT_RETRY_AFTER = 60
+
 
 class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
     """Per-IP rate limiting middleware."""
@@ -37,6 +40,6 @@ class PerIPRateLimitMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=429,
                 content={"error": "Too Many Requests"},
-                headers={"Retry-After": str(reset_time or 60)},
+                headers={"Retry-After": str(reset_time or DEFAULT_RETRY_AFTER)},
             )
         return await call_next(request)
