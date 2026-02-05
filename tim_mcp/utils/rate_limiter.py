@@ -54,14 +54,16 @@ def with_rate_limit(
                 try:
                     cache = cache_getter(args[0])
                     cache_key = cache_key_fn(*args, **kwargs)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Cache setup failed: {e}")
                     pass
 
             def try_stale_cache():
                 if cache and cache_key:
                     try:
                         return cache.get(cache_key, allow_stale=True)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Stale cache retrieval failed: {e}")
                         pass
                 return None
 
