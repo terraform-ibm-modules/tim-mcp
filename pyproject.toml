@@ -9,7 +9,7 @@ name = "tim-mcp"
 dynamic = ["version"]
 description = "Terraform IBM Modules MCP"
 readme = "README.md"
-requires-python = "==3.12.*"
+requires-python = ">= 3.11.0"
 dependencies = [
     "cachetools==6.2.4",
     "click==8.3.1",
@@ -34,7 +34,7 @@ dev = [
     "pytest-mock==3.15.1",
     "vcrpy==8.1.1",
     "ruff==0.14.14",
-    "hypothesis==6.151.0",
+    "hypothesis==6.151.4",
 ]
 
 [tool.uv]
