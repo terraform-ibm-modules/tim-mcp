@@ -7,7 +7,7 @@ for the TIM-MCP server.
 
 import os
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from .exceptions import ConfigurationError
 
@@ -40,6 +40,16 @@ class Config(BaseModel):
     cache_maxsize: int = Field(
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
     )
+
+    @field_validator("cache_evict_ttl")
+    @classmethod
+    def validate_evict_ttl(cls, v: int, info) -> int:
+        """Validate that evict_ttl is greater than fresh_ttl."""
+        if "cache_fresh_ttl" in info.data and v <= info.data["cache_fresh_ttl"]:
+            raise ValueError(
+                f"cache_evict_ttl ({v}) must be greater than cache_fresh_ttl ({info.data['cache_fresh_ttl']})"
+            )
+        return v
 
     # Request Configuration
     request_timeout: int = Field(30, ge=1, description="Request timeout in seconds")
