@@ -57,15 +57,15 @@ class Config(BaseModel):
     retry_backoff: float = Field(1.0, ge=0.1, description="Retry backoff factor")
 
     # Rate Limiting Configuration
-    global_rate_limit: int = Field(
-        30,
+    global_rate_limit: int | None = Field(
+        None,
         ge=1,
-        description="Global rate limit: max requests per minute across all clients",
+        description="Global rate limit: max requests per minute across all clients (None = unlimited)",
     )
-    per_ip_rate_limit: int = Field(
-        10,
+    per_ip_rate_limit: int | None = Field(
+        None,
         ge=1,
-        description="Per-IP rate limit: max requests per minute per client IP (HTTP mode only)",
+        description="Per-IP rate limit: max requests per minute per client IP in HTTP mode (None = unlimited)",
     )
     rate_limit_window: int = Field(
         60, ge=1, description="Rate limit time window in seconds"
