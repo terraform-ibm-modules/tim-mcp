@@ -1,6 +1,5 @@
 """Unit tests for PerIPRateLimitMiddleware."""
 
-import pytest
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -105,7 +104,9 @@ class TestPerIPRateLimitMiddleware:
         client = TestClient(app)
 
         # Request with X-Forwarded-For header
-        response = client.get("/", headers={"X-Forwarded-For": "192.168.1.100, 10.0.0.1"})
+        response = client.get(
+            "/", headers={"X-Forwarded-For": "192.168.1.100, 10.0.0.1"}
+        )
         assert response.status_code == 200
 
         # Same IP should be rate limited
@@ -137,17 +138,15 @@ class TestPerIPRateLimitMiddleware:
         client = TestClient(app)
 
         # Request with both headers - X-Forwarded-For should be used
-        response = client.get("/", headers={
-            "X-Forwarded-For": "1.1.1.1",
-            "X-Real-IP": "2.2.2.2"
-        })
+        response = client.get(
+            "/", headers={"X-Forwarded-For": "1.1.1.1", "X-Real-IP": "2.2.2.2"}
+        )
         assert response.status_code == 200
 
         # Request with same X-Forwarded-For should be blocked
-        response = client.get("/", headers={
-            "X-Forwarded-For": "1.1.1.1",
-            "X-Real-IP": "3.3.3.3"
-        })
+        response = client.get(
+            "/", headers={"X-Forwarded-For": "1.1.1.1", "X-Real-IP": "3.3.3.3"}
+        )
         assert response.status_code == 429
 
     def test_per_ip_isolation(self):

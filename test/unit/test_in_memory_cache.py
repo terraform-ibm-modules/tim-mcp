@@ -162,7 +162,9 @@ class TestInMemoryCache:
         assert cache.get("list_key") == [1, 2, 3, 4, 5]
 
         # Test nested structures
-        nested = {"data": [{"id": 1, "items": [1, 2, 3]}, {"id": 2, "items": [4, 5, 6]}]}
+        nested = {
+            "data": [{"id": 1, "items": [1, 2, 3]}, {"id": 2, "items": [4, 5, 6]}]
+        }
         cache.set("nested_key", nested)
         assert cache.get("nested_key") == nested
 

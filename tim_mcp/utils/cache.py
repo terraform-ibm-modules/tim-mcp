@@ -19,7 +19,7 @@ class InMemoryCache:
             fresh_ttl: TTL for fresh entries in seconds (default: 1 hour)
             evict_ttl: TTL before eviction in seconds (default: 24 hours)
             maxsize: Maximum cache entries per cache
-        
+
         Raises:
             ValueError: If evict_ttl is not greater than or equal to fresh_ttl
         """

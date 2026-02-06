@@ -1,11 +1,12 @@
 """Unit tests for RateLimiter."""
 
-import pytest
-import time
 import threading
-from freezegun import freeze_time
-from tim_mcp.utils.rate_limiter import RateLimiter
+import time
+
+import pytest
+
 from tim_mcp.exceptions import RateLimitError
+from tim_mcp.utils.rate_limiter import RateLimiter
 
 
 class TestRateLimiter:
@@ -198,8 +199,8 @@ class TestRateLimitDecorator:
         Note: Cache TTL uses time.monotonic() internally, requiring real sleep
         for accurate expiration testing.
         """
-        from tim_mcp.utils.rate_limiter import with_rate_limit
         from tim_mcp.utils.cache import InMemoryCache
+        from tim_mcp.utils.rate_limiter import with_rate_limit
 
         # Use 0 rate limit slots to immediately trigger rate limiting
         limiter = RateLimiter(max_requests=1, window_seconds=60)
@@ -220,7 +221,7 @@ class TestRateLimitDecorator:
             @with_rate_limit(
                 limiter_getter=lambda self: limiter,
                 cache_getter=lambda self: cache,
-                cache_key_fn=lambda self: "test_key"
+                cache_key_fn=lambda self: "test_key",
             )
             async def test_func(self):
                 nonlocal call_count
@@ -236,8 +237,8 @@ class TestRateLimitDecorator:
 
     async def test_decorator_caches_fresh_results(self):
         """Test decorator caches fresh results after successful calls."""
-        from tim_mcp.utils.rate_limiter import with_rate_limit
         from tim_mcp.utils.cache import InMemoryCache
+        from tim_mcp.utils.rate_limiter import with_rate_limit
 
         limiter = RateLimiter(max_requests=10, window_seconds=60)
         cache = InMemoryCache(fresh_ttl=3600, maxsize=10)
@@ -250,7 +251,7 @@ class TestRateLimitDecorator:
             @with_rate_limit(
                 limiter_getter=lambda self: limiter,
                 cache_getter=lambda self: cache,
-                cache_key_fn=lambda self: "test_key"
+                cache_key_fn=lambda self: "test_key",
             )
             async def test_func(self):
                 nonlocal call_count
@@ -271,8 +272,8 @@ class TestRateLimitDecorator:
 
     async def test_decorator_with_cache_getter_receiving_self(self):
         """Test decorator properly passes self to cache_getter."""
-        from tim_mcp.utils.rate_limiter import with_rate_limit
         from tim_mcp.utils.cache import InMemoryCache
+        from tim_mcp.utils.rate_limiter import with_rate_limit
 
         class MockClient:
             def __init__(self):
@@ -282,7 +283,7 @@ class TestRateLimitDecorator:
             @with_rate_limit(
                 limiter_getter=lambda self: self.rate_limiter,
                 cache_getter=lambda self: self.cache,
-                cache_key_fn=lambda self, arg: f"key_{arg}"
+                cache_key_fn=lambda self, arg: f"key_{arg}",
             )
             async def fetch_data(self, arg: str):
                 return f"data_{arg}"
