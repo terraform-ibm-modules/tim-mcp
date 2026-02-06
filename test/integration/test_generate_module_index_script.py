@@ -1,7 +1,6 @@
 """
 Integration test for the generate_module_index.py script.
-
-This test verifies that the script can execute successfully with mocked dependencies
+See also the unit tests under test/unit/test_generate_module_index.py.
 """
 
 import json
@@ -24,7 +23,7 @@ async def test_generate_module_index_script_execution(tmp_path, monkeypatch):
     
     This integration test verifies:
     1. The script can be imported and called
-    2. Cache is initialized correctly (catches the original CI bug: Cache(ttl=0))
+    2. Cache is initialized correctly
     3. The script produces valid JSON output
     4. Basic data structure is correct
     """
@@ -63,8 +62,6 @@ async def test_generate_module_index_script_execution(tmp_path, monkeypatch):
     with patch("generate_module_index.load_config", return_value=mock_config):
         with patch("generate_module_index.TerraformClient", return_value=mock_tf_client):
             with patch("generate_module_index.GitHubClient", return_value=mock_gh_client):
-                # This is the critical test - if Cache initialization uses wrong parameters,
-                # it will raise: TypeError: InMemoryCache.__init__() got an unexpected keyword argument 'ttl'
                 await generate_module_index(output_path=output_file)
     
     # Verify the output file was created
