@@ -181,3 +181,35 @@ class TestInMemoryCache:
         # Should also update the value in stale cache
         time.sleep(1.1)
         assert cache.get("key1", allow_stale=True) == "value2"
+
+    def test_cache_equal_ttls_allowed(self):
+        """Test that evict_ttl == fresh_ttl is allowed."""
+        # This should not raise an error
+        cache = InMemoryCache(fresh_ttl=3600, evict_ttl=3600)
+        assert cache is not None
+
+        # Verify cache works normally
+        cache.set("key1", "value1")
+        assert cache.get("key1") == "value1"
+
+    def test_cache_evict_ttl_less_than_fresh_ttl_raises_error(self):
+        """Test that evict_ttl < fresh_ttl raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError) as exc_info:
+            InMemoryCache(fresh_ttl=3600, evict_ttl=1800)
+
+        assert "must be greater than or equal to" in str(exc_info.value)
+        assert "3600" in str(exc_info.value)  # fresh_ttl
+        assert "1800" in str(exc_info.value)  # evict_ttl
+
+    def test_cache_disabled_with_zero_ttls(self):
+        """Test that both TTLs can be set to 0 (disabled cache scenario from generate_module_index.py)."""
+        # This is the scenario from generate_module_index.py: Cache(fresh_ttl=0, evict_ttl=0)
+        cache = InMemoryCache(fresh_ttl=0, evict_ttl=0)
+        assert cache is not None
+
+        # Cache should work but entries expire immediately
+        cache.set("key1", "value1")
+        # With TTL=0, entry may or may not be retrievable depending on timing
+        # Just verify no errors occur during initialization and basic operations

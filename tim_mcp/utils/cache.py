@@ -25,7 +25,7 @@ class InMemoryCache:
         """
         if evict_ttl < fresh_ttl:
             raise ValueError(
-                f"evict_ttl ({evict_ttl}) must be greater than or egal to fresh_ttl ({fresh_ttl})"
+                f"evict_ttl ({evict_ttl}) must be greater than or equal to fresh_ttl ({fresh_ttl})"
             )
         self._fresh = TTLCache(maxsize=maxsize, ttl=fresh_ttl)
         self._stale = TTLCache(maxsize=maxsize, ttl=evict_ttl)
