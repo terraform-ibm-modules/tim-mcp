@@ -31,11 +31,11 @@ class Config(BaseModel):
     )
 
     # Cache Configuration
-    cache_fresh_ttl: int = Field(
-        3600, ge=60, description="Fresh cache TTL in seconds"
-    )
+    cache_fresh_ttl: int = Field(3600, ge=60, description="Fresh cache TTL in seconds")
     cache_evict_ttl: int = Field(
-        86400, ge=60, description="Eviction TTL in seconds (stale entries persist until this)"
+        86400,
+        ge=60,
+        description="Eviction TTL in seconds (stale entries persist until this)",
     )
     cache_maxsize: int = Field(
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
