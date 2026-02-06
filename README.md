@@ -228,8 +228,8 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 | `TIM_CACHE_FRESH_TTL` | 3600 | Fresh cache TTL in seconds |
 | `TIM_CACHE_EVICT_TTL` | 86400 | Eviction TTL in seconds (stale entries persist until this) |
 | `TIM_CACHE_MAXSIZE` | 1000 | Maximum cache entries (LRU eviction when exceeded) |
-| `TIM_GLOBAL_RATE_LIMIT` | 30 | Global rate limit: max requests per minute across all clients |
-| `TIM_PER_IP_RATE_LIMIT` | 10 | Per-IP rate limit: max requests per minute per client IP (HTTP mode only) |
+| `TIM_GLOBAL_RATE_LIMIT` | None | Global rate limit: max requests per minute across all clients (unset = unlimited) |
+| `TIM_PER_IP_RATE_LIMIT` | None | Per-IP rate limit: max requests per minute per client IP in HTTP mode (unset = unlimited) |
 | `TIM_RATE_LIMIT_WINDOW` | 60 | Rate limit time window in seconds |
 | `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
 | `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
