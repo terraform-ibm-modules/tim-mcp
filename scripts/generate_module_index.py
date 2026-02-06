@@ -816,7 +816,7 @@ async def generate_module_index():
 
     # Initialize clients
     config = load_config()
-    cache = Cache(ttl=0)  # Disable cache for fresh data
+    cache = Cache(fresh_ttl=0, evict_ttl=0)  # Disable cache for fresh data
 
     async with (
         TerraformClient(config, cache) as tf_client,
