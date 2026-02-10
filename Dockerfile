@@ -25,7 +25,7 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION}
 
 # Switch to default user for dependency installation
 USER 1001
-RUN uv sync --no-dev
+RUN UV_CACHE_DIR=/app/.uv-cache uv sync --no-dev && rm -rf /app/.uv-cache
 
 # Stage 2: Runtime
 FROM registry.access.redhat.com/ubi8/python-312:latest

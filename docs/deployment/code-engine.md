@@ -10,17 +10,13 @@ This guide covers deploying tim-mcp to IBM Code Engine as a containerized HTTP s
    curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
    ibmcloud plugin install code-engine
    ```
-3. **Terraform** >= 1.6 (for automated deployment)
-4. **GitHub Personal Access Token** (optional, recommended for higher rate limits)
-   - Create at: https://github.com/settings/tokens
+3. **Terraform** >= 1.9
+4. **GitHub Personal Access Token** (recommended)
    - For classic tokens: `public_repo` scope
    - For fine-grained tokens: `Public Repositories (read-only)` access
-5. **IBM Cloud API Key**
-   - Create at: https://cloud.ibm.com/iam/apikeys
+5. **IBM Cloud API Key** — create at https://cloud.ibm.com/iam/apikeys
 
 ## Deployment
-
-Use the provided Terraform configuration and deployment script:
 
 ```bash
 # Set required environment variables
@@ -28,36 +24,19 @@ export IBM_CLOUD_API_KEY="<your-ibm-cloud-api-key>"
 export GITHUB_TOKEN="<your-github-token>"
 
 # Optional: customize deployment
-export IBM_CLOUD_REGION="us-south"           # Default: us-south
-export IBM_CLOUD_RESOURCE_GROUP="Default"    # Default: Default
-export REGISTRY="us.icr.io"                  # Default: us.icr.io (container registry server)
-export NAMESPACE="your-username"             # Default: tim-mcp (container registry namespace)
-export TAG="latest"                          # Default: latest (image tag)
-export GIT_BRANCH="main"                     # Default: main
+export IBM_CLOUD_REGION="us-south"        # Default: us-south
+export IBM_CLOUD_RESOURCE_GROUP="Default"  # Default: Default
+export GIT_BRANCH="main"                  # Default: main
 
-# Run deployment script
+# Run deployment
 ./scripts/deploy-code-engine.sh
 ```
 
-The script will:
-1. Initialize Terraform
-2. Create Code Engine project and build configuration
-3. Set up secrets for GitHub token
-4. Automatically trigger the container build
-5. Wait for the build to complete
-6. Create or update the application
-
-The deployment is fully automated and will display progress with build status updates. See `terraform/variables.tf` for all configurable options.
+The script will use Terraform (with the [TIM Code Engine module](https://registry.terraform.io/modules/terraform-ibm-modules/code-engine/ibm)) to create the project, build the container, set up secrets, and deploy the application. See `terraform/variables.tf` for all configurable options.
 
 ## Verification
 
-After deployment, test the health endpoint:
-
 ```bash
-# Get application URL
-ibmcloud ce application get --name tim-mcp --output url
-
-# Test health check
 curl https://<app-url>/health
 ```
 
@@ -73,90 +52,32 @@ Expected response:
 }
 ```
 
-## Configuration
-
-Key environment variables:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GITHUB_TOKEN` | - | GitHub PAT (5000 req/hr vs 60) |
-| `TIM_LOG_LEVEL` | INFO | Log level (DEBUG, INFO, WARNING, ERROR) |
-| `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces |
-
-## Cost Optimization
-
-Default configuration runs 24/7 (~$25-30/month). To enable scale-to-zero:
-
-```bash
-terraform apply -var="min_scale=0"
-```
-
-This reduces costs to ~$0-5/month with cold start latency.
-
 ## Troubleshooting
 
 ### Build Failures
 
-The deployment script monitors build progress automatically. If a build fails, check the logs:
-
+Check build logs:
 ```bash
-ibmcloud ce buildrun logs -n tim-mcp-buildrun-<timestamp>
+ibmcloud ce buildrun logs -n <buildrun-name>
 ```
-
-Common issues:
-- **Registry quota**: If Container Registry exceeds 80% quota, consider cleaning old images.
-- **Authentication**: Verify IBM Cloud API key has Container Registry access.
-
-### Application Not Starting
-
-Check application logs:
-```bash
-ibmcloud ce application logs --name tim-mcp
-```
-
-Verify health endpoint status shows dependency connectivity.
 
 ### Invalid GitHub Token
 
-If the health check shows "unhealthy" status for GitHub:
-
-```json
-{
-  "status": "degraded",
-  "dependencies": {
-    "github": {
-      "status": "unhealthy",
-      "error": "Invalid or expired GitHub token"
-    }
-  }
-}
+Update the secret and restart:
+```bash
+ibmcloud ce secret update --name tim-mcp-secrets --from-literal GITHUB_TOKEN=<new-token>
+ibmcloud ce app update --name tim-mcp
 ```
-
-The GitHub token needs to be updated. Create a new token at https://github.com/settings/tokens with `public_repo` scope (for classic tokens) or `Public Repositories (read-only)` access (for fine-grained tokens), then update the secret:
-
-1. Via UI: Code Engine → Projects → tim-mcp → Secrets and configmaps → tim-mcp-secrets → Edit
-2. Via CLI:
-   ```bash
-   ibmcloud ce secret update --name tim-mcp-secrets --from-literal GITHUB_TOKEN=<new-token>
-   ibmcloud ce app update --name tim-mcp
-   ```
-3. Or re-run the deployment script with the new token exported.
 
 ## Updates
 
-To deploy a new version, simply re-run the deployment script:
-
+Re-run the deployment script:
 ```bash
 ./scripts/deploy-code-engine.sh
 ```
 
-The script will automatically trigger a new build and update the application with the latest code.
-
 ## Cleanup
 
-To remove all resources:
-
 ```bash
-cd terraform
-terraform destroy
+cd terraform && terraform destroy
 ```
