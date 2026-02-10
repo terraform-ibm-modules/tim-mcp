@@ -784,7 +784,7 @@ async def process_module(
     }
 
 
-async def generate_module_index():
+async def generate_module_index(output_path: Path | None = None):
     """
     Generate the module index JSON file by fetching, filtering, and processing
     Terraform modules from the registry.
@@ -797,8 +797,9 @@ async def generate_module_index():
     5. Extracts meaningful excerpts from README files
     6. Generates a JSON file with the processed data
 
-    The output file is written to the static directory with the name defined
-    in OUTPUT_FILENAME.
+    Args:
+        output_path: Optional path for the output file. If not provided, uses the default
+                    static directory path.
 
     Raises:
         EnvironmentError: If GITHUB_TOKEN environment variable is not set
@@ -816,7 +817,7 @@ async def generate_module_index():
 
     # Initialize clients
     config = load_config()
-    cache = Cache(ttl=0)  # Disable cache for fresh data
+    cache = Cache(fresh_ttl=0, evict_ttl=0)  # Disable cache for fresh data
 
     async with (
         TerraformClient(config, cache) as tf_client,
@@ -881,7 +882,8 @@ async def generate_module_index():
         }
 
         # Write to static directory
-        output_path = Path(__file__).parent.parent / "static" / OUTPUT_FILENAME
+        if output_path is None:
+            output_path = Path(__file__).parent.parent / "static" / OUTPUT_FILENAME
         output_path.parent.mkdir(exist_ok=True)
 
         with open(output_path, "w") as f:

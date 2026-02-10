@@ -205,6 +205,37 @@ claude mcp remove tim-mcp
 ```
 
 
+## Configuration
+
+### Environment Variables
+
+#### Basic Configuration
+
+For most users running TIM-MCP locally, you only need:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
+| `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+<details>
+<summary><strong>Advanced Configuration (Production/Hosting)</strong></summary>
+
+These settings are for advanced users deploying TIM-MCP in production or HTTP mode:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TIM_CACHE_FRESH_TTL` | 3600 | Fresh cache TTL in seconds |
+| `TIM_CACHE_EVICT_TTL` | 86400 | Eviction TTL in seconds (stale entries persist until this) |
+| `TIM_CACHE_MAXSIZE` | 1000 | Maximum cache entries (LRU eviction when exceeded) |
+| `TIM_GLOBAL_RATE_LIMIT` | None | Global rate limit: max requests per minute across all clients (unset = unlimited) |
+| `TIM_PER_IP_RATE_LIMIT` | None | Per-IP rate limit: max requests per minute per client IP in HTTP mode (unset = unlimited) |
+| `TIM_RATE_LIMIT_WINDOW` | 60 | Rate limit time window in seconds |
+| `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
+| `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
+
+</details>
+
 ## HTTP Mode (Optional)
 
 Most users run tim-mcp in STDIO mode (default). HTTP mode is available for advanced use cases like hosted deployments.

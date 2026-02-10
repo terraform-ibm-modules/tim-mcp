@@ -9,16 +9,19 @@ name = "tim-mcp"
 dynamic = ["version"]
 description = "Terraform IBM Modules MCP"
 readme = "README.md"
-requires-python = "==3.12.*"
+requires-python = ">= 3.11.0"
 dependencies = [
-    "httpx==0.28.1",
-    "fastmcp==2.14.4",
-    "pydantic==2.12.5",
-    "tenacity==9.1.2",
-    "structlog==25.5.0",
+    "cachetools==6.2.4",
     "click==8.3.1",
-    "pyyaml==6.0.3",
+    "fastmcp==2.14.4",
+    "freezegun>=1.5.1",
+    "httpx==0.28.1",
+    "limits==5.6.0",
     "packaging==26.0",
+    "pydantic==2.12.5",
+    "pyyaml==6.0.3",
+    "structlog==25.5.0",
+    "tenacity==9.1.2",
 ]
 
 [project.scripts]
@@ -26,19 +29,20 @@ tim-mcp = "tim_mcp.main:cli"
 
 [project.optional-dependencies]
 dev = [
+    "freezegun==1.5.1",
     "pytest==9.0.2",
     "pytest-asyncio==1.3.0",
     "pytest-mock==3.15.1",
     "vcrpy==8.1.1",
     "ruff==0.14.14",
-    "hypothesis==6.150.3",
+    "hypothesis==6.151.4",
 ]
 
 [tool.uv]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 exclude = ["common-dev-assets"]
 
 [tool.ruff.lint]
@@ -63,7 +67,7 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["test"]
+testpaths = ["test/unit", "test/integration"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"

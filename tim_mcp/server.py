@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from .config import Config, load_config
+from .context import init_context
 from .exceptions import TIMError
 from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
@@ -26,11 +27,39 @@ from .types import (
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
+from .utils.cache import InMemoryCache
+from .utils.rate_limiter import RateLimiter
 
 # Global configuration and logger
 config: Config = load_config()
 configure_logging(config)
 logger = get_logger(__name__)
+
+# Initialize global rate limiter (only if configured) and shared cache
+global_rate_limiter = None
+if config.global_rate_limit is not None:
+    global_rate_limiter = RateLimiter(
+        max_requests=config.global_rate_limit,
+        window_seconds=config.rate_limit_window,
+    )
+
+shared_cache = InMemoryCache(
+    fresh_ttl=config.cache_fresh_ttl,
+    evict_ttl=config.cache_evict_ttl,
+    maxsize=config.cache_maxsize,
+)
+
+# Initialize shared context for tools
+init_context(global_rate_limiter, shared_cache)
+
+logger.info(
+    "Cache initialized",
+    global_rate_limit=config.global_rate_limit or "unlimited",
+    rate_limit_window=config.rate_limit_window,
+    cache_fresh_ttl=config.cache_fresh_ttl,
+    cache_evict_ttl=config.cache_evict_ttl,
+    cache_maxsize=config.cache_maxsize,
+)
 
 
 def _find_static_file(filename: str) -> Path:
@@ -701,12 +730,46 @@ def main(transport_config=None):
         logger.info(
             f"Starting stateless HTTP server on {transport_config.host}:{transport_config.port}"
         )
-        mcp.run(
-            transport="http",
+
+        import uvicorn
+
+        # Add per-IP rate limiting middleware only if configured
+        middleware = []
+        if config.per_ip_rate_limit is not None:
+            from starlette.middleware import Middleware
+
+            from .middleware import PerIPRateLimitMiddleware
+
+            per_ip_limiter = RateLimiter(
+                max_requests=config.per_ip_rate_limit,
+                window_seconds=config.rate_limit_window,
+            )
+            middleware.append(
+                Middleware(
+                    PerIPRateLimitMiddleware,
+                    rate_limiter=per_ip_limiter,
+                    bypass_paths=["/health"],
+                )
+            )
+            logger.info(
+                "Per-IP rate limiting enabled",
+                per_ip_rate_limit=config.per_ip_rate_limit,
+                rate_limit_window=config.rate_limit_window,
+            )
+        else:
+            logger.info("Per-IP rate limiting disabled (not configured)")
+
+        # Get the app with middleware applied
+        app = mcp.http_app(
+            stateless_http=True,
+            middleware=middleware,
+        )
+
+        # Run with uvicorn directly to use our configured app
+        uvicorn.run(
+            app,
             host=transport_config.host,
             port=transport_config.port,
-            stateless_http=True,
-            show_banner=False,
         )
     else:
         raise ValueError(f"Unsupported transport mode: {transport_config.mode}")
