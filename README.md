@@ -81,18 +81,26 @@ Before configuring TIM-MCP, ensure you have the following installed:
    uv --version
    ```
 
-2. **GitHub Personal Access Token** (optional but recommended)
+2. **GitHub Authentication** (optional but recommended)
 
-   A GitHub token helps avoid API rate limits when accessing TIM repositories:
-   - Without token: 60 requests/hour
-   - With token: 5,000 requests/hour
+   Authenticated requests get higher API rate limits (5,000 req/hr vs 60 req/hr). Two methods are supported:
 
-   To create a token:
+   **Option A: Personal Access Token (PAT)** — simplest setup
    - Go to: **GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens**
    - Create a token with:
      - **Repository access:** "Public repositories only"
      - **Permissions:** No private access scopes needed
      - **Expiration:** Set to 90 days or longer
+   - Set `GITHUB_TOKEN` environment variable
+
+   **Option B: GitHub App** — auto-rotating tokens, fine-grained permissions
+   - [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps) with read-only access to public repos
+   - Install the app and note the installation ID
+   - Set all three environment variables:
+     - `GITHUB_APP_ID` — the App ID
+     - `GITHUB_APP_PRIVATE_KEY` — the private key PEM, **base64-encoded** (e.g. `base64 -i private-key.pem`)
+     - `GITHUB_APP_INSTALLATION_ID` — the installation ID
+   - Tokens are obtained automatically and refresh before the 1-hour expiry
 
 ## Installation Instructions
 
@@ -216,6 +224,9 @@ For most users running TIM-MCP locally, you only need:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
+| `GITHUB_APP_ID` | No | None | GitHub App ID (use all three `GITHUB_APP_*` vars together) |
+| `GITHUB_APP_PRIVATE_KEY` | No | None | GitHub App private key (base64-encoded PEM) |
+| `GITHUB_APP_INSTALLATION_ID` | No | None | GitHub App installation ID |
 | `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
 <details>

@@ -809,10 +809,19 @@ async def generate_module_index(output_path: Path | None = None):
     # Check for GitHub token to fail fast with a clear error message
     # Skip this check in test environments
     is_test = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
-    if not os.environ.get("GITHUB_TOKEN") and not is_test:
+    has_github_auth = (
+        os.environ.get("GITHUB_TOKEN")
+        or (
+            os.environ.get("GITHUB_APP_ID")
+            and os.environ.get("GITHUB_APP_PRIVATE_KEY")
+            and os.environ.get("GITHUB_APP_INSTALLATION_ID")
+        )
+    )
+    if not has_github_auth and not is_test:
         raise OSError(
-            "GITHUB_TOKEN environment variable is not set. "
-            "This is required to access GitHub API and avoid 403 errors."
+            "GitHub authentication is not configured. "
+            "Set GITHUB_TOKEN or all three GITHUB_APP_* environment variables "
+            "to access the GitHub API and avoid 403 errors."
         )
 
     # Initialize clients
