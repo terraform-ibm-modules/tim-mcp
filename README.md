@@ -8,21 +8,20 @@
 A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/getting-started/intro) that provides structured access to the [Terraform IBM Modules (TIM)](https://github.com/terraform-ibm-modules) ecosystem. TIM is a curated collection of IBM Cloud Terraform modules designed to follow best practices.
 
 ## Table of Contents
-- [Terraform IBM Modules MCP](#terraform-ibm-modules-mcp)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-    - [Key Features](#key-features)
-    - [Important Notes](#important-notes)
-  - [Why TIM-MCP?](#why-tim-mcp)
-  - [Installing TIM-MCP](#installing-tim-mcp)
-  - [Troubleshooting](#troubleshooting)
-  - [Using TIM-MCP](#using-tim-mcp)
-    - [Getting Started with IBM Cloud](#getting-started-with-ibm-cloud)
-    - [Building Enterprise Infrastructure](#building-enterprise-infrastructure)
-    - [Quick Solutions](#quick-solutions)
-  - [Additional Resources](#additional-resources)
-  - [For Developers](#for-developers)
-  - [Contributing](#contributing)
+
+- [Overview](#overview)
+	- [Key Features](#key-features)
+	- [Important Notes](#important-notes)
+- [Why TIM-MCP?](#why-tim-mcp)
+- [Installing TIM-MCP](#installing-tim-mcp)
+- [Troubleshooting](#troubleshooting)
+- [Using TIM-MCP](#using-tim-mcp)
+	- [Getting Started with IBM Cloud](#getting-started-with-ibm-cloud)
+	- [Building Enterprise Infrastructure](#building-enterprise-infrastructure)
+	- [Quick Solutions](#quick-solutions)
+- [Additional Resources](#additional-resources)
+- [For Developers](#for-developers)
+- [Contributing](#contributing)
 
 ## Overview
 
@@ -75,10 +74,10 @@ Once configured, your AI assistant can help you build IBM Cloud infrastructure f
 
 ## Additional Resources
 
-- **TIM-MCP Repository:** https://github.com/terraform-ibm-modules/tim-mcp
-- **Model Context Protocol Docs:** https://modelcontextprotocol.io
-- **GitHub API Rate Limit Docs:** https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- **Terraform Registry (IBM Modules):** https://registry.terraform.io/namespaces/terraform-ibm-modules
+- [**TIM-MCP Repository**](https://github.com/terraform-ibm-modules/tim-mcp)
+- [**Model Context Protocol Docs**](https://modelcontextprotocol.io) 
+- [**GitHub API Rate Limit Docs**](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
+- [**Terraform Registry (IBM Modules)**](https://registry.terraform.io/namespaces/terraform-ibm-modules)
 
 ## For Developers
 
