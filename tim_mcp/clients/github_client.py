@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from ..auth import create_github_auth
 from ..config import Config, get_github_auth_headers
 from ..exceptions import GitHubError, ModuleNotFoundError
 from ..logging import get_logger, log_api_request
@@ -46,11 +47,13 @@ class GitHubClient:
         self.rate_limiter = rate_limiter
         self.logger = get_logger(__name__, client="github")
 
-        headers = get_github_auth_headers(config)
+        headers = get_github_auth_headers()
+        auth = create_github_auth(config)
         self.client = httpx.AsyncClient(
             base_url=str(config.github_base_url),
             timeout=config.request_timeout,
             headers=headers,
+            auth=auth,
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 

@@ -7,7 +7,14 @@ for the TIM-MCP server.
 
 import os
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 from .exceptions import ConfigurationError
 
@@ -18,6 +25,15 @@ class Config(BaseModel):
     # GitHub Configuration
     github_token: str | None = Field(
         None, description="GitHub API token for authenticated requests"
+    )
+    github_app_id: str | None = Field(
+        None, description="GitHub App ID"
+    )
+    github_app_private_key: str | None = Field(
+        None, description="GitHub App private key (base64 encoded PEM)"
+    )
+    github_app_installation_id: str | None = Field(
+        None, description="GitHub App installation ID"
     )
     github_base_url: HttpUrl = Field(
         default_factory=lambda: HttpUrl("https://api.github.com"),
@@ -40,6 +56,22 @@ class Config(BaseModel):
     cache_maxsize: int = Field(
         1000, ge=10, description="Maximum cache entries (LRU eviction when exceeded)"
     )
+
+    @model_validator(mode="after")
+    def validate_github_app_config(self):
+        """Validate that all GitHub App fields are set together or none."""
+        fields = {
+            "github_app_id": self.github_app_id,
+            "github_app_private_key": self.github_app_private_key,
+            "github_app_installation_id": self.github_app_installation_id,
+        }
+        set_fields = {k for k, v in fields.items() if v is not None}
+        if set_fields and set_fields != set(fields.keys()):
+            missing = set(fields.keys()) - set_fields
+            raise ValueError(
+                f"GitHub App auth requires all three fields. Missing: {', '.join(sorted(missing))}"
+            )
+        return self
 
     @field_validator("cache_evict_ttl")
     @classmethod
@@ -109,6 +141,10 @@ def load_config() -> Config:
         if github_token := os.getenv("GITHUB_TOKEN"):
             config_data["github_token"] = github_token
 
+        for env_key in ("GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_INSTALLATION_ID"):
+            if val := os.getenv(env_key):
+                config_data[env_key.lower()] = val
+
         if github_base_url := os.getenv("TIM_GITHUB_BASE_URL"):
             config_data["github_base_url"] = github_base_url
 
@@ -173,26 +209,20 @@ def load_config() -> Config:
         raise ConfigurationError(f"Invalid configuration: {e}") from e
 
 
-def get_github_auth_headers(config: Config) -> dict[str, str]:
+def get_github_auth_headers() -> dict[str, str]:
     """
-    Get GitHub authentication headers.
+    Get GitHub API headers (non-auth).
 
-    Args:
-        config: Configuration instance
+    Authorization is handled by httpx.Auth (see auth.py).
 
     Returns:
         Dictionary of headers for GitHub API requests
     """
-    headers = {
+    return {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "TIM-MCP/0.1.0",
     }
-
-    if config.github_token:
-        headers["Authorization"] = f"Bearer {config.github_token}"
-
-    return headers
 
 
 def get_terraform_registry_headers() -> dict[str, str]:
