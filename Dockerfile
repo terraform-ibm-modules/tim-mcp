@@ -34,9 +34,6 @@ FROM registry.access.redhat.com/ubi8/python-312:latest
 USER root
 WORKDIR /app
 
-# Copy uv binary
-COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
-
 # Copy installed dependencies
 COPY --from=builder /app/.venv /app/.venv
 

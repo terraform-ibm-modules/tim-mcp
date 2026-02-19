@@ -626,86 +626,54 @@ async def module_index():
         )
 
 
+async def _check_dependency(check_fn):
+    """Run a health-check coroutine, return (dep_info, is_healthy)."""
+    try:
+        return await check_fn(), True
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}, False
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
-    """
-    Health check endpoint for container orchestration platforms.
-    Returns 200 OK with basic service information and dependency checks.
-
-    Validates connectivity to:
-    - GitHub API (checks for token validity and rate limits)
-    - Terraform Registry API
-    """
+    """Health check endpoint for container orchestration platforms."""
     from .clients.github_client import GitHubClient
     from .clients.terraform_client import TerraformClient
 
-    health_status = {
-        "status": "healthy",
-        "service": "tim-mcp",
-        "dependencies": {}
-    }
+    health_status = {"status": "healthy", "service": "tim-mcp", "dependencies": {}}
 
-    # Check GitHub API connectivity using existing client
-    try:
-        async with GitHubClient(config) as github_client:
-            # Use rate_limit endpoint to verify connectivity and token validity
-            response = await github_client.client.get("/rate_limit")
-            if response.status_code == 200:
-                rate_data = response.json()
-                remaining = rate_data.get("rate", {}).get("remaining", 0)
-                limit = rate_data.get("rate", {}).get("limit", 0)
-                health_status["dependencies"]["github"] = {
-                    "status": "healthy",
-                    "rate_limit_remaining": remaining,
-                    "rate_limit_total": limit
-                }
-                if remaining < 10:
-                    health_status["dependencies"]["github"]["warning"] = "Low rate limit remaining"
-            elif response.status_code == 401:
-                health_status["dependencies"]["github"] = {
-                    "status": "unhealthy",
-                    "error": "Invalid or expired GitHub token"
-                }
-                health_status["status"] = "degraded"
-            else:
-                health_status["dependencies"]["github"] = {
-                    "status": "unhealthy",
-                    "error": f"Unexpected status code: {response.status_code}"
-                }
-                health_status["status"] = "degraded"
-    except Exception as e:
-        health_status["dependencies"]["github"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
-        health_status["status"] = "degraded"
+    async def _github_check():
+        async with GitHubClient(config) as gh:
+            resp = await gh.client.get("/rate_limit")
+            if resp.status_code == 401:
+                raise Exception("Invalid or expired GitHub token")
+            if resp.status_code != 200:
+                raise Exception(f"Unexpected status code: {resp.status_code}")
+            rate = resp.json().get("rate", {})
+            info = {
+                "status": "healthy",
+                "rate_limit_remaining": rate.get("remaining", 0),
+                "rate_limit_total": rate.get("limit", 0),
+            }
+            if rate.get("remaining", 0) < 10:
+                info["warning"] = "Low rate limit remaining"
+            return info
 
-    # Check Terraform Registry connectivity using existing client
-    try:
-        async with TerraformClient(config) as tf_client:
-            # Test with a known stable module
-            # Note: base_url already includes /v1
-            response = await tf_client.client.get(
+    async def _terraform_check():
+        async with TerraformClient(config) as tf:
+            resp = await tf.client.get(
                 "/modules/terraform-ibm-modules/landing-zone/ibm"
             )
-            if response.status_code == 200:
-                health_status["dependencies"]["terraform_registry"] = {
-                    "status": "healthy"
-                }
-            else:
-                health_status["dependencies"]["terraform_registry"] = {
-                    "status": "unhealthy",
-                    "error": f"Unexpected status code: {response.status_code}"
-                }
-                health_status["status"] = "degraded"
-    except Exception as e:
-        health_status["dependencies"]["terraform_registry"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
-        health_status["status"] = "degraded"
+            if resp.status_code != 200:
+                raise Exception(f"Unexpected status code: {resp.status_code}")
+            return {"status": "healthy"}
 
-    # Return 200 for healthy/degraded, 503 for unhealthy
+    for dep_name, check_fn in [("github", _github_check), ("terraform_registry", _terraform_check)]:
+        info, healthy = await _check_dependency(check_fn)
+        health_status["dependencies"][dep_name] = info
+        if not healthy:
+            health_status["status"] = "degraded"
+
     status_code = 200 if health_status["status"] in ["healthy", "degraded"] else 503
     return JSONResponse(health_status, status_code=status_code)
 

@@ -4,93 +4,99 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from starlette.testclient import TestClient
 
-from tim_mcp.config import Config
+from tim_mcp.server import mcp
 
 
-def _make_github_response(status_code, json_data=None):
+def _resp(status_code, json_data=None):
     """Create a mock httpx response."""
-    response = httpx.Response(status_code, json=json_data or {})
-    return response
+    return httpx.Response(status_code, json=json_data or {})
+
+
+def _mock_client(get_return=None, get_side_effect=None):
+    """Build an AsyncMock that works as an async context manager with .client.get()."""
+    mock = AsyncMock()
+    mock.__aenter__.return_value = mock
+    if get_side_effect:
+        mock.client.get.side_effect = get_side_effect
+    else:
+        mock.client.get.return_value = get_return
+    return mock
 
 
 @pytest.fixture
-def config():
-    return Config(github_token="test-token")
+def client():
+    """Test client for the MCP HTTP app."""
+    return TestClient(mcp.http_app(stateless_http=True))
 
 
-class TestHealthCheck:
-    """Tests for the /health endpoint dependency checks."""
+class TestHealthEndpoint:
+    """Tests for GET /health using the real route."""
 
-    @pytest.mark.asyncio
-    async def test_healthy_when_all_dependencies_ok(self, config):
-        """Health check returns healthy when GitHub and Terraform Registry are reachable."""
-        from tim_mcp.clients.github_client import GitHubClient
-        from tim_mcp.clients.terraform_client import TerraformClient
+    def test_healthy_when_all_deps_ok(self, client):
+        """Both deps healthy -> 200, status 'healthy'."""
+        gh = _mock_client(_resp(200, {"rate": {"remaining": 4999, "limit": 5000}}))
+        tf = _mock_client(_resp(200))
 
-        github_resp = _make_github_response(200, {"rate": {"remaining": 4999, "limit": 5000}})
-        tf_resp = _make_github_response(200, {"id": "test"})
+        with (
+            patch("tim_mcp.clients.github_client.GitHubClient", return_value=gh),
+            patch("tim_mcp.clients.terraform_client.TerraformClient", return_value=tf),
+        ):
+            r = client.get("/health")
 
-        async with GitHubClient(config) as gh:
-            gh.client = AsyncMock()
-            gh.client.get = AsyncMock(return_value=github_resp)
-            response = await gh.client.get("/rate_limit")
-            assert response.status_code == 200
-            rate_data = response.json()
-            assert rate_data["rate"]["remaining"] == 4999
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "healthy"
+        assert body["dependencies"]["github"]["status"] == "healthy"
+        assert body["dependencies"]["github"]["rate_limit_remaining"] == 4999
+        assert body["dependencies"]["terraform_registry"]["status"] == "healthy"
 
-        async with TerraformClient(config) as tf:
-            tf.client = AsyncMock()
-            tf.client.get = AsyncMock(return_value=tf_resp)
-            response = await tf.client.get("/modules/terraform-ibm-modules/landing-zone/ibm")
-            assert response.status_code == 200
+    def test_degraded_github_401(self, client):
+        """GitHub 401 -> 200, status 'degraded'."""
+        gh = _mock_client(_resp(401, {"message": "Bad credentials"}))
+        tf = _mock_client(_resp(200))
 
-    @pytest.mark.asyncio
-    async def test_degraded_with_invalid_github_token(self, config):
-        """Health check returns degraded when GitHub token is invalid (401)."""
-        from tim_mcp.clients.github_client import GitHubClient
+        with (
+            patch("tim_mcp.clients.github_client.GitHubClient", return_value=gh),
+            patch("tim_mcp.clients.terraform_client.TerraformClient", return_value=tf),
+        ):
+            r = client.get("/health")
 
-        github_resp = _make_github_response(401, {"message": "Bad credentials"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "degraded"
+        assert body["dependencies"]["github"]["status"] == "unhealthy"
+        assert "Invalid or expired" in body["dependencies"]["github"]["error"]
 
-        async with GitHubClient(config) as gh:
-            gh.client = AsyncMock()
-            gh.client.get = AsyncMock(return_value=github_resp)
-            response = await gh.client.get("/rate_limit")
-            assert response.status_code == 401
+    def test_github_low_rate_limit_warning(self, client):
+        """GitHub low rate limit -> 200, healthy with warning field."""
+        gh = _mock_client(_resp(200, {"rate": {"remaining": 5, "limit": 5000}}))
+        tf = _mock_client(_resp(200))
 
-    @pytest.mark.asyncio
-    async def test_degraded_with_low_rate_limit(self, config):
-        """Health check warns when GitHub rate limit is low."""
-        from tim_mcp.clients.github_client import GitHubClient
+        with (
+            patch("tim_mcp.clients.github_client.GitHubClient", return_value=gh),
+            patch("tim_mcp.clients.terraform_client.TerraformClient", return_value=tf),
+        ):
+            r = client.get("/health")
 
-        github_resp = _make_github_response(200, {"rate": {"remaining": 5, "limit": 5000}})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "healthy"
+        assert body["dependencies"]["github"]["warning"] == "Low rate limit remaining"
 
-        async with GitHubClient(config) as gh:
-            gh.client = AsyncMock()
-            gh.client.get = AsyncMock(return_value=github_resp)
-            response = await gh.client.get("/rate_limit")
-            rate_data = response.json()
-            assert rate_data["rate"]["remaining"] < 10
+    def test_degraded_terraform_unreachable(self, client):
+        """Terraform Registry unreachable -> 200, status 'degraded'."""
+        gh = _mock_client(_resp(200, {"rate": {"remaining": 4999, "limit": 5000}}))
+        tf = _mock_client(get_side_effect=httpx.ConnectError("Connection refused"))
 
-    @pytest.mark.asyncio
-    async def test_degraded_when_terraform_registry_unreachable(self, config):
-        """Health check returns degraded when Terraform Registry is unreachable."""
-        from tim_mcp.clients.terraform_client import TerraformClient
+        with (
+            patch("tim_mcp.clients.github_client.GitHubClient", return_value=gh),
+            patch("tim_mcp.clients.terraform_client.TerraformClient", return_value=tf),
+        ):
+            r = client.get("/health")
 
-        async with TerraformClient(config) as tf:
-            tf.client = AsyncMock()
-            tf.client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
-            with pytest.raises(httpx.ConnectError):
-                await tf.client.get("/modules/terraform-ibm-modules/landing-zone/ibm")
-
-    @pytest.mark.asyncio
-    async def test_github_rate_limit_response_structure(self, config):
-        """Verify the expected GitHub /rate_limit API response structure."""
-        github_resp = _make_github_response(200, {
-            "rate": {"remaining": 4999, "limit": 5000, "reset": 1234567890},
-            "resources": {}
-        })
-        data = github_resp.json()
-        assert "rate" in data
-        assert "remaining" in data["rate"]
-        assert "limit" in data["rate"]
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "degraded"
+        assert body["dependencies"]["terraform_registry"]["status"] == "unhealthy"
