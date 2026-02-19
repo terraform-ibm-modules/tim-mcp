@@ -71,6 +71,7 @@ testpaths = ["test/unit", "test/integration"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+markers = ["integration: tests that hit real external APIs (need network)"]
 
 [dependency-groups]
 dev = [

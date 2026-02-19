@@ -13,6 +13,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import ValidationError
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .config import Config, load_config
 from .context import init_context
@@ -622,6 +624,58 @@ async def module_index():
             },
             indent=2,
         )
+
+
+async def _check_dependency(check_fn):
+    """Run a health-check coroutine, return (dep_info, is_healthy)."""
+    try:
+        return await check_fn(), True
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}, False
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    """Health check endpoint for container orchestration platforms."""
+    from .clients.github_client import GitHubClient
+    from .clients.terraform_client import TerraformClient
+
+    health_status = {"status": "healthy", "service": "tim-mcp", "dependencies": {}}
+
+    async def _github_check():
+        async with GitHubClient(config) as gh:
+            resp = await gh.client.get("/rate_limit")
+            if resp.status_code == 401:
+                raise Exception("Invalid or expired GitHub token")
+            if resp.status_code != 200:
+                raise Exception(f"Unexpected status code: {resp.status_code}")
+            rate = resp.json().get("rate", {})
+            info = {
+                "status": "healthy",
+                "rate_limit_remaining": rate.get("remaining", 0),
+                "rate_limit_total": rate.get("limit", 0),
+            }
+            if rate.get("remaining", 0) < 10:
+                info["warning"] = "Low rate limit remaining"
+            return info
+
+    async def _terraform_check():
+        async with TerraformClient(config) as tf:
+            resp = await tf.client.get(
+                "/modules/terraform-ibm-modules/landing-zone/ibm"
+            )
+            if resp.status_code != 200:
+                raise Exception(f"Unexpected status code: {resp.status_code}")
+            return {"status": "healthy"}
+
+    for dep_name, check_fn in [("github", _github_check), ("terraform_registry", _terraform_check)]:
+        info, healthy = await _check_dependency(check_fn)
+        health_status["dependencies"][dep_name] = info
+        if not healthy:
+            health_status["status"] = "degraded"
+
+    status_code = 200 if health_status["status"] in ["healthy", "degraded"] else 503
+    return JSONResponse(health_status, status_code=status_code)
 
 
 def main(transport_config=None):
