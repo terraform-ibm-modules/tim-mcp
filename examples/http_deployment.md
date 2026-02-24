@@ -182,195 +182,137 @@ sudo journalctl -u tim-mcp.service -f
 
 ## Docker Deployment
 
-### Dockerfile
+A production-ready `Dockerfile` is included in the repository root. It uses a
+multi-stage build on Red Hat UBI9 with Python 3.12, runs as non-root user 1001,
+and listens on port 8080.
 
-Create a Dockerfile for containerized deployment:
+### Build and Run
 
-```dockerfile
-FROM python:3.11-slim
+```bash
+# Build the image (VERSION is used by hatch-vcs since .git isn't in the image)
+docker build --build-arg VERSION=0.1.0 -t tim-mcp:latest .
 
-# Install uv
-RUN pip install uv
+# Run the container
+docker run -p 8080:8080 -e GITHUB_TOKEN=<your_token> tim-mcp:latest
 
-# Set working directory
-WORKDIR /app
+# Test health endpoint
+curl http://localhost:8080/health
 
-# Copy project files
-COPY . .
-
-# Install dependencies
-RUN uv sync --frozen
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash tim-mcp
-
-# Switch to non-root user
-USER tim-mcp
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the server
-CMD ["uv", "run", "tim-mcp", "--http", "--host", "0.0.0.0", "--port", "8000"]
+# Test MCP endpoint
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
 ```
+
+The `PORT` environment variable controls which port the server listens on
+(default: 8080 inside the container).
 
 ### Docker Compose
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
-
 services:
   tim-mcp:
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: "0.1.0"
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - TIM_ALLOWED_NAMESPACES=terraform-ibm-modules
-      - TIM_EXCLUDED_MODULES=
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - /path/to/ssl/certs:/etc/ssl/certs:ro
-    depends_on:
-      - tim-mcp
+      start_period: 10s
     restart: unless-stopped
 ```
-
-### Run with Docker
 
 ```bash
 # Build and start
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f tim-mcp
+docker compose logs -f tim-mcp
 
 # Stop
-docker-compose down
+docker compose down
 ```
 
-## Kubernetes Deployment
+## Kubernetes / OpenShift Deployment
 
-### Deployment and Service
+Production Kustomize manifests are provided in `deploy/openshift/`. These work
+on both vanilla Kubernetes and OpenShift.
 
-```yaml
-# tim-mcp-k8s.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: tim-mcp
-  labels:
-    app: tim-mcp
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: tim-mcp
-  template:
-    metadata:
-      labels:
-        app: tim-mcp
-    spec:
-      containers:
-      - name: tim-mcp
-        image: your-registry/tim-mcp:latest
-        ports:
-        - containerPort: 8000
-        env:
-        - name: GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: tim-mcp-secrets
-              key: github-token
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+### Kustomize Structure
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: tim-mcp-service
-spec:
-  selector:
-    app: tim-mcp
-  ports:
-  - port: 80
-    targetPort: 8000
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: tim-mcp-secrets
-type: Opaque
-data:
-  github-token: <base64-encoded-token>
+```
+deploy/openshift/
+├── base/                       # Shared resources (Deployment, Service, ConfigMap, Secret)
+├── overlays/
+│   ├── mcp-gateway/            # Behind Red Hat MCP Gateway (HTTPRoute, MCPServerRegistration, NetworkPolicy)
+│   └── standalone/             # Direct access via OpenShift Route with TLS edge termination
 ```
 
-### Ingress (optional)
+### Deploy to OpenShift
 
-```yaml
-# tim-mcp-ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: tim-mcp-ingress
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - tim-mcp.your-domain.com
-    secretName: tim-mcp-tls
-  rules:
-  - host: tim-mcp.your-domain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: tim-mcp-service
-            port:
-              number: 80
+```bash
+# Create namespace
+oc new-project tim-mcp
+
+# Option A: Standalone (direct access via Route)
+oc apply -k deploy/openshift/overlays/standalone
+
+# Option B: Behind Red Hat MCP Gateway
+oc apply -k deploy/openshift/overlays/mcp-gateway
+
+# Set the GitHub token (replace placeholder secret)
+oc create secret generic tim-mcp-secrets \
+  --from-literal=github-token=<YOUR_TOKEN> \
+  -n tim-mcp --dry-run=client -o yaml | oc apply -f -
+
+# Verify
+oc get pods -n tim-mcp
+oc logs -f deployment/tim-mcp -n tim-mcp
 ```
+
+### Deploy to Vanilla Kubernetes
+
+The base manifests work on any Kubernetes cluster. For ingress, add your own
+Ingress or Gateway API HTTPRoute:
+
+```bash
+kubectl create namespace tim-mcp
+kubectl apply -k deploy/openshift/base
+kubectl create secret generic tim-mcp-secrets \
+  --from-literal=github-token=<YOUR_TOKEN> \
+  -n tim-mcp --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### Building on OpenShift (No External Registry)
+
+If you don't have a container image in a registry, you can build directly on
+the cluster using OpenShift's built-in build system:
+
+```bash
+# Create a binary build config
+oc new-build --name=tim-mcp --binary --strategy=docker -n tim-mcp
+
+# Upload source and build
+oc start-build tim-mcp --from-dir=. --follow -n tim-mcp
+
+# Patch the deployment to use the internal image
+oc set image deployment/tim-mcp \
+  tim-mcp=image-registry.openshift-image-registry.svc:5000/tim-mcp/tim-mcp:latest \
+  -n tim-mcp
+```
+
+For the full MCP Gateway investigation and architecture details, see
+[docs/openshift-mcp-gateway.md](../docs/openshift-mcp-gateway.md).
 
 ## Monitoring and Logging
 
@@ -385,15 +327,35 @@ tim-mcp --http --log-level INFO --log-format json
 
 ### Health Checks
 
-The server should provide a health endpoint at `/health` for monitoring:
+The `/health` endpoint checks GitHub API and Terraform Registry connectivity:
 
 ```bash
 # Basic health check
-curl -f http://localhost:8000/health
+curl -f http://localhost:8080/health
 
 # With timeout
-curl -f --max-time 10 http://localhost:8000/health
+curl -f --max-time 10 http://localhost:8080/health
 ```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "service": "tim-mcp",
+  "dependencies": {
+    "github": {
+      "status": "healthy",
+      "rate_limit_remaining": 4983,
+      "rate_limit_total": 5000
+    },
+    "terraform_registry": {
+      "status": "healthy"
+    }
+  }
+}
+```
+
+Status values: `healthy` (all deps up), `degraded` (one or more deps down, still returns 200).
 
 ### Prometheus Metrics (Future Enhancement)
 

@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
     "--port",
     type=click.IntRange(1, 65535),
     default=8000,
-    help="Port for HTTP server (default: 8000, requires --http)",
+    envvar="PORT",
+    show_default=True,
+    help="Port for HTTP server (requires --http)",
 )
 @click.option(
     "--log-level",
