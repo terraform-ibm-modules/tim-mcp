@@ -1,0 +1,10 @@
+apiVersion: gateway.kuadrant.io/v1alpha1
+kind: MCPServerRegistration
+metadata:
+  name: tim-mcp
+spec:
+  toolPrefix: tim_
+  mcpServerRef:
+    httpRouteRef:
+      name: tim-mcp
+    path: /mcp

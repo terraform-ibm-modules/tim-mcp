@@ -316,6 +316,47 @@ Once configured, your AI assistant can help you build IBM Cloud infrastructure f
 - **GitHub API Rate Limit Docs:** https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
 - **Terraform Registry (IBM Modules):** https://registry.terraform.io/namespaces/terraform-ibm-modules
 
+## Container and OpenShift Deployment
+
+TIM-MCP can be deployed as a container on OpenShift or any Kubernetes cluster.
+
+### Quick Start (Docker)
+
+```bash
+# Build the container image
+docker build --build-arg VERSION=0.1.0 -t tim-mcp:latest .
+
+# Run locally
+docker run -p 8080:8080 -e GITHUB_TOKEN=<your_token> tim-mcp:latest
+
+# Test
+curl http://localhost:8080/health
+```
+
+### OpenShift Deployment
+
+Deploy to OpenShift using the provided Kustomize manifests:
+
+```bash
+# Create namespace
+oc new-project tim-mcp
+
+# Deploy (standalone — direct access via OpenShift Route)
+oc apply -k deploy/openshift/overlays/standalone
+
+# Or deploy behind the Red Hat MCP Gateway
+oc apply -k deploy/openshift/overlays/mcp-gateway
+
+# Set the GitHub token secret
+oc create secret generic tim-mcp-secrets \
+  --from-literal=github-token=<YOUR_TOKEN> \
+  -n tim-mcp --dry-run=client -o yaml | oc apply -f -
+```
+
+For full details on the OpenShift and MCP Gateway deployment architecture, see [docs/openshift-mcp-gateway.md](docs/openshift-mcp-gateway.md).
+
+For HTTP deployment options (nginx, systemd, Docker Compose, Kubernetes), see [examples/http_deployment.md](examples/http_deployment.md).
+
 ## For Developers
 
 If you're interested in contributing to TIM-MCP or modifying the server itself, please see the [Development Guide](DEVELOPMENT.md) for detailed instructions on development setup, transport modes, and advanced configuration options.
