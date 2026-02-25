@@ -53,64 +53,60 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     # Initialize clients with shared cache and rate limiter
     cache = get_cache()
     rate_limiter = get_rate_limiter()
-    terraform_client = TerraformClient(config, cache=cache, rate_limiter=rate_limiter)
-    github_client = GitHubClient(config, cache=cache, rate_limiter=rate_limiter)
 
-    try:
-        # Try Registry API first for examples and submodules
-        try:
-            logger.info(
-                "Fetching module structure from Registry API",
-                module_id=base_module_id,
-                version=version,
+    # Use nested async context managers to ensure proper cleanup
+    async with TerraformClient(config, cache=cache, rate_limiter=rate_limiter) as terraform_client:
+        async with GitHubClient(config, cache=cache, rate_limiter=rate_limiter) as github_client:
+            # Try Registry API first for examples and submodules
+            try:
+                logger.info(
+                    "Fetching module structure from Registry API",
+                    module_id=base_module_id,
+                    version=version,
+                )
+
+                # Get module structure from Registry
+                module_data = await terraform_client.get_module_structure(
+                    namespace, name, provider, version
+                )
+
+                # Extract version from Registry response
+                resolved_version = module_data.get("version", version)
+
+                # Build categorized paths from Registry data
+                categorized_paths = _extract_registry_paths(module_data)
+
+                # Extract descriptions from Registry READMEs
+                path_descriptions = _extract_registry_descriptions(module_data)
+
+                logger.info(
+                    "Successfully fetched from Registry API",
+                    module_id=base_module_id,
+                    examples=len(categorized_paths.get("examples", [])),
+                    submodules=len(categorized_paths.get("submodules", [])),
+                )
+
+            except TerraformRegistryError as e:
+                # Fall back to full GitHub implementation if Registry fails
+                logger.warning(
+                    "Registry API failed, falling back to GitHub",
+                    module_id=base_module_id,
+                    error=str(e),
+                )
+                return await _list_content_github_fallback(
+                    base_module_id,
+                    namespace,
+                    name,
+                    provider,
+                    version,
+                    config,
+                    github_client,
+                )
+
+            # Return formatted content listing
+            return _format_content_listing(
+                base_module_id, resolved_version, categorized_paths, path_descriptions
             )
-
-            # Get module structure from Registry
-            module_data = await terraform_client.get_module_structure(
-                namespace, name, provider, version
-            )
-
-            # Extract version from Registry response
-            resolved_version = module_data.get("version", version)
-
-            # Build categorized paths from Registry data
-            categorized_paths = _extract_registry_paths(module_data)
-
-            # Extract descriptions from Registry READMEs
-            path_descriptions = _extract_registry_descriptions(module_data)
-
-            logger.info(
-                "Successfully fetched from Registry API",
-                module_id=base_module_id,
-                examples=len(categorized_paths.get("examples", [])),
-                submodules=len(categorized_paths.get("submodules", [])),
-            )
-
-        except TerraformRegistryError as e:
-            # Fall back to full GitHub implementation if Registry fails
-            logger.warning(
-                "Registry API failed, falling back to GitHub",
-                module_id=base_module_id,
-                error=str(e),
-            )
-            return await _list_content_github_fallback(
-                base_module_id,
-                namespace,
-                name,
-                provider,
-                version,
-                config,
-                github_client,
-            )
-
-        # Return formatted content listing
-        return _format_content_listing(
-            base_module_id, resolved_version, categorized_paths, path_descriptions
-        )
-
-    finally:
-        await terraform_client.client.aclose()
-        await github_client.client.aclose()
 
 
 def _extract_registry_paths(module_data: dict) -> dict[str, list[str]]:
@@ -212,9 +208,6 @@ async def _list_content_github_fallback(
     """
     # Extract repository information from base module ID
     owner, repo_name = _extract_repo_from_module_id(base_module_id)
-
-    # Get repository information
-    await github_client.get_repository_info(owner, repo_name)
 
     # Transform version for GitHub tag lookup (add "v" prefix if needed)
     github_version = transform_version_for_github(version)
