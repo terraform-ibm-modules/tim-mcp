@@ -134,17 +134,8 @@ class TestListContentImpl:
             with patch(
                 "tim_mcp.tools.list_content.TerraformClient"
             ) as MockTerraformClient:
-                MockGitHubClient.return_value = mock_github_client
-                mock_github_client.client = AsyncMock()
-                mock_github_client.client.aclose = AsyncMock()
-
                 # Mock TerraformClient
                 mock_terraform_client = AsyncMock()
-                MockTerraformClient.return_value = mock_terraform_client
-                mock_terraform_client.client = AsyncMock()
-                mock_terraform_client.client.aclose = AsyncMock()
-
-                # Return structure from Registry
                 mock_terraform_client.get_module_structure.return_value = {
                     "version": "main",
                     "root": {
@@ -167,6 +158,13 @@ class TestListContentImpl:
                         }
                     ],
                 }
+
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
 
                 result = await list_content_impl(request, mock_config)
 
@@ -217,18 +215,30 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            MockGitHubClient.return_value = mock_github_client
-            mock_github_client.client = AsyncMock()
-            mock_github_client.client.aclose = AsyncMock()
-            result = await list_content_impl(request, mock_config)
+            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+                # Mock TerraformClient to fail (force GitHub fallback)
+                mock_terraform_client = AsyncMock()
+                from tim_mcp.exceptions import TerraformRegistryError
+                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
+                    "Module not found", status_code=404, response_body="Not Found"
+                )
+                
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                result = await list_content_impl(request, mock_config)
 
-        # Verify
-        assert "**Version:** v5.1.0" in result
+                # Verify
+                assert "**Version:** v5.1.0" in result
 
-        # Verify GitHub client called with specific version
-        mock_github_client.get_repository_tree.assert_called_once_with(
-            "terraform-ibm-modules", "terraform-ibm-vpc", "v5.1.0", recursive=True
-        )
+                # Verify GitHub client called with specific version
+                mock_github_client.get_repository_tree.assert_called_once_with(
+                    "terraform-ibm-modules", "terraform-ibm-vpc", "v5.1.0", recursive=True
+                )
 
     @pytest.mark.asyncio
     async def test_list_content_module_not_found(self, mock_config, mock_github_client):
@@ -236,21 +246,34 @@ class TestListContentImpl:
         # Setup
         request = ListContentRequest(module_id="nonexistent/module/ibm")
 
-        mock_github_client.get_repository_info.side_effect = ModuleNotFoundError(
-            "nonexistent/terraform-ibm-module",
-            details={"reason": "Repository not found"},
-        )
-
         # Execute & Verify
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            MockGitHubClient.return_value = mock_github_client
-            mock_github_client.client = AsyncMock()
-            mock_github_client.client.aclose = AsyncMock()
+            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+                # Mock TerraformClient to fail
+                mock_terraform_client = AsyncMock()
+                from tim_mcp.exceptions import TerraformRegistryError
+                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
+                    "Module not found", status_code=404, response_body="Not Found"
+                )
+                
+                # Setup async context managers - __aexit__ must return None to not swallow exceptions
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__ = AsyncMock(return_value=None)
+                
+                # Mock GitHub to also fail - need to create a fresh mock
+                mock_github_fallback = AsyncMock()
+                mock_github_fallback.resolve_version.side_effect = ModuleNotFoundError(
+                    "nonexistent/terraform-ibm-module",
+                    details={"reason": "Repository not found"},
+                )
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_fallback
+                MockGitHubClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            with pytest.raises(ModuleNotFoundError) as exc_info:
-                await list_content_impl(request, mock_config)
+                with pytest.raises(ModuleNotFoundError) as exc_info:
+                    await list_content_impl(request, mock_config)
 
-            assert "nonexistent/terraform-ibm-module" in str(exc_info.value)
+                assert "nonexistent/terraform-ibm-module" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_list_content_github_api_error(self, mock_config, mock_github_client):
@@ -270,23 +293,21 @@ class TestListContentImpl:
             with patch(
                 "tim_mcp.tools.list_content.TerraformClient"
             ) as MockTerraformClient:
-                MockGitHubClient.return_value = mock_github_client
-                mock_github_client.client = AsyncMock()
-                mock_github_client.client.aclose = AsyncMock()
-
                 # Mock TerraformClient to succeed
                 mock_terraform_client = AsyncMock()
-                MockTerraformClient.return_value = mock_terraform_client
-                mock_terraform_client.client = AsyncMock()
-                mock_terraform_client.client.aclose = AsyncMock()
-
-                # Return empty structure from Registry (module with no examples/submodules)
                 mock_terraform_client.get_module_structure.return_value = {
                     "version": "1.0.0",
                     "root": {"readme": "# Test Module\n\nTest description."},
                     "examples": [],
                     "submodules": [],
                 }
+
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
 
                 # Should succeed with Registry data even though GitHub failed
                 result = await list_content_impl(request, mock_config)
@@ -297,7 +318,7 @@ class TestListContentImpl:
                 assert "## Root Module" in result
 
     @pytest.mark.asyncio
-    async def test_list_content_rate_limit_error(self, mock_config, mock_github_client):
+    async def test_list_content_rate_limit_error(self, mock_config):
         """Test error handling for Registry API rate limit errors."""
         # Setup
         request = ListContentRequest(module_id="terraform-ibm-modules/vpc/ibm")
@@ -307,16 +328,9 @@ class TestListContentImpl:
             with patch(
                 "tim_mcp.tools.list_content.TerraformClient"
             ) as MockTerraformClient:
-                MockGitHubClient.return_value = mock_github_client
-                mock_github_client.client = AsyncMock()
-                mock_github_client.client.aclose = AsyncMock()
-
                 # Mock TerraformClient to raise rate limit error
                 mock_terraform_client = AsyncMock()
-                MockTerraformClient.return_value = mock_terraform_client
-                mock_terraform_client.client = AsyncMock()
-                mock_terraform_client.client.aclose = AsyncMock()
-
+                
                 from tim_mcp.exceptions import TerraformRegistryError
 
                 mock_terraform_client.get_module_structure.side_effect = (
@@ -327,12 +341,20 @@ class TestListContentImpl:
                     )
                 )
 
-                # Mock GitHub fallback to also fail with rate limit
-                mock_github_client.get_repository_info.side_effect = RateLimitError(
+                # Setup async context managers - __aexit__ must return None to not swallow exceptions
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__ = AsyncMock(return_value=None)
+                
+                # Mock GitHub fallback to also fail with rate limit - create fresh mock
+                mock_github_fallback = AsyncMock()
+                mock_github_fallback.resolve_version.side_effect = RateLimitError(
                     "GitHub rate limit exceeded",
                     reset_time=1234567890,
                     api_name="GitHub",
                 )
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_fallback
+                MockGitHubClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
                 with pytest.raises(RateLimitError) as exc_info:
                     await list_content_impl(request, mock_config)
@@ -366,20 +388,32 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            MockGitHubClient.return_value = mock_github_client
-            mock_github_client.client = AsyncMock()
-            mock_github_client.client.aclose = AsyncMock()
-            result = await list_content_impl(request, mock_config)
+            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+                # Mock TerraformClient to fail (force GitHub fallback)
+                mock_terraform_client = AsyncMock()
+                from tim_mcp.exceptions import TerraformRegistryError
+                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
+                    "Module not found", status_code=404, response_body="Not Found"
+                )
+                
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                result = await list_content_impl(request, mock_config)
 
-        # Verify
-        assert "# terraform-ibm-modules/empty/ibm - Available Content" in result
-        assert "**Version:** main" in result
-        # Should only have root module section with no description since no README
-        assert "## Root Module" in result
-        assert "**Path:** `` (empty string)" in result
-        # Should not have other sections since no content
-        assert "## Examples" not in result
-        assert "## Submodules" not in result
+                # Verify
+                assert "# terraform-ibm-modules/empty/ibm - Available Content" in result
+                assert "**Version:** main" in result
+                # Should only have root module section with no description since no README
+                assert "## Root Module" in result
+                assert "**Path:** `` (empty string)" in result
+                # Should not have other sections since no content
+                assert "## Examples" not in result
+                assert "## Submodules" not in result
 
     @pytest.mark.asyncio
     async def test_list_content_readme_parsing_fallback(
@@ -403,17 +437,8 @@ class TestListContentImpl:
             with patch(
                 "tim_mcp.tools.list_content.TerraformClient"
             ) as MockTerraformClient:
-                MockGitHubClient.return_value = mock_github_client
-                mock_github_client.client = AsyncMock()
-                mock_github_client.client.aclose = AsyncMock()
-
                 # Mock TerraformClient with empty READMEs
                 mock_terraform_client = AsyncMock()
-                MockTerraformClient.return_value = mock_terraform_client
-                mock_terraform_client.client = AsyncMock()
-                mock_terraform_client.client.aclose = AsyncMock()
-
-                # Return structure with no READMEs
                 mock_terraform_client.get_module_structure.return_value = {
                     "version": "main",
                     "root": {},  # No readme
@@ -424,6 +449,13 @@ class TestListContentImpl:
                         {"path": "modules/landing-zone-vpc"},  # No readme
                     ],
                 }
+
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
 
                 result = await list_content_impl(request, mock_config)
 
@@ -476,10 +508,24 @@ class TestListContentImpl:
 
         # Execute
         with patch("tim_mcp.tools.list_content.GitHubClient") as MockGitHubClient:
-            MockGitHubClient.return_value = mock_github_client
-            mock_github_client.client = AsyncMock()
-            mock_github_client.client.aclose = AsyncMock()
-            result = await list_content_impl(request, mock_config)
+            with patch("tim_mcp.tools.list_content.TerraformClient") as MockTerraformClient:
+                # Mock TerraformClient to fail (force GitHub fallback)
+                mock_terraform_client = AsyncMock()
+                from tim_mcp.exceptions import TerraformRegistryError
+                mock_terraform_client.get_module_structure.side_effect = TerraformRegistryError(
+                    "Module not found", status_code=404, response_body="Not Found"
+                )
+                
+                # Setup async context managers
+                MockTerraformClient.return_value.__aenter__.return_value = mock_terraform_client
+                MockTerraformClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                mock_github_client.resolve_version.return_value = "main"
+                
+                MockGitHubClient.return_value.__aenter__.return_value = mock_github_client
+                MockGitHubClient.return_value.__aexit__.return_value = AsyncMock()
+                
+                result = await list_content_impl(request, mock_config)
 
         # Verify proper categorization
         assert "## Root Module" in result
