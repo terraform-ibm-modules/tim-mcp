@@ -169,7 +169,6 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 ### Example Selection Strategy
 - `examples/basic` or `examples/simple` → for straightforward demos
 - `examples/complete` → for comprehensive usage
-- `solutions/` → for complex architecture patterns
 - Use descriptions to select the single most relevant example
 
 ## Optimization Principles
