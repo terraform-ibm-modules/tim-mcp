@@ -62,150 +62,21 @@ By connecting models to documentation and examples spread across many repositori
 
 ## Prerequisites
 
-Before configuring TIM-MCP, ensure you have the following installed:
-
-1. **uv Package Manager** (required for running the MCP server)
-
-   **macOS/Linux:**
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-   **Windows:**
-   ```powershell
-   winget install --id=astral-sh.uv -e
-   ```
-
-   Verify installation:
-   ```bash
-   uv --version
-   ```
-
-2. **GitHub Personal Access Token** (optional but recommended)
-
-   A GitHub token helps avoid API rate limits when accessing TIM repositories:
-   - Without token: 60 requests/hour
-   - With token: 5,000 requests/hour
-
-   To create a token:
-   - Go to: **GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-   - Create a token with:
-     - **Repository access:** "Public repositories only"
-     - **Permissions:** No private access scopes needed
-     - **Expiration:** Set to 90 days or longer
+Review required tools and preparation steps in [IBM Cloud Docs - Before you begin](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-before-you-begin).
 
 ## Installation Instructions
 
-### Claude Desktop
+For installation steps by client/tool, see IBM Cloud Docs:
 
-Claude Desktop is a standalone application that supports MCP servers through a JSON configuration file.
-
-1. **Install uv** (if not already installed) - see Prerequisites section
-
-2. **Add TIM-MCP Configuration**:
-   - **macOS:** Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows:** Edit `%APPDATA%\Claude\claude_desktop_config.json`
-
-   **Basic Configuration:**
-   ```json
-   {
-     "mcpServers": {
-       "tim-mcp": {
-         "command": "uvx",
-         "args": [
-           "--from",
-           "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
-           "tim-mcp"
-         ]
-       }
-     }
-   }
-   ```
-
-   **With GitHub Token** (recommended to avoid rate limits):
-   ```json
-   {
-     "mcpServers": {
-       "tim-mcp": {
-         "command": "uvx",
-         "args": [
-           "--from",
-           "git+https://github.com/terraform-ibm-modules/tim-mcp.git",
-           "tim-mcp"
-         ],
-         "env": { "GITHUB_TOKEN": "your_github_token_here" }
-       }
-     }
-   }
-   ```
-
-3. **Restart Claude Desktop** and look for the 🔨 icon to confirm MCP tools are loaded
-
-4. **Test it**: Ask Claude "What IBM Cloud VPC modules are available?"
-
-### VS Code
-
-Visual Studio Code supports MCP servers through extension and configuration files.
-
-1. **Install the MCP extension** for VS Code if not already installed
-
-2. **Configure TIM-MCP** using one of these methods:
-   - Create/edit `.vscode/mcp.json` in your project directory
-   - Use the Command Palette (Ctrl+Shift+P or Cmd+Shift+P) and select "MCP: Add Server"
-
-3. **Add the configuration** using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
-
-### Cursor
-
-Cursor IDE supports MCP servers through configuration files.
-
-1. **Create/edit** one of these files:
-   - `.cursor/mcp.json` in your project directory
-   - `~/.cursor/mcp.json` for global configuration
-
-2. **Add the configuration** using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
-
-### IBM Bob
-
-[IBM Bob](https://www.ibm.com/products/bob) supports MCP servers through configuration files.
-
-#### Configuring MCP Servers in Bob
-
-MCP server configurations can be managed at two levels:
-
-- **Project-level Configuration**: Create the file `.bob/mcp.json` within your project directory, and then **add the configuration** using the JSON format shown in the [Claude Desktop](#claude-desktop) section
-- **Global Configuration**: Stored in the `mcp_settings.json` file, accessible via VS Code settings. These settings apply across all your workspaces unless overridden by a project-level configuration.
-  1. Click the icon in the top navigation of the Bob pane.
-  2. Scroll to the bottom of the MCP settings view.
-  3. Click **Edit Global MCP**: Opens the global `mcp_settings.json` file.
-  4. Add the configuration using the same JSON format as shown in the [Claude Desktop](#claude-desktop) section
-
-
-### Claude Code
-
-Claude Code supports configuration via CLI or config file. The configuration format is similar to the [Claude Desktop](#claude-desktop) section.
-
-**CLI Method:**
-```bash
-# Navigate to your project directory first
-cd /path/to/your/project
-
-# Add the MCP server with GitHub token
-claude mcp add tim-mcp --env GITHUB_TOKEN=your_github_token_here \
-  -- uvx --from git+https://github.com/terraform-ibm-modules/tim-mcp.git tim-mcp
-
-# Or without GitHub token (may hit rate limits)
-claude mcp add tim-mcp -- uvx --from git+https://github.com/terraform-ibm-modules/tim-mcp.git tim-mcp
-
-# List configured MCP servers
-claude mcp list
-
-# Remove if needed
-claude mcp remove tim-mcp
-```
-
+- <a id="claude-desktop"></a>**Claude Desktop:** [IBM Cloud Docs - Claude Desktop setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-desktop)
+- <a id="vs-code"></a>**VS Code:** [IBM Cloud Docs - VS Code setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-vscode)
+- <a id="cursor"></a>**Cursor:** [IBM Cloud Docs - Cursor setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-cursor)
+- <a id="ibm-bob"></a>**IBM Bob:** [IBM Cloud Docs - IBM Project Bob setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-ibm-bob)
+- <a id="claude-code"></a>**Claude Code:** [IBM Cloud Docs - Claude Code setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-code)
 
 ## Configuration
+
+See environment and config details in [IBM Cloud Docs - Configuration guidance](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-project-bob).
 
 ### Environment Variables
 
@@ -238,76 +109,19 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 
 ## Version Pinning
 
-For production use, pin to a specific version to ensure consistent behavior (using the same format as in the [Claude Desktop](#claude-desktop) section):
-
-```json
-{
-  "mcpServers": {
-    "tim-mcp": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/terraform-ibm-modules/tim-mcp.git@vX.X.X",
-        "tim-mcp"
-      ],
-      "env": { "GITHUB_TOKEN": "your_github_token_here" }
-    }
-  }
-}
-```
-
-> **Note:** Check the [releases page](https://github.com/terraform-ibm-modules/tim-mcp/releases) for the latest version tag.
+Use [IBM Cloud Docs - Version pinning for production](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning) for stable production deployments.
 
 ## Verification
 
-After configuration:
-
-1. **Restart** your IDE or Claude Desktop completely
-2. **Check** for the hammer icon (🔨) in the input box, indicating MCP tools are available
-3. **Test** by asking: "What IBM Cloud Terraform modules are available for VPC?"
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-**Server not starting:**
-- Ensure `uv` is installed and available in your PATH
-- Verify your MCP configuration JSON syntax is valid
-
-**No tools appearing:**
-- Restart your IDE or Claude Desktop completely
-- Check logs for error messages
-
-**Rate limiting errors:**
-- Add a `GITHUB_TOKEN` environment variable with a valid GitHub personal access token
-- The token needs only public repository access permissions
-
-**Token Authentication Fails:**
-1. Verify token is valid and not expired
-2. Check token has public repository access
-3. Ensure token is in quotes in JSON
-4. Test token manually:
-```bash
-curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
-```
+Validate the setup with [IBM Cloud Docs - Verification steps](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-desktop).
 
 ## Using TIM-MCP
 
-Once configured, your AI assistant can help you build IBM Cloud infrastructure from simple to complex deployments. Ask for help with scenarios like:
+Explore prompts and workflows in [IBM Cloud Docs - Using TIM-MCP with AI assistants](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-using-tim-mcp-with-ai-assistants).
 
-### Getting Started with IBM Cloud
-- "I am new to IBM Cloud. Help me create a simple and cheap OpenShift cluster and access the console"
-- "I want to create a simple basic virtual server on IBM Cloud and SSH to it"
+## Troubleshooting
 
-### Building Enterprise Infrastructure
-- "Design a VPC + OpenShift: Create a complete container platform with networking, including multi-zone VPC, subnets, OpenShift/ROKS cluster, and load balancers"
-- "Design a Secure Landing Zone: Implement enterprise-grade security with network isolation, encryption key management, private endpoints, and security groups"
-- "Design a Multi-Zone HA Database: Design resilient database infrastructure across 3+ availability zones with automated failover, backup strategies, and disaster recovery"
-
-### Quick Solutions
-- "Design a Quick POC Setup: Rapidly deploy a minimal viable environment with compute instances, basic networking, and essential services for testing"
-- "Design a FS-Validated Architecture: Deploy compliant infrastructure meeting Financial Services requirements with HPCS encryption, audit logging, and regulatory controls"
-- "Design a Hub-Spoke Network: Create an enterprise network architecture with centralized connectivity, network segmentation, and secure VPC interconnection"
+Resolve common issues using [IBM Cloud Docs - Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error).
 
 ## Additional Resources
 
