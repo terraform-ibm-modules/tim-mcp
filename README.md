@@ -12,14 +12,7 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 - [Why TIM-MCP?](#why-tim-mcp)
 - [Prerequisites](#prerequisites)
 - [Installation Instructions](#installation-instructions)
-  - [Claude Desktop](#claude-desktop)
-  - [VS Code](#vs-code)
-  - [Cursor](#cursor)
-  - [IBM Bob](#ibm-bob)
-  - [Claude Code](#claude-code)
 - [Version Pinning](#version-pinning)
-- [Verification](#verification)
-- [Troubleshooting](#troubleshooting)
 - [Using TIM-MCP](#using-tim-mcp)
 - [Additional Resources](#additional-resources)
 - [For Developers](#for-developers)
@@ -62,21 +55,13 @@ By connecting models to documentation and examples spread across many repositori
 
 ## Prerequisites
 
-Review required tools and preparation steps in [IBM Cloud Docs - Before you begin](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-before-you-begin).
+For prerequisites, follow the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-prereqs).
 
 ## Installation Instructions
 
-For installation steps by client/tool, see IBM Cloud Docs:
-
-- <a id="claude-desktop"></a>**Claude Desktop:** [IBM Cloud Docs - Claude Desktop setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-desktop)
-- <a id="vs-code"></a>**VS Code:** [IBM Cloud Docs - VS Code setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-vscode)
-- <a id="cursor"></a>**Cursor:** [IBM Cloud Docs - Cursor setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-cursor)
-- <a id="ibm-bob"></a>**IBM Bob:** [IBM Cloud Docs - IBM Project Bob setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-ibm-bob)
-- <a id="claude-code"></a>**Claude Code:** [IBM Cloud Docs - Claude Code setup](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-code)
+For installation steps by client/tool, use the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
 
 ## Configuration
-
-See environment and config details in [IBM Cloud Docs - Configuration guidance](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-project-bob).
 
 ### Environment Variables
 
@@ -107,13 +92,10 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 
 </details>
 
+<a id="version-pinning"></a><a id="verification"></a><a id="using-tim-mcp"></a>
 ## Version Pinning
 
-Use [IBM Cloud Docs - Version pinning for production](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning) for stable production deployments.
-
-## Verification
-
-Validate the setup with [IBM Cloud Docs - Verification steps](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-claude-desktop).
+For version pinning , see [IBM Cloud Docs - Using TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning).
 
 ## Using TIM-MCP
 
@@ -121,7 +103,7 @@ Explore prompts and workflows in [IBM Cloud Docs - Using TIM-MCP with AI assista
 
 ## Troubleshooting
 
-Resolve common issues using [IBM Cloud Docs - Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error).
+For troubleshooting, see [IBM Cloud Docs - Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error).
 
 ## Additional Resources
 
