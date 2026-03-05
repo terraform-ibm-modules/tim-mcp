@@ -253,6 +253,7 @@ class TerraformClient:
             raise TerraformRegistryError(
                 f"Request error getting module versions: {e}"
             ) from e
+
     @api_method(cache_key_prefix="tf_module_structure")
     async def get_module_structure(
         self, namespace: str, name: str, provider: str, version: str = "latest"
@@ -318,7 +319,6 @@ class TerraformClient:
             raise TerraformRegistryError(
                 f"Request error getting module structure: {e}"
             ) from e
-
 
     @api_method(cache_key_prefix="tf_provider_info")
     async def get_provider_info(self, namespace: str, name: str) -> dict[str, Any]:

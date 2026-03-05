@@ -14,7 +14,6 @@ from ..config import Config
 from ..context import get_cache, get_rate_limiter
 from ..exceptions import (
     ModuleNotFoundError,
-    RateLimitError,
     TerraformRegistryError,
 )
 from ..logging import get_logger
@@ -55,8 +54,12 @@ async def list_content_impl(request: ListContentRequest, config: Config) -> str:
     rate_limiter = get_rate_limiter()
 
     # Use nested async context managers to ensure proper cleanup
-    async with TerraformClient(config, cache=cache, rate_limiter=rate_limiter) as terraform_client:
-        async with GitHubClient(config, cache=cache, rate_limiter=rate_limiter) as github_client:
+    async with TerraformClient(
+        config, cache=cache, rate_limiter=rate_limiter
+    ) as terraform_client:
+        async with GitHubClient(
+            config, cache=cache, rate_limiter=rate_limiter
+        ) as github_client:
             # Try Registry API first for examples and submodules
             try:
                 logger.info(
