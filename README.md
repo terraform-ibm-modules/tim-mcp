@@ -10,10 +10,11 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 ## Table of Contents
 - [Overview](#overview)
 - [Why TIM-MCP?](#why-tim-mcp)
+- [About TIM-MCP](#about-tim-mcp)
 - [Prerequisites](#prerequisites)
-- [Installation Instructions](#installation-instructions)
-- [Version Pinning](#version-pinning)
-- [Using TIM-MCP](#using-tim-mcp)
+- [Installation, Version Pinning, and Usage Workflows](#installation-version-pinning-and-usage-workflows)
+- [Troubleshooting](#troubleshooting)
+- [Configuration](#configuration)
 - [Additional Resources](#additional-resources)
 - [For Developers](#for-developers)
 - [Contributing](#contributing)
@@ -53,13 +54,28 @@ Foundation models may have limited or outdated knowledge of IBM Cloud Terraform 
 ### Unlocking distributed knowledge
 By connecting models to documentation and examples spread across many repositories, TIM-MCP helps foundation models leverage the collective expertise embedded in the TIM ecosystem, resulting in more accurate and production-ready infrastructure code.
 
+## About TIM-MCP
+
+TIM-MCP connects AI assistants to curated Terraform IBM Modules so generated infrastructure is more accurate, aligned to IBM Cloud best practices, and grounded in real module interfaces.
+
+To get started quickly:
+- Read [About TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim-mcp)
+
+
 ## Prerequisites
 
-For prerequisites, follow the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-prereqs).
+Before setting up TIM-MCP, ensure your local environment and tooling are ready.
+Prerequisites: [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-prereqs)
 
-## Installation Instructions
+## Installation, Version Pinning, and Usage Workflows
 
-For installation steps by client/tool, use the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
+- **Installation:** Set up TIM-MCP with your preferred client by following the guided installation steps. [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp)
+- **Version Pinning:** Pinning versions helps keep behavior stable across teams and environments. [Using TIM-MCP - version pinning](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning)
+- **Usage Workflows:** Use these examples to understand effective prompts and end-to-end TIM-MCP usage patterns. [Using TIM-MCP with AI assistants](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-using-tim-mcp-with-ai-assistants)
+
+## Troubleshooting
+
+If setup or runtime issues occur, use the troubleshooting guide to diagnose and resolve common errors. [Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error)
 
 ## Configuration
 
@@ -91,19 +107,6 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 | `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
 
 </details>
-
-<a id="version-pinning"></a><a id="verification"></a><a id="using-tim-mcp"></a>
-## Version Pinning
-
-For version pinning , see [IBM Cloud Docs - Using TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning).
-
-## Using TIM-MCP
-
-Explore prompts and workflows in [IBM Cloud Docs - Using TIM-MCP with AI assistants](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-using-tim-mcp-with-ai-assistants).
-
-## Troubleshooting
-
-For troubleshooting, see [IBM Cloud Docs - Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error).
 
 ## Additional Resources
 
