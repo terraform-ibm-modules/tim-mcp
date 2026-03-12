@@ -75,7 +75,7 @@ Prerequisites: [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-
 
 ## Troubleshooting
 
-If setup or runtime issues occur, use the troubleshooting guide to diagnose and resolve common errors. [Troubleshoot TIM-MCP errors](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error)
+If you face any issue, use the [troubleshooting guide](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error) to diagnose and resolve common errors.
 
 ## Configuration
 
