@@ -236,6 +236,36 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 
 </details>
 
+## HTTP Mode (Optional)
+
+Most users run tim-mcp in STDIO mode (default). HTTP mode is available for advanced use cases like hosted deployments.
+
+### Running Locally in HTTP Mode
+
+```bash
+# Using uv
+uv run tim-mcp --http --host 127.0.0.1 --port 8080
+
+# Using Docker
+docker build -t tim-mcp:local .
+docker run -p 8080:8080 tim-mcp:local
+```
+
+### Testing HTTP Mode
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# List tools
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+For production deployments to IBM Code Engine, see [Deployment Guide](docs/deployment/code-engine.md).
+
 ## Version Pinning
 
 For production use, pin to a specific version to ensure consistent behavior (using the same format as in the [Claude Desktop](#claude-desktop) section):
