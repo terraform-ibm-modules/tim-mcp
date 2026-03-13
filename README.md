@@ -11,6 +11,7 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 - [Overview](#overview)
 - [About TIM-MCP](#about-tim-mcp)
 - [Install TIM-MCP](#install-tim-mcp)
+- [Using TIM-MCP](#using-tim-mcp)
 - [Troubleshooting](#troubleshooting)
 - [Configuration](#configuration)
 - [Additional Resources](#additional-resources)
@@ -45,6 +46,24 @@ To get started quickly, read [about TIM-MCP](https://cloud.ibm.com/docs/ibm-clou
 
 For installation, version pinning, and usage workflows, follow the instructions provided in [TIM-MCP tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
 
+## Using TIM-MCP
+
+Once configured, your AI assistant can help you build IBM Cloud infrastructure from simple to complex deployments. Ask for help with scenarios like:
+
+### Getting Started with IBM Cloud
+- "I am new to IBM Cloud. Help me create a simple and cheap OpenShift cluster and access the console"
+- "I want to create a simple basic virtual server on IBM Cloud and SSH to it"
+
+### Building Enterprise Infrastructure
+- "Design a VPC + OpenShift: Create a complete container platform with networking, including multi-zone VPC, subnets, OpenShift/ROKS cluster, and load balancers"
+- "Design a Secure Landing Zone: Implement enterprise-grade security with network isolation, encryption key management, private endpoints, and security groups"
+- "Design a Multi-Zone HA Database: Design resilient database infrastructure across 3+ availability zones with automated failover, backup strategies, and disaster recovery"
+
+### Quick Solutions
+- "Design a Quick POC Setup: Rapidly deploy a minimal viable environment with compute instances, basic networking, and essential services for testing"
+- "Design a FS-Validated Architecture: Deploy compliant infrastructure meeting Financial Services requirements with HPCS encryption, audit logging, and regulatory controls"
+- "Design a Hub-Spoke Network: Create an enterprise network architecture with centralized connectivity, network segmentation, and secure VPC interconnection"
+  
 ## Troubleshooting
 
 If you face any issue, use the [troubleshooting guide](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-troubleshoot-tim-mcp-error) to diagnose and resolve common errors.
