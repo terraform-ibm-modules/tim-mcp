@@ -9,10 +9,9 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 
 ## Table of Contents
 - [Overview](#overview)
-- [Why TIM-MCP?](#why-tim-mcp)
 - [About TIM-MCP](#about-tim-mcp)
 - [Prerequisites](#prerequisites)
-- [Installation, Version Pinning, and Usage Workflows](#installation-version-pinning-and-usage-workflows)
+- [Install TIM-MCP](#install-tim-mcp)
 - [Troubleshooting](#troubleshooting)
 - [Configuration](#configuration)
 - [Additional Resources](#additional-resources)
@@ -38,28 +37,11 @@ The TIM-MCP server acts as a bridge between AI models and the Terraform IBM Modu
 
 ⚠️ **Human Review Required**: Even when the tools and workflows mature, human expertise will remain essential for reviewing outputs, making final adjustments, and ensuring configurations meet specific requirements.
 
-## Why TIM-MCP?
-
-TIM-MCP guides foundation models (FMs) to produce better IBM Cloud infrastructure solutions by:
-
-### Steering models toward best practices
-Without TIM-MCP, foundation models might generate generic or outdated Terraform code. TIM-MCP steers models toward IBM-validated patterns and current best practices by providing direct access to curated modules, preventing common anti-patterns and ensuring alignment with IBM Cloud architecture recommendations.
-
-### Providing contextual guardrails
-TIM-MCP acts as a guardrail system, helping models navigate the complex IBM Cloud ecosystem. It provides structured access to module interfaces, dependencies, and implementation patterns, reducing the likelihood of hallucinated parameters or incompatible resource combinations.
-
-### Enhancing precision with real-time module data
-Foundation models may have limited or outdated knowledge of IBM Cloud Terraform modules. TIM-MCP provides real-time access to module details, ensuring AI assistants generate code with accurate input variables, correct resource configurations, and proper module versioning.
-
-### Unlocking distributed knowledge
-By connecting models to documentation and examples spread across many repositories, TIM-MCP helps foundation models leverage the collective expertise embedded in the TIM ecosystem, resulting in more accurate and production-ready infrastructure code.
-
 ## About TIM-MCP
 
 TIM-MCP connects AI assistants to curated Terraform IBM Modules so generated infrastructure is more accurate, aligned to IBM Cloud best practices, and grounded in real module interfaces.
 
-To get started quickly:
-- Read [About TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim-mcp)
+To get started quickly, read [About TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim-mcp).
 
 
 ## Prerequisites
@@ -67,11 +49,9 @@ To get started quickly:
 Before setting up TIM-MCP, ensure your local environment and tooling are ready.
 Prerequisites: [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-prereqs)
 
-## Installation, Version Pinning, and Usage Workflows
+## Install TIM-MCP
 
-- **Installation:** Set up TIM-MCP with your preferred client by following the guided installation steps. [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp)
-- **Version Pinning:** Pinning versions helps keep behavior stable across teams and environments. [Using TIM-MCP - version pinning](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-version-pinning)
-- **Usage Workflows:** Use these examples to understand effective prompts and end-to-end TIM-MCP usage patterns. [Using TIM-MCP with AI assistants](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-using-tim-mcp-with-ai-assistants)
+For installation, version pinning, and usage workflows, see the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
 
 ## Troubleshooting
 
@@ -79,11 +59,9 @@ If you face any issue, use the [troubleshooting guide](https://cloud.ibm.com/doc
 
 ## Configuration
 
-### Environment Variables
-
 #### Basic Configuration
 
-For most users running TIM-MCP locally, you only need:
+For most users running TIM-MCP locally, you only need these environment variables:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
