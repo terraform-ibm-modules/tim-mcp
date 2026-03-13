@@ -10,12 +10,10 @@ A [Model Context Protocol (MCP) server](https://modelcontextprotocol.io/docs/get
 ## Table of Contents
 - [Overview](#overview)
 - [About TIM-MCP](#about-tim-mcp)
-- [Prerequisites](#prerequisites)
 - [Install TIM-MCP](#install-tim-mcp)
 - [Troubleshooting](#troubleshooting)
 - [Configuration](#configuration)
 - [Additional Resources](#additional-resources)
-- [For Developers](#for-developers)
 - [Contributing](#contributing)
 
 ## Overview
@@ -41,17 +39,11 @@ The TIM-MCP server acts as a bridge between AI models and the Terraform IBM Modu
 
 TIM-MCP connects AI assistants to curated Terraform IBM Modules so generated infrastructure is more accurate, aligned to IBM Cloud best practices, and grounded in real module interfaces.
 
-To get started quickly, read [About TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim-mcp).
-
-
-## Prerequisites
-
-Before setting up TIM-MCP, ensure your local environment and tooling are ready.
-Prerequisites: [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp#tim-mcp-prereqs)
+To get started quickly, read [about TIM-MCP](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim-mcp).
 
 ## Install TIM-MCP
 
-For installation, version pinning, and usage workflows, see the [TIM-MCP Tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
+For installation, version pinning, and usage workflows, follow the instructions provided in [TIM-MCP tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
 
 ## Troubleshooting
 
@@ -68,8 +60,7 @@ For most users running TIM-MCP locally, you only need these environment variable
 | `GITHUB_TOKEN` | Recommended | None | GitHub PAT for API rate limits (5000 req/hr vs 60 req/hr) |
 | `TIM_LOG_LEVEL` | No | INFO | Logging level (DEBUG, INFO, WARNING, ERROR) |
 
-<details>
-<summary><strong>Advanced Configuration (Production/Hosting)</strong></summary>
+#### Advanced Configuration (Production/Hosting)
 
 These settings are for advanced users deploying TIM-MCP in production or HTTP mode:
 
@@ -84,8 +75,6 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 | `TIM_REQUEST_TIMEOUT` | 30 | External API timeout in seconds |
 | `TIM_ALLOWED_NAMESPACES` | terraform-ibm-modules | Allowed module namespaces (comma-separated) |
 
-</details>
-
 ## Additional Resources
 
 - **TIM-MCP Repository:** https://github.com/terraform-ibm-modules/tim-mcp
@@ -93,10 +82,8 @@ These settings are for advanced users deploying TIM-MCP in production or HTTP mo
 - **GitHub API Rate Limit Docs:** https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
 - **Terraform Registry (IBM Modules):** https://registry.terraform.io/namespaces/terraform-ibm-modules
 
-## For Developers
+## Contributing
 
 If you're interested in contributing to TIM-MCP or modifying the server itself, please see the [Development Guide](DEVELOPMENT.md) for detailed instructions on development setup, transport modes, and advanced configuration options.
-
-## Contributing
 
 You can report issues and request features for this module in GitHub issues in the module repo. See [Report an issue or request a feature](https://github.com/terraform-ibm-modules/.github/blob/main/.github/SUPPORT.md).
