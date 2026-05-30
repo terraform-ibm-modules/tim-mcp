@@ -33,11 +33,11 @@ tim-mcp = "tim_mcp.main:cli"
 dev = [
     "freezegun==1.5.5",
     "pytest==9.0.3",
-    "pytest-asyncio==1.3.0",
+    "pytest-asyncio==1.4.0",
     "pytest-mock==3.15.1",
     "vcrpy==8.1.1",
-    "ruff==0.15.14",
-    "hypothesis==6.152.9",
+    "ruff==0.15.15",
+    "hypothesis==6.155.1",
 ]
 
 [tool.uv]
@@ -76,8 +76,8 @@ python_functions = "test_*"
 
 [dependency-groups]
 dev = [
-    "pytest-asyncio==1.3.0",
-    "ruff==0.15.14",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.15.15",
 ]
 
 [tool.hatch.build]
