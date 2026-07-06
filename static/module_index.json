@@ -1469,6 +1469,39 @@
       "readme_excerpt": "This repository contains the following sample deployable architectures: Cloud essentials for private-path external connectivity"
     },
     {
+      "id": "terraform-ibm-modules/security-verify/ibm/1.1.9",
+      "name": "security-verify",
+      "description": "IBM Verify provides Single Sign-On (SSO), multi-factor authentication (MFA), identity governance, and identity lifecycle controls for internal (workforce) and external (consumer) user types.",
+      "category": "security",
+      "downloads": 3,
+      "published_at": "2025-12-20T10:57:28.756978Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-security-verify",
+      "submodules": [],
+      "readme_excerpt": "This module is used to create an IBM Security Verify instance to provide Single Sign-On (SSO), multi-factor authentication (MFA), identity governance, and identity lifecycle controls for internal (workforce) and external (consumer) user types."
+    },
+    {
+      "id": "terraform-ibm-modules/account-infrastructure-base/ibm/3.3.11",
+      "name": "account-infrastructure-base",
+      "description": "A general base layer module for setting up a newly provisioned account.",
+      "category": "management",
+      "downloads": 3,
+      "published_at": "2026-02-01T00:19:47.309079Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-account-infrastructure-base",
+      "submodules": [],
+      "readme_excerpt": "This module is a general base layer module for setting up a newly provisioned account with a default provision of: Base Resource Group, IAM Account Settings, Trusted Profile + Access Group for Projects, CBR Rules + Zones"
+    },
+    {
+      "id": "terraform-ibm-modules/landing-zone-vsi-autoscale/ibm/1.0.12",
+      "name": "landing-zone-vsi-autoscale",
+      "description": "This module creates an Auto Scale for VPC instance group which dynamically creates virtual server instances to meet the demands of your environment.",
+      "category": "networking",
+      "downloads": 0,
+      "published_at": "2025-12-20T18:24:51.358718Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi-autoscale",
+      "submodules": [],
+      "readme_excerpt": "This module creates an Auto Scale for VPC instance group which dynamically creates virtual server instances to meet the demands of your environment. The virtual server instances (VSI) prescribed via an instance template can be connected to a load balancers."
+    },
+    {
       "id": "terraform-ibm-modules/terraform-enterprise/ibm/4.0.2",
       "name": "terraform-enterprise",
       "description": "This repository provides a top-level Terraform module for deploying and managing HashiCorp Terraform Enterprise (TFE) on IBM Cloud Red Hat OpenShift clusters.",

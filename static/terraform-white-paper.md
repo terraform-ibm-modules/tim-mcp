@@ -1442,7 +1442,7 @@ Key tips for deployable architecture authors:
 
 ### Use compliance scans on infrastructure created by automation
 
-From an operational standpoint, it is equaly critical to ensure that the infrastructure that is provisioned by the deployable architecture remains compliant over time. Continued compliance involves scanning the deployed resources with [IBM Cloud Security and Compliance Center](https://www.ibm.com/products/security-and-compliance-center) (SCC) regularly to detect misconfigurations or drift from the declared compliance standards.
+From an operational standpoint, it is equally critical to ensure that the infrastructure that is provisioned by the deployable architecture remains compliant over time. Continued compliance involves scanning the deployed resources with [IBM Cloud Security and Compliance Center](https://www.ibm.com/products/security-and-compliance-center) (SCC) regularly to detect misconfigurations or drift from the declared compliance standards.
 
 
 Start with the deployable architecture compliance claims
