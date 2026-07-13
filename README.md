@@ -44,7 +44,13 @@ To get started quickly, read [about TIM-MCP](https://cloud.ibm.com/docs/ibm-clou
 
 ## Install TIM-MCP
 
-For installation, version pinning, and usage workflows, follow the instructions provided in [TIM-MCP tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
+### Quick Install
+
+**VS Code** — click to install directly into VS Code (requires VS Code 1.99+ with GitHub Copilot):
+
+<a href="https://vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522tim-mcp%2522%252C%2522command%2522%253A%2522uvx%2522%252C%2522args%2522%253A%255B%2522--from%2522%252C%2522git%252Bhttps%253A%2F%2Fgithub.com%2Fterraform-ibm-modules%2Ftim-mcp.git%2522%252C%2522tim-mcp%2522%255D%257D"><img src="https://img.shields.io/badge/VS_Code-Install_TIM--MCP-0078d4?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Install TIM-MCP in VS Code"></a>
+
+For detailed installation, version pinning, and usage workflows, follow the instructions provided in [TIM-MCP tutorial](https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-using-tim-mcp).
 
 ## Using TIM-MCP
 
