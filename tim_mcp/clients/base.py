@@ -82,9 +82,9 @@ def api_method(cache_key_prefix: str | None = None):
         # Apply rate limit decorator with caching
         @with_rate_limit(
             limiter_getter=lambda self: getattr(self, "rate_limiter", None),
-            cache_getter=lambda self: getattr(self, "cache", None)
-            if cache_key_fn
-            else None,
+            cache_getter=lambda self: (
+                getattr(self, "cache", None) if cache_key_fn else None
+            ),
             cache_key_fn=cache_key_fn,
         )
         @wraps(func)
