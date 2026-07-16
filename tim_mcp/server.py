@@ -22,6 +22,7 @@ from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
     GetContentRequest,
     GetExampleDetailsRequest,
+    LatestModuleVersionRequest,
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
@@ -346,6 +347,74 @@ async def get_module_details(module_id: str) -> str:
             error=str(e),
         )
         logger.exception("Unexpected error in get_module_details")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def get_latest_module_version(module_id: str) -> str:
+    """
+    Get the latest published module version and GitHub release information when available.
+
+    Args:
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
+
+    Returns:
+        Plain text with markdown formatted latest version and release information
+    """
+    start_time = time.time()
+
+    try:
+        request = LatestModuleVersionRequest(module_id=module_id)
+
+        from .tools.latest_version import get_latest_module_version_impl
+
+        response = await get_latest_module_version_impl(request, config)
+
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_latest_module_version")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
