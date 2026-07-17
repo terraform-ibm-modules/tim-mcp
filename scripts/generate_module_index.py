@@ -888,6 +888,7 @@ async def generate_module_index(output_path: Path | None = None):
 
         with open(output_path, "w") as f:
             json.dump(output, f, indent=2)
+            f.write("\n")
 
         print(f"\n✅ Module index generated: {output_path}")
         print(f"   Total modules: {len(filtered_modules)}")
