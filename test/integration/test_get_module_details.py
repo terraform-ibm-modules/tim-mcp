@@ -82,7 +82,20 @@ def sample_module_details_response():
                     "description": "CRN of the VPC instance",
                 },
             ],
-            "dependencies": [{"name": "ibm", "version": ">= 1.49.0"}],
+            "dependencies": [
+                {
+                    "name": "vpc",
+                    "version": "v4.0.0",
+                    "source": "terraform-ibm-modules/vpc/ibm",
+                }
+            ],
+            "provider_dependencies": [
+                {
+                    "name": "ibm",
+                    "namespace": "IBM-Cloud",
+                    "version": ">= 1.70.1, < 3.0.0",
+                }
+            ],
         },
         "versions": ["7.4.2", "7.4.1", "7.4.0", "7.3.1"],
     }
@@ -115,9 +128,10 @@ Provisions and configures IBM Cloud VPC resources including subnets, security gr
 
 ## Dependencies
 **Provider Requirements:**
-- IBM Cloud Provider >= 1.49.0
+- IBM Cloud Provider >= 1.70.1, < 3.0.0
 
-**Module Dependencies:** None
+**Module Dependencies:**
+- vpc v4.0.0: terraform-ibm-modules/vpc/ibm
 
 ## Available Versions
 v7.4.2, v7.4.1, v7.4.0, v7.3.1"""
@@ -263,7 +277,12 @@ class TestGetModuleDetailsSuccess:
             "downloads": 100,
             "verified": False,
             "published_at": "2025-01-01T00:00:00.000Z",
-            "root": {"inputs": [], "outputs": [], "dependencies": []},
+            "root": {
+                "inputs": [],
+                "outputs": [],
+                "dependencies": [],
+                "provider_dependencies": [],
+            },
             "versions": ["1.0.0"],
         }
 
@@ -277,7 +296,7 @@ class TestGetModuleDetailsSuccess:
 
             result = await get_module_details_impl(request, config)
 
-            assert "**Module Dependencies:** None" in result
+            assert "**Module Dependencies:**\nNone" in result
             assert "**Provider Requirements:**\nNone" in result
 
     @pytest.mark.asyncio
@@ -300,8 +319,18 @@ class TestGetModuleDetailsSuccess:
                 "inputs": [],
                 "outputs": [],
                 "dependencies": [
-                    {"name": "aws", "version": ">= 4.0.0"},
-                    {"name": "terraform-aws-modules/vpc/aws", "version": "~> 3.0"},
+                    {
+                        "name": "terraform-aws-modules/vpc/aws",
+                        "version": "~> 3.0",
+                        "source": "app.terraform.io/terraform-aws-modules/vpc/aws",
+                    }
+                ],
+                "provider_dependencies": [
+                    {
+                        "name": "aws",
+                        "namespace": "hashicorp",
+                        "version": ">= 4.0.0, < 6.0.0",
+                    }
                 ],
             },
             "versions": ["2.0.0"],
@@ -318,7 +347,7 @@ class TestGetModuleDetailsSuccess:
             result = await get_module_details_impl(request, config)
 
             assert "**Provider Requirements:**" in result
-            assert "- AWS Provider >= 4.0.0" in result
+            assert "- AWS Provider >= 4.0.0, < 6.0.0" in result
             assert "**Module Dependencies:**" in result
             assert "- terraform-aws-modules/vpc/aws ~> 3.0" in result
 
@@ -411,7 +440,12 @@ class TestMarkdownFormatting:
             "source": "https://github.com/test/module",
             "downloads": 1000,
             "published_at": "2025-01-01T12:00:00.000Z",
-            "root": {"inputs": [], "outputs": [], "dependencies": []},
+            "root": {
+                "inputs": [],
+                "outputs": [],
+                "dependencies": [],
+                "provider_dependencies": [],
+            },
         }
 
         versions = ["1.0.0"]
@@ -460,14 +494,61 @@ class TestMarkdownFormatting:
         from tim_mcp.tools.details import format_dependencies
 
         dependencies = [
-            {"name": "aws", "version": ">= 4.0.0"},
-            {"name": "terraform-aws-modules/vpc/aws", "version": "~> 3.0"},
+            {
+                "name": "aws",
+                "namespace": "hashicorp",
+                "version": ">= 4.0.0, < 6.0.0",
+            },
+            {
+                "name": "terraform-aws-modules/vpc/aws",
+                "version": "~> 3.0",
+                "source": "app.terraform.io/terraform-aws-modules/vpc/aws",
+            },
         ]
 
         provider_deps, module_deps = format_dependencies(dependencies)
 
-        assert "- AWS Provider >= 4.0.0" in provider_deps
+        assert "- AWS Provider >= 4.0.0, < 6.0.0" in provider_deps
         assert "- terraform-aws-modules/vpc/aws ~> 3.0" in module_deps
+
+    def test_format_dependencies_classifies_by_namespace(self):
+        """Test dependency classification based on namespace presence."""
+        from tim_mcp.tools.details import format_dependencies
+
+        dependencies = [
+            {
+                "name": "ibm",
+                "namespace": "IBM-Cloud",
+                "version": ">= 1.70.1, < 3.0.0",
+            },
+            {
+                "name": "vpc",
+                "version": "v4.0.0",
+                "source": "terraform-ibm-modules/vpc/ibm",
+            },
+        ]
+
+        provider_deps, module_deps = format_dependencies(dependencies)
+
+        assert provider_deps == "- IBM Cloud Provider >= 1.70.1, < 3.0.0"
+        assert module_deps == "- vpc v4.0.0: terraform-ibm-modules/vpc/ibm"
+
+    def test_format_dependencies_preserves_provider_version_ranges(self):
+        """Test provider dependency formatting with compound version ranges."""
+        from tim_mcp.tools.details import format_dependencies
+
+        dependencies = [
+            {
+                "name": "ibm",
+                "namespace": "IBM-Cloud",
+                "version": ">= 1.70.1, < 3.0.0",
+            }
+        ]
+
+        provider_deps, module_deps = format_dependencies(dependencies)
+
+        assert provider_deps == "- IBM Cloud Provider >= 1.70.1, < 3.0.0"
+        assert module_deps == "None"
 
     def test_format_large_download_count(self):
         """Test formatting of large download counts with commas."""
