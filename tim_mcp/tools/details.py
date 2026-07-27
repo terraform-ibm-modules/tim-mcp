@@ -155,14 +155,15 @@ def format_dependencies(dependencies: list[dict[str, Any]]) -> tuple[str, str]:
     for dep in dependencies:
         name = dep.get("name", "")
         version = dep.get("version", "")
+        source = dep.get("source", "")
 
         if not name:
             continue
 
-        # Check if it's a provider (simple name) or module (namespace/name/provider)
-        if "/" in name:
+        # Providers have a 'namespace' field; module dependencies do not
+        if "namespace" not in dep:
             # Module dependency
-            module_deps.append(f"- {name} {version}")
+            module_deps.append(f"- {name} {version}: {source}")
         else:
             # Provider dependency - format nicely
             provider_name = provider_display_names.get(name.lower(), name.title())
@@ -205,11 +206,13 @@ def format_module_details(module_data: dict[str, Any], versions: list[str]) -> s
     inputs = root.get("inputs", [])
     outputs = root.get("outputs", [])
     dependencies = root.get("dependencies", [])
+    provider_dependencies = root.get("provider_dependencies", [])
 
     # Format sections
     required_inputs, optional_inputs = format_inputs(inputs)
     formatted_outputs = format_outputs(outputs)
-    provider_deps, module_deps = format_dependencies(dependencies)
+    _, module_deps = format_dependencies(dependencies)
+    provider_deps, _ = format_dependencies(provider_dependencies)
 
     # Build comprehensive markdown
     markdown = f"""# {module_id} - Module Details
@@ -235,7 +238,8 @@ def format_module_details(module_data: dict[str, Any], versions: list[str]) -> s
 **Provider Requirements:**
 {provider_deps}
 
-**Module Dependencies:** {module_deps}
+**Module Dependencies:**
+{module_deps}
 
 ## Available Versions
 {format_version_list(versions)}"""
