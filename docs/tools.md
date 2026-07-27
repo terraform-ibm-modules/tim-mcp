@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-TIM-MCP provides six tools designed for **efficient context gathering**. Each tool retrieves specific information to **minimize token usage** while **maximizing relevance**. The goal is to gather only the context needed for the user's task - no more, no less.
+TIM-MCP provides multiple tools designed for **efficient context gathering**. Each tool retrieves specific information to **minimize token usage** while **maximizing relevance**. The goal is to gather only the context needed for the user's task - no more, no less.
 
 ## Context Efficiency Strategy
 
