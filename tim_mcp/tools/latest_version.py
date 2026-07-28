@@ -40,14 +40,12 @@ def format_latest_module_version(
         if release_data.get("body"):
             lines.extend(["", "## Release Notes", release_data["body"].strip()])
     else:
-        lines.extend(["**Release Information:** Not available"]) 
+        lines.extend(["**Release Information:** Not available"])
 
     return "\n".join(lines)
 
 
-async def get_latest_module_version_impl(
-    request, config: Config
-) -> str:
+async def get_latest_module_version_impl(request, config: Config) -> str:
     """Implementation for latest module version lookup."""
     try:
         namespace, name, provider, _ = parse_module_id_with_version(request.module_id)
@@ -72,7 +70,9 @@ async def get_latest_module_version_impl(
     latest_version = versions[0]
     release_data = None
 
-    async with GitHubClient(config, cache=cache, rate_limiter=rate_limiter) as github_client:
+    async with GitHubClient(
+        config, cache=cache, rate_limiter=rate_limiter
+    ) as github_client:
         try:
             release_data = await github_client.get_latest_release(
                 owner=namespace,

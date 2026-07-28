@@ -49,7 +49,10 @@ class TestGetLatestModuleVersion:
             assert "**Release Tag:** v7.4.2" in result
             assert "**Release Name:** Release v7.4.2" in result
             assert "**Published:** 2025-09-02" in result
-            assert "**Release URL:** https://github.com/terraform-ibm-modules/terraform-ibm-vpc/releases/tag/v7.4.2" in result
+            assert (
+                "**Release URL:** https://github.com/terraform-ibm-modules/terraform-ibm-vpc/releases/tag/v7.4.2"
+                in result
+            )
             assert "## Release Notes" in result
             assert "Bug fixes and documentation updates." in result
 
@@ -82,7 +85,9 @@ class TestGetLatestModuleVersion:
                 "terraform-ibm-modules/example"
             )
 
-            request = LatestModuleVersionRequest(module_id="terraform-ibm-modules/example/ibm")
+            request = LatestModuleVersionRequest(
+                module_id="terraform-ibm-modules/example/ibm"
+            )
             result = await get_latest_module_version_impl(request, config)
 
             assert "**Latest Version:** v1.2.3" in result
@@ -98,7 +103,9 @@ class TestGetLatestModuleVersion:
             mock_tf_class.return_value.__aenter__.return_value = mock_tf_client
             mock_tf_client.get_module_versions.return_value = []
 
-            request = LatestModuleVersionRequest(module_id="terraform-ibm-modules/missing/ibm")
+            request = LatestModuleVersionRequest(
+                module_id="terraform-ibm-modules/missing/ibm"
+            )
 
             with pytest.raises(ModuleNotFoundError):
                 await get_latest_module_version_impl(request, config)
