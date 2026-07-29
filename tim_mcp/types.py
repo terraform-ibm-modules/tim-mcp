@@ -89,6 +89,14 @@ class ModuleDetailsRequest(BaseModel):
     )
 
 
+class LatestModuleVersionRequest(BaseModel):
+    """Request model for latest module version lookup."""
+
+    module_id: str = Field(
+        ..., description="Full module identifier (with or without version)"
+    )
+
+
 class ModuleInput(BaseModel):
     """Module input variable definition."""
 
