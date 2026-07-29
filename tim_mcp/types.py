@@ -97,14 +97,6 @@ class LatestModuleVersionRequest(BaseModel):
     )
 
 
-class ModuleDependencyRequest(BaseModel):
-    """Request model for fetching module dependencies."""
-
-    module_id: str = Field(
-        ..., description="Full module identifier (with or without version)"
-    )
-
-
 class ModuleInput(BaseModel):
     """Module input variable definition."""
 

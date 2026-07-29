@@ -6,15 +6,49 @@ Terraform module (root + submodules) from the Terraform Registry and formats
 them as markdown.
 """
 
+import re
 from typing import Any
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
 from ..context import get_cache, get_rate_limiter
 from ..exceptions import ModuleNotFoundError, TerraformRegistryError, ValidationError
-from ..types import ModuleDependencyRequest
+from ..types import ModuleDetailsRequest
 from ..utils.module_id import parse_module_id_with_version
 from .details import format_dependencies
+
+# Matches a single row in the README Requirements table, e.g.:
+# | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+_REQUIREMENT_ROW_RE = re.compile(r'\|\s*<a name="requirement_(\w+)">.*?\|\s*(.*?)\s*\|')
+
+
+def _parse_terraform_version(readme: str) -> str | None:
+    """
+    Extract the Terraform version constraint from the Requirements table in a
+    module README.
+
+    The registry embeds a markdown table like:
+
+        ## Requirements
+        | Name    | Version    |
+        |---------|------------|
+        | terraform | >= 1.9.0 |
+        | ibm       | >= 1.79.0 |
+
+    Returns the version string for the ``terraform`` row, or ``None`` when the
+    README does not contain a Requirements table or lacks a terraform row.
+    """
+    req_block_match = re.search(
+        r"## Requirements\s*\n(.*?)(?=\n##|\Z)", readme, re.DOTALL
+    )
+    if not req_block_match:
+        return None
+
+    for name, version in _REQUIREMENT_ROW_RE.findall(req_block_match.group(0)):
+        if name == "terraform":
+            return version.strip() or None
+
+    return None
 
 
 def format_module_dependencies(module_data: dict[str, Any]) -> str:
@@ -25,6 +59,7 @@ def format_module_dependencies(module_data: dict[str, Any]) -> str:
     Uses the same keys as details.py:
       - root["dependencies"]          → module dependencies
       - root["provider_dependencies"] → provider requirements
+      - root["readme"]                → terraform version (parsed from Requirements table)
 
     Args:
         module_data: Module data dict returned by the Terraform Registry API.
@@ -43,6 +78,12 @@ def format_module_dependencies(module_data: dict[str, Any]) -> str:
     _, module_dep_text = format_dependencies(dependencies)
     provider_text, _ = format_dependencies(provider_dependencies)
 
+    # Terraform version requirement — parsed from the Requirements table in the
+    # root README because the registry API does not expose required_core directly
+    readme = root.get("readme", "")
+    terraform_version = _parse_terraform_version(readme)
+    terraform_version_text = terraform_version if terraform_version else "_None_"
+
     # Submodule dependencies — always list every submodule regardless of whether
     # it has dependencies, so submodules are never silently hidden
     submodule_sections: list[str] = []
@@ -58,11 +99,13 @@ def format_module_dependencies(module_data: dict[str, Any]) -> str:
             f"**Module Dependencies:**\n{sub_module_text}"
         )
 
-    submodule_block = (
-        "\n\n".join(submodule_sections) if submodule_sections else "_None_"
-    )
+    submodule_block = "\n\n".join(submodule_sections) if submodule_sections else "None"
 
     return f"""# {module_id} v{version} - Dependencies
+
+## Requirements
+
+**Terraform Version:** {terraform_version_text}
 
 ## Root Module
 
@@ -77,7 +120,7 @@ def format_module_dependencies(module_data: dict[str, Any]) -> str:
 
 
 async def get_module_dependency_impl(
-    request: ModuleDependencyRequest, config: Config
+    request: ModuleDetailsRequest, config: Config
 ) -> str:
     """
     Implementation function for the get_module_dependency MCP tool.

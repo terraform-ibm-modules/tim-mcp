@@ -12,7 +12,7 @@ from tim_mcp.exceptions import (
     RateLimitError,
     TerraformRegistryError,
 )
-from tim_mcp.types import ModuleDependencyRequest
+from tim_mcp.types import ModuleDetailsRequest
 
 
 @pytest.fixture
@@ -28,6 +28,14 @@ def sample_module_data():
         "id": "terraform-ibm-modules/vpc/ibm",
         "version": "7.4.2",
         "root": {
+            "readme": (
+                "## Requirements\n\n"
+                "| Name | Version |\n"
+                "|------|----------|\n"
+                '| <a name="requirement_terraform"></a> [terraform](#requirement\\_terraform) | >= 1.9.0 |\n'
+                '| <a name="requirement_ibm"></a> [ibm](#requirement\\_ibm) | >= 1.70.1, < 3.0.0 |\n'
+                "\n## Providers\n"
+            ),
             "dependencies": [
                 {
                     "name": "vpc",
@@ -59,26 +67,12 @@ def sample_module_data():
     }
 
 
-@pytest.fixture
-def sample_module_data_no_deps():
-    """Sample API response with no dependencies."""
-    return {
-        "id": "simple/module/aws",
-        "version": "1.0.0",
-        "root": {
-            "dependencies": [],
-            "provider_dependencies": [],
-        },
-        "submodules": [],
-    }
-
-
 class TestGetModuleDependencySuccess:
     """Test successful dependency retrieval."""
 
     @pytest.mark.asyncio
-    async def test_returns_markdown_string(self, config, sample_module_data):
-        """Test that the tool returns a non-empty markdown string."""
+    async def test_output_contains_all_sections(self, config, sample_module_data):
+        """Test that the output contains all expected sections and values."""
         from tim_mcp.tools.dependency import get_module_dependency_impl
 
         with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
@@ -86,126 +80,63 @@ class TestGetModuleDependencySuccess:
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.get_module_details.return_value = sample_module_data
 
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
+            request = ModuleDetailsRequest(module_id="terraform-ibm-modules/vpc/ibm")
             result = await get_module_dependency_impl(request, config)
 
         assert isinstance(result, str)
-        assert len(result) > 0
-
-    @pytest.mark.asyncio
-    async def test_output_contains_module_id_and_version(
-        self, config, sample_module_data
-    ):
-        """Test that the output header includes the module ID and version."""
-        from tim_mcp.tools.dependency import get_module_dependency_impl
-
-        with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = sample_module_data
-
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
-            result = await get_module_dependency_impl(request, config)
-
+        # Header
         assert "terraform-ibm-modules/vpc/ibm" in result
         assert "7.4.2" in result
-
-    @pytest.mark.asyncio
-    async def test_output_contains_provider_requirements(
-        self, config, sample_module_data
-    ):
-        """Test that root provider requirements appear in the output."""
-        from tim_mcp.tools.dependency import get_module_dependency_impl
-
-        with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = sample_module_data
-
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
-            result = await get_module_dependency_impl(request, config)
-
-        assert "Provider Requirements" in result
+        # Terraform version requirement
+        assert "## Requirements" in result
+        assert "**Terraform Version:** >= 1.9.0" in result
+        # Provider requirements
+        assert "**Provider Requirements:**" in result
         assert ">= 1.70.1, < 3.0.0" in result
-
-    @pytest.mark.asyncio
-    async def test_output_contains_module_dependencies(
-        self, config, sample_module_data
-    ):
-        """Test that root module dependencies appear in the output."""
-        from tim_mcp.tools.dependency import get_module_dependency_impl
-
-        with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = sample_module_data
-
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
-            result = await get_module_dependency_impl(request, config)
-
-        assert "Module Dependencies" in result
+        # Module dependencies
+        assert "**Module Dependencies:**" in result
         assert "vpc" in result
-
-    @pytest.mark.asyncio
-    async def test_output_contains_submodule_section(self, config, sample_module_data):
-        """Test that submodule dependency sections are present."""
-        from tim_mcp.tools.dependency import get_module_dependency_impl
-
-        with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = sample_module_data
-
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
-            result = await get_module_dependency_impl(request, config)
-
-        assert "Submodule" in result
+        # Submodule
+        assert "## Submodule Dependencies" in result
         assert "modules/subnet" in result
 
     @pytest.mark.asyncio
-    async def test_no_dependencies_renders_none(
-        self, config, sample_module_data_no_deps
-    ):
-        """Test that modules with no dependencies display 'None' placeholders."""
+    async def test_no_dependencies_renders_none(self, config):
+        """Test that modules with no dependencies display 'None' in empty sections."""
         from tim_mcp.tools.dependency import get_module_dependency_impl
+
+        no_deps_data = {
+            "id": "simple/module/aws",
+            "version": "1.0.0",
+            "root": {"dependencies": [], "provider_dependencies": []},
+            "submodules": [],
+        }
 
         with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = sample_module_data_no_deps
+            mock_client.get_module_details.return_value = no_deps_data
 
-            request = ModuleDependencyRequest(module_id="simple/module/aws")
+            request = ModuleDetailsRequest(module_id="simple/module/aws")
             result = await get_module_dependency_impl(request, config)
 
+        assert "**Provider Requirements:**" in result
+        assert "**Module Dependencies:**" in result
+        assert "## Submodule Dependencies" in result
         assert "None" in result
 
     @pytest.mark.asyncio
-    async def test_specific_version_passed_to_client(self, config, sample_module_data):
-        """Test that a pinned version is forwarded to the Terraform client."""
-        from tim_mcp.tools.dependency import get_module_dependency_impl
-
-        versioned_data = {**sample_module_data, "version": "7.4.1"}
-
-        with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.get_module_details.return_value = versioned_data
-
-            request = ModuleDependencyRequest(
-                module_id="terraform-ibm-modules/vpc/ibm/7.4.1"
-            )
-            await get_module_dependency_impl(request, config)
-
-            mock_client.get_module_details.assert_called_once_with(
-                namespace="terraform-ibm-modules",
-                name="vpc",
-                provider="ibm",
-                version="7.4.1",
-            )
-
-    @pytest.mark.asyncio
-    async def test_latest_version_passed_to_client(self, config, sample_module_data):
-        """Test that omitting version results in 'latest' being passed to the client."""
+    @pytest.mark.parametrize(
+        "module_id,expected_version",
+        [
+            ("terraform-ibm-modules/vpc/ibm/7.4.1", "7.4.1"),
+            ("terraform-ibm-modules/vpc/ibm", "latest"),
+        ],
+    )
+    async def test_version_forwarded_to_client(
+        self, config, sample_module_data, module_id, expected_version
+    ):
+        """Test that the requested version (pinned or latest) is forwarded to the client."""
         from tim_mcp.tools.dependency import get_module_dependency_impl
 
         with patch("tim_mcp.tools.dependency.TerraformClient") as mock_client_class:
@@ -213,14 +144,15 @@ class TestGetModuleDependencySuccess:
             mock_client_class.return_value.__aenter__.return_value = mock_client
             mock_client.get_module_details.return_value = sample_module_data
 
-            request = ModuleDependencyRequest(module_id="terraform-ibm-modules/vpc/ibm")
-            await get_module_dependency_impl(request, config)
+            await get_module_dependency_impl(
+                ModuleDetailsRequest(module_id=module_id), config
+            )
 
             mock_client.get_module_details.assert_called_once_with(
                 namespace="terraform-ibm-modules",
                 name="vpc",
                 provider="ibm",
-                version="latest",
+                version=expected_version,
             )
 
 
@@ -239,10 +171,10 @@ class TestGetModuleDependencyErrors:
                 "Module not found", status_code=404
             )
 
-            request = ModuleDependencyRequest(module_id="nonexistent/module/ibm")
-
             with pytest.raises(ModuleNotFoundError) as exc_info:
-                await get_module_dependency_impl(request, config)
+                await get_module_dependency_impl(
+                    ModuleDetailsRequest(module_id="nonexistent/module/ibm"), config
+                )
 
         assert "nonexistent/module/ibm" in str(exc_info.value)
 
@@ -258,10 +190,10 @@ class TestGetModuleDependencyErrors:
                 "Internal server error", status_code=500
             )
 
-            request = ModuleDependencyRequest(module_id="test/module/ibm")
-
             with pytest.raises(TerraformRegistryError) as exc_info:
-                await get_module_dependency_impl(request, config)
+                await get_module_dependency_impl(
+                    ModuleDetailsRequest(module_id="test/module/ibm"), config
+                )
 
         assert exc_info.value.status_code == 500
 
@@ -277,20 +209,20 @@ class TestGetModuleDependencyErrors:
                 "Rate limit exceeded", reset_time=1640995200
             )
 
-            request = ModuleDependencyRequest(module_id="test/module/ibm")
-
             with pytest.raises(RateLimitError):
-                await get_module_dependency_impl(request, config)
+                await get_module_dependency_impl(
+                    ModuleDetailsRequest(module_id="test/module/ibm"), config
+                )
 
     @pytest.mark.asyncio
     async def test_invalid_module_id_raises_terraform_registry_error(self, config):
         """Test that a malformed module_id raises TerraformRegistryError."""
         from tim_mcp.tools.dependency import get_module_dependency_impl
 
-        request = ModuleDependencyRequest(module_id="invalid-format")
-
         with pytest.raises(TerraformRegistryError) as exc_info:
-            await get_module_dependency_impl(request, config)
+            await get_module_dependency_impl(
+                ModuleDetailsRequest(module_id="invalid-format"), config
+            )
 
         assert "validation" in str(exc_info.value).lower()
 
@@ -298,8 +230,9 @@ class TestGetModuleDependencyErrors:
 class TestFormatModuleDependencies:
     """Unit tests for the format_module_dependencies formatter."""
 
-    def test_format_includes_root_module_section(self):
-        """Test that the root module section is always present."""
+    def test_format_output_structure(self):
+        """Test that all structural sections are always present and empty sections
+        use fallback text instead of bare 'None' labels."""
         from tim_mcp.tools.dependency import format_module_dependencies
 
         data = {
@@ -311,22 +244,12 @@ class TestFormatModuleDependencies:
 
         result = format_module_dependencies(data)
 
+        assert "## Requirements" in result
         assert "## Root Module" in result
-
-    def test_format_submodules_none_when_empty(self):
-        """Test that '_None_' is rendered when there are no submodules."""
-        from tim_mcp.tools.dependency import format_module_dependencies
-
-        data = {
-            "id": "test/module/ibm",
-            "version": "1.0.0",
-            "root": {"dependencies": [], "provider_dependencies": []},
-            "submodules": [],
-        }
-
-        result = format_module_dependencies(data)
-
-        assert "_None_" in result
+        assert "## Submodule Dependencies" in result
+        assert "**Provider Requirements:**" in result
+        assert "**Module Dependencies:**" in result
+        assert "None" in result
 
     def test_format_submodule_path_in_output(self):
         """Test that each submodule path is included in its section header."""
@@ -348,3 +271,37 @@ class TestFormatModuleDependencies:
         result = format_module_dependencies(data)
 
         assert "modules/worker" in result
+
+    def test_format_terraform_version_from_readme(self):
+        """Test that the terraform version is extracted from the README and shown,
+        and falls back to None when the README is absent or has no terraform row."""
+        from tim_mcp.tools.dependency import format_module_dependencies
+
+        # With a valid terraform row
+        data_with_readme = {
+            "id": "test/module/ibm",
+            "version": "1.0.0",
+            "root": {
+                "readme": (
+                    "## Requirements\n\n"
+                    "| Name | Version |\n"
+                    "|------|----------|\n"
+                    '| <a name="requirement_terraform"></a> [terraform](#requirement\\_terraform) | >= 1.9.0 |\n'
+                ),
+                "dependencies": [],
+                "provider_dependencies": [],
+            },
+            "submodules": [],
+        }
+        assert ">= 1.9.0" in format_module_dependencies(data_with_readme)
+
+        # Without a readme at all — falls back to _None_ (italic markdown)
+        data_no_readme = {
+            "id": "test/module/ibm",
+            "version": "1.0.0",
+            "root": {"dependencies": [], "provider_dependencies": []},
+            "submodules": [],
+        }
+        assert "**Terraform Version:** _None_" in format_module_dependencies(
+            data_no_readme
+        )

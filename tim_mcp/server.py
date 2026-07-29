@@ -24,7 +24,6 @@ from .types import (
     GetExampleDetailsRequest,
     LatestModuleVersionRequest,
     ListContentRequest,
-    ModuleDependencyRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
 )
@@ -761,7 +760,7 @@ async def get_module_dependency(module_id: str) -> str:
     start_time = time.time()
 
     try:
-        request = ModuleDependencyRequest(module_id=module_id)
+        request = ModuleDetailsRequest(module_id=module_id)
 
         from .tools.dependency import get_module_dependency_impl
 
