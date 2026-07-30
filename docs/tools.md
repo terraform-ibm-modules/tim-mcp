@@ -18,6 +18,7 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 | `list_content` | Lightweight | Discover what examples/content exist |
 | `get_example_details` | Medium | Understand example without fetching code |
 | `get_module_details` | Medium | Get module interface for custom builds |
+| `get_module_dependency` | Medium | Inspect provider and module dependencies |
 | `get_content` | Heavy | Fetch actual source code (be selective!) |
 
 ## search_modules
@@ -171,6 +172,34 @@ get_example_details(
 1. `list_content` - see what examples exist (lightweight)
 2. `get_example_details` - verify it matches needs (medium, optional but recommended)
 3. `get_content` - fetch only the necessary code (heavy, be selective with filters!)
+
+---
+
+## get_module_dependency
+
+Get all required provider requirements and module dependencies for a Terraform module, covering the root module and every submodule.
+
+**When to use:**
+- User asks "what does this module depend on?"
+- To check required providers before adding a module to an existing stack
+- To understand transitive dependencies across submodules
+
+**Parameters:**
+```
+module_id (required):
+  - "terraform-ibm-modules/vpc/ibm" (latest version)
+  - "terraform-ibm-modules/vpc/ibm/7.19.0" (specific version)
+```
+
+**Returns:** Markdown with:
+- Root module provider requirements (name and version constraint)
+- Root module module dependencies (name, version, and source)
+- Per-submodule provider and module dependency breakdown
+
+**Example:**
+```
+get_module_dependency(module_id="terraform-ibm-modules/vpc/ibm")
+```
 
 ---
 
