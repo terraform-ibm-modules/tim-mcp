@@ -179,17 +179,22 @@ async def search_modules(
     limit: int = 5,
 ) -> str:
     """
-    Search Terraform Registry for modules with intelligent result optimization.
+    Search for IBM Terraform modules by name, keyword, service, category, or use case.
 
-    SEARCH TIPS:
-    - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
+    A single query matches across module names, descriptions, service categories
+    (e.g. "networking", "security", "storage"), README use-case text, and submodule
+    names — so queries like "vpc", "key protect", "object storage", or "fscloud"
+    all find the right modules.
+
+    The module_id in each result can be passed directly to other tools:
+    get_module_details, list_content, get_content, get_module_dependency.
 
     Args:
-        query: Specific search term (e.g., "vpc", "kubernetes", "security")
-        limit: Maximum results based on use case (optional only use if asked)
+        query: What you are looking for (e.g., "vpc", "kubernetes", "key protect")
+        limit: Maximum number of results to return (optional, default 5)
 
     Returns:
-        JSON formatted module search results with download counts, descriptions, and verification status
+        JSON with matched modules including module_id, name, description, category, and downloads
     """
     start_time = time.time()
 

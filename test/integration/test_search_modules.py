@@ -166,6 +166,7 @@ class TestSearchModulesImpl:
         mock_github_client = create_mock_github_client()
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -210,6 +211,7 @@ class TestSearchModulesImpl:
         mock_github_client = create_mock_github_client()
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -243,6 +245,7 @@ class TestSearchModulesImpl:
         mock_github_client = create_mock_github_client()
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -268,7 +271,8 @@ class TestSearchModulesImpl:
         )
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with patch("tim_mcp.tools.search._search_index", return_value=None), \
+             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -288,7 +292,8 @@ class TestSearchModulesImpl:
         )
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with patch("tim_mcp.tools.search._search_index", return_value=None), \
+             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -321,6 +326,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -378,6 +384,7 @@ class TestSearchModulesImpl:
         mock_github_client = create_mock_github_client()
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -404,7 +411,8 @@ class TestSearchModulesImpl:
         mock_terraform_client.search_modules.return_value = no_meta_response
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with patch("tim_mcp.tools.search._search_index", return_value=None), \
+             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -423,7 +431,8 @@ class TestSearchModulesImpl:
         mock_terraform_client.search_modules.return_value = sample_registry_response
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with patch("tim_mcp.tools.search._search_index", return_value=None), \
+             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
             # Set up the context manager correctly
             mock_instance = AsyncMock()
             mock_instance.__aenter__.return_value = mock_terraform_client
@@ -465,6 +474,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -510,6 +520,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -587,6 +598,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -624,6 +636,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -697,6 +710,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -776,6 +790,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -840,6 +855,7 @@ class TestSearchModulesImpl:
 
         mock_github_client = AsyncMock()
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -959,6 +975,7 @@ class TestRepositoryFiltering:
         request = ModuleSearchRequest(query="vpc", limit=2)
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
         ):
@@ -1018,6 +1035,7 @@ class TestRepositoryFiltering:
         request = ModuleSearchRequest(query="vpc", limit=5)
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
         ):
@@ -1076,6 +1094,7 @@ class TestRepositoryFiltering:
         request = ModuleSearchRequest(query="vpc", limit=5)
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
         ):
@@ -1344,6 +1363,7 @@ class TestTotalFoundBug:
 
         # Patch the context managers
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch(
                 "tim_mcp.tools.search.TerraformClient",
                 return_value=mock_terraform_client,
@@ -1420,6 +1440,7 @@ class TestPrereleaseVersionFiltering:
 
         # Patch the context managers
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -1477,6 +1498,7 @@ class TestPrereleaseVersionFiltering:
 
         # Patch the context managers
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -1544,6 +1566,7 @@ class TestPrereleaseVersionFiltering:
 
         # Patch the context managers
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -1633,6 +1656,7 @@ class TestPrereleaseVersionFiltering:
 
         # Patch the context managers
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -1738,6 +1762,7 @@ class TestLatestVersionFetching:
         request = ModuleSearchRequest(query="postgresql", limit=5)
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,
@@ -1830,6 +1855,7 @@ class TestLatestVersionFetching:
         request = ModuleSearchRequest(query="postgresql", limit=5)
 
         with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
             patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch("tim_mcp.tools.search._is_repository_valid") as mock_is_valid,

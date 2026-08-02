@@ -11,7 +11,9 @@ The implementation follows these principles:
 - Data transformation to match the tool specification format
 """
 
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from ..clients.github_client import GitHubClient
@@ -85,6 +87,16 @@ async def search_modules_impl(
 
     logger = get_logger(__name__)
 
+    # Search the local index first — fast, no API call needed.
+    # Covers name, keyword, service, category, use case, and submodule tag searches.
+    # Falls back to the live Terraform Registry API only when the index has no match,
+    # avoiding unnecessary API calls and rate limit exhaustion.
+    index_result = _search_index(request.query, request.limit)
+    if index_result is not None:
+        logger.info("Search served from local index", query=request.query, total=index_result.total_found)
+        return index_result
+
+    # Fall back to live Terraform Registry API when index has no match
     # Use the configured namespace (always the first allowed namespace)
     namespace = config.allowed_namespaces[0] if config.allowed_namespaces else None
 
@@ -442,3 +454,112 @@ async def _is_repository_valid(
             error=str(e),
         )
         return False
+
+
+def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
+    """
+    Search the local module index by matching the query against all relevant
+    fields. This fills the gaps left by the live Terraform Registry API which
+    only supports free-text search by module name.
+
+    Args:
+        query: Search term to match (e.g. "vpc", "security", "key protect")
+        limit: Maximum number of results to return
+
+    Returns:
+        ModuleSearchResponse if any modules matched, None if no matches found
+        (caller then falls back to the live Terraform Registry API).
+        Each module id has the version stripped so it is consumable directly
+        by other tools such as get_module_details and list_content.
+    """
+    # Locate module_index.json — check both packaged and dev layouts
+    for candidate in [
+        Path(__file__).parent.parent / "static" / "module_index.json",
+        Path(__file__).parent.parent.parent / "static" / "module_index.json",
+    ]:
+        if candidate.exists():
+            index_path = candidate
+            break
+    else:
+        return None
+
+    with open(index_path) as f:
+        data = json.load(f)
+
+    # Remove common stop words that carry no search meaning
+    stop_words = {
+        "a", "an", "the", "to", "of", "in", "for", "and", "or", "is", "with",
+        "create", "use", "using", "setup", "set", "get", "how", "i", "my", "me",
+    }
+    words = [w for w in query.lower().split() if w not in stop_words]
+
+    # If all words were stop words, fall back to the full query as one phrase
+    if not words:
+        words = [query.lower()]
+
+    # Require all meaningful words to match — prevents a single common word like
+    # "vpc" from matching dozens of unrelated modules in a multi-word query
+    threshold = len(words)
+
+    scored: list[tuple[int, dict]] = []
+
+    for m in data["modules"]:
+        # Combine all searchable fields into one string so a single query can
+        # match by name, keyword, service, category, use case, or submodule tag
+        searchable = " ".join([
+            m.get("name", ""),
+            m.get("description", ""),
+            m.get("category", ""),
+            m.get("readme_excerpt", "") or "",
+            " ".join(s.get("name", "") for s in m.get("submodules", [])),
+            " ".join(s.get("description", "") for s in m.get("submodules", [])),
+        ]).lower()
+
+        match_count = sum(1 for w in words if w in searchable)
+        if match_count < threshold:
+            continue
+
+        scored.append((match_count, m))
+
+    # Sort by number of matching words — best matches first
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    matched: list[ModuleInfo] = []
+    for _, m in scored:
+
+        # The index id is "namespace/name/provider/version" — strip the version
+        # so the returned id works directly with other tools
+        raw_id = m["id"]
+        parts = raw_id.split("/")
+        module_id = "/".join(parts[:3]) if len(parts) == 4 else raw_id
+        version = parts[3] if len(parts) == 4 else ""
+
+        try:
+            matched.append(ModuleInfo(
+                id=module_id,
+                namespace=parts[0] if parts else "",
+                name=m["name"],
+                provider=parts[2] if len(parts) >= 3 else "",
+                version=version,
+                description=m.get("description", ""),
+                source_url=m["source_url"],
+                downloads=m.get("downloads", 0),
+                verified=False,
+                published_at=datetime.fromisoformat(
+                    m["published_at"].replace("Z", "+00:00")
+                ),
+            ))
+        except Exception:
+            continue
+
+        if len(matched) >= limit:
+            break
+
+    if not matched:
+        return None
+
+    return ModuleSearchResponse(
+        query=query,
+        total_found=len(matched),
+        modules=matched,
+    )
