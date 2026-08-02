@@ -93,7 +93,11 @@ async def search_modules_impl(
     # avoiding unnecessary API calls and rate limit exhaustion.
     index_result = _search_index(request.query, request.limit)
     if index_result is not None:
-        logger.info("Search served from local index", query=request.query, total=index_result.total_found)
+        logger.info(
+            "Search served from local index",
+            query=request.query,
+            total=index_result.total_found,
+        )
         return index_result
 
     # Fall back to live Terraform Registry API when index has no match
@@ -488,8 +492,27 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
 
     # Remove common stop words that carry no search meaning
     stop_words = {
-        "a", "an", "the", "to", "of", "in", "for", "and", "or", "is", "with",
-        "create", "use", "using", "setup", "set", "get", "how", "i", "my", "me",
+        "a",
+        "an",
+        "the",
+        "to",
+        "of",
+        "in",
+        "for",
+        "and",
+        "or",
+        "is",
+        "with",
+        "create",
+        "use",
+        "using",
+        "setup",
+        "set",
+        "get",
+        "how",
+        "i",
+        "my",
+        "me",
     }
     words = [w for w in query.lower().split() if w not in stop_words]
 
@@ -506,14 +529,16 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
     for m in data["modules"]:
         # Combine all searchable fields into one string so a single query can
         # match by name, keyword, service, category, use case, or submodule tag
-        searchable = " ".join([
-            m.get("name", ""),
-            m.get("description", ""),
-            m.get("category", ""),
-            m.get("readme_excerpt", "") or "",
-            " ".join(s.get("name", "") for s in m.get("submodules", [])),
-            " ".join(s.get("description", "") for s in m.get("submodules", [])),
-        ]).lower()
+        searchable = " ".join(
+            [
+                m.get("name", ""),
+                m.get("description", ""),
+                m.get("category", ""),
+                m.get("readme_excerpt", "") or "",
+                " ".join(s.get("name", "") for s in m.get("submodules", [])),
+                " ".join(s.get("description", "") for s in m.get("submodules", [])),
+            ]
+        ).lower()
 
         match_count = sum(1 for w in words if w in searchable)
         if match_count < threshold:
@@ -526,7 +551,6 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
 
     matched: list[ModuleInfo] = []
     for _, m in scored:
-
         # The index id is "namespace/name/provider/version" — strip the version
         # so the returned id works directly with other tools
         raw_id = m["id"]
@@ -535,20 +559,22 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
         version = parts[3] if len(parts) == 4 else ""
 
         try:
-            matched.append(ModuleInfo(
-                id=module_id,
-                namespace=parts[0] if parts else "",
-                name=m["name"],
-                provider=parts[2] if len(parts) >= 3 else "",
-                version=version,
-                description=m.get("description", ""),
-                source_url=m["source_url"],
-                downloads=m.get("downloads", 0),
-                verified=False,
-                published_at=datetime.fromisoformat(
-                    m["published_at"].replace("Z", "+00:00")
-                ),
-            ))
+            matched.append(
+                ModuleInfo(
+                    id=module_id,
+                    namespace=parts[0] if parts else "",
+                    name=m["name"],
+                    provider=parts[2] if len(parts) >= 3 else "",
+                    version=version,
+                    description=m.get("description", ""),
+                    source_url=m["source_url"],
+                    downloads=m.get("downloads", 0),
+                    verified=False,
+                    published_at=datetime.fromisoformat(
+                        m["published_at"].replace("Z", "+00:00")
+                    ),
+                )
+            )
         except Exception:
             continue
 

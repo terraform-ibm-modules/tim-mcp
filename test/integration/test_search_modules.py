@@ -271,8 +271,10 @@ class TestSearchModulesImpl:
         )
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search._search_index", return_value=None), \
-             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
+            patch("tim_mcp.tools.search.TerraformClient") as mock_client_class,
+        ):
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -292,8 +294,10 @@ class TestSearchModulesImpl:
         )
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search._search_index", return_value=None), \
-             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
+            patch("tim_mcp.tools.search.TerraformClient") as mock_client_class,
+        ):
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -411,8 +415,10 @@ class TestSearchModulesImpl:
         mock_terraform_client.search_modules.return_value = no_meta_response
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search._search_index", return_value=None), \
-             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
+            patch("tim_mcp.tools.search.TerraformClient") as mock_client_class,
+        ):
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_terraform_client
             )
@@ -431,8 +437,10 @@ class TestSearchModulesImpl:
         mock_terraform_client.search_modules.return_value = sample_registry_response
         request = ModuleSearchRequest(query="vpc")
 
-        with patch("tim_mcp.tools.search._search_index", return_value=None), \
-             patch("tim_mcp.tools.search.TerraformClient") as mock_client_class:
+        with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
+            patch("tim_mcp.tools.search.TerraformClient") as mock_client_class,
+        ):
             # Set up the context manager correctly
             mock_instance = AsyncMock()
             mock_instance.__aenter__.return_value = mock_terraform_client
