@@ -19,7 +19,7 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 | `get_example_details` | Medium | Understand example without fetching code |
 | `get_module_details` | Medium | Get module interface for custom builds |
 | `get_module_dependency` | Medium | Inspect provider and module dependencies |
-| `get_content` | Heavy | Fetch actual source code (be selective!) |
+| `get_content` | Heavy | Fetch actual source code or submodule input/output schemas (be selective!) |
 
 ## search_modules
 
@@ -211,6 +211,7 @@ Fetch actual source code and files from the GitHub repository. **This is the hea
 - User wants to see actual terraform code
 - After `list_content` identified the right example
 - You've verified the content is relevant (via `get_example_details` or descriptions)
+- User asks about inputs or outputs of a **submodule** (use `path="modules/<submodule-name>"` with `include_files=["variables.tf", "outputs.tf"]`)
 
 **Context efficiency tips:**
 - Always use `include_files` to fetch only what's needed
@@ -260,6 +261,15 @@ get_content(
     module_id="terraform-ibm-modules/vpc/ibm",
     path="examples/basic"
 )
+
+# Submodule schemas: get input/output schema for a submodule
+# Returns variables.tf, outputs.tf
+# Use list_content first to discover available submodule paths
+get_content(
+    module_id="terraform-ibm-modules/vpc/ibm",
+    path="modules/submodule-name",
+    include_files=["variables.tf", "outputs.tf"]
+)
 ```
 
 ---
@@ -295,10 +305,16 @@ For production use cases, recommend pinned versions for consistency.
 
 ### "What inputs does module X need"
 **Goal**: Get module interface only
+
+**For root module:**
 1. `get_module_details` - get inputs/outputs from Registry (medium, direct from Registry)
 2. Explain to user
 
-**Don't** fetch source code - the Registry metadata is sufficient and faster.
+**Don't** fetch source code for the root module - the Registry metadata is sufficient and faster.
+
+**For a submodule:**
+1. `list_content` - identify the submodule path under the **Submodules** section (lightweight)
+2. `get_content` with `path="modules/<submodule-name>"` and `include_files=["variables.tf", "outputs.tf"]` - fetches the schema files and generates a Configuration Summary (heavy but targeted)
 
 ### "Help me build terraform for X"
 **Goal**: Provide starting point - prefer examples over raw interface
