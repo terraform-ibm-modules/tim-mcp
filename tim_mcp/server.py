@@ -22,6 +22,7 @@ from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
     GetContentRequest,
     GetExampleDetailsRequest,
+    LatestModuleVersionRequest,
     ListContentRequest,
     ModuleDetailsRequest,
     ModuleSearchRequest,
@@ -350,6 +351,74 @@ async def get_module_details(module_id: str) -> str:
 
 
 @mcp.tool()
+async def get_latest_module_version(module_id: str) -> str:
+    """
+    Get the latest published module version and GitHub release information when available.
+
+    Args:
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
+
+    Returns:
+        Plain text with markdown formatted latest version and release information
+    """
+    start_time = time.time()
+
+    try:
+        request = LatestModuleVersionRequest(module_id=module_id)
+
+        from .tools.latest_version import get_latest_module_version_impl
+
+        response = await get_latest_module_version_impl(request, config)
+
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_latest_module_version",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_latest_module_version")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
 async def list_content(module_id: str) -> str:
     """
     Discover available examples and repository structure - FIRST step in examples workflow.
@@ -661,6 +730,87 @@ async def get_content(
             error=str(e),
         )
         logger.exception("Unexpected error in get_content")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def get_module_dependency(module_id: str) -> str:
+    """
+    Get all required dependencies for a Terraform module.
+
+    Returns provider requirements and module dependencies for both the root
+    module and every submodule, formatted as markdown.
+
+    WHEN TO USE:
+    - When user asks "what does this module depend on?"
+    - To check required providers before adding a module to an existing stack
+    - To understand transitive dependencies across submodules
+
+    WHAT THIS PROVIDES:
+    - Root module provider requirements
+    - Root module sub-module dependencies
+    - Per-submodule provider and module dependency breakdown
+
+    Args:
+        module_id: Full module identifier (e.g., "terraform-ibm-modules/vpc/ibm" or "terraform-ibm-modules/vpc/ibm/1.2.3")
+
+    Returns:
+        Plain text with markdown formatted dependency listing
+    """
+    start_time = time.time()
+
+    try:
+        request = ModuleDetailsRequest(module_id=module_id)
+
+        from .tools.dependency import get_module_dependency_impl
+
+        response = await get_module_dependency_impl(request, config)
+
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_module_dependency",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_module_dependency",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_module_dependency",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "get_module_dependency",
+            {"module_id": module_id},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in get_module_dependency")
         raise TIMError(f"Unexpected error: {e}") from e
 
 

@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-TIM-MCP provides five tools designed for **efficient context gathering**. Each tool retrieves specific information to **minimize token usage** while **maximizing relevance**. The goal is to gather only the context needed for the user's task - no more, no less.
+TIM-MCP provides multiple tools designed for **efficient context gathering**. Each tool retrieves specific information to **minimize token usage** while **maximizing relevance**. The goal is to gather only the context needed for the user's task - no more, no less.
 
 ## Context Efficiency Strategy
 
@@ -14,9 +14,11 @@ TIM-MCP provides five tools designed for **efficient context gathering**. Each t
 | Tool | Context Weight | Primary Use |
 |------|----------------|-------------|
 | `search_modules` | Lightweight | Find module IDs (essential first step) |
+| `get_latest_module_version` | Lightweight | Get the newest published module version and release info |
 | `list_content` | Lightweight | Discover what examples/content exist |
 | `get_example_details` | Medium | Understand example without fetching code |
 | `get_module_details` | Medium | Get module interface for custom builds |
+| `get_module_dependency` | Medium | Inspect provider and module dependencies |
 | `get_content` | Heavy | Fetch actual source code (be selective!) |
 
 ## search_modules
@@ -39,6 +41,35 @@ limit (optional): Number of results, default 5
 **Example:**
 ```
 search_modules(query="vpc", limit=5)
+```
+
+---
+
+## get_latest_module_version
+
+Get the latest published module version for a module and include GitHub release metadata when a release exists.
+
+**When to use:**
+- User asks for the latest version of a known module
+- User wants release-related information before pinning a version
+- You need a targeted on-demand version lookup instead of browsing the static module index
+
+**Parameters:**
+```
+module_id (required):
+  - "terraform-ibm-modules/vpc/ibm" (preferred)
+  - "terraform-ibm-modules/vpc/ibm/7.19.0" (accepted, but latest published version is still returned)
+```
+
+**Returns:** Markdown with:
+- Latest published module version
+- GitHub release tag, name, publication date, and release URL when available
+- Release notes when available
+- A fallback message when the repository has no GitHub release data
+
+**Example:**
+```
+get_latest_module_version(module_id="terraform-ibm-modules/vpc/ibm")
 ```
 
 ---
@@ -141,6 +172,34 @@ get_example_details(
 1. `list_content` - see what examples exist (lightweight)
 2. `get_example_details` - verify it matches needs (medium, optional but recommended)
 3. `get_content` - fetch only the necessary code (heavy, be selective with filters!)
+
+---
+
+## get_module_dependency
+
+Get all required provider requirements and module dependencies for a Terraform module, covering the root module and every submodule.
+
+**When to use:**
+- User asks "what does this module depend on?"
+- To check required providers before adding a module to an existing stack
+- To understand transitive dependencies across submodules
+
+**Parameters:**
+```
+module_id (required):
+  - "terraform-ibm-modules/vpc/ibm" (latest version)
+  - "terraform-ibm-modules/vpc/ibm/7.19.0" (specific version)
+```
+
+**Returns:** Markdown with:
+- Root module provider requirements (name and version constraint)
+- Root module module dependencies (name, version, and source)
+- Per-submodule provider and module dependency breakdown
+
+**Example:**
+```
+get_module_dependency(module_id="terraform-ibm-modules/vpc/ibm")
+```
 
 ---
 
