@@ -524,14 +524,15 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
     # "vpc" from matching dozens of unrelated modules in a multi-word query
     threshold = len(words)
 
-    scored: list[tuple[int, dict]] = []
+    scored: list[tuple[int, int, dict]] = []
 
     for m in data["modules"]:
         # Combine all searchable fields into one string so a single query can
         # match by name, keyword, service, category, use case, or submodule tag
+        name_str = m.get("name", "").lower()
         searchable = " ".join(
             [
-                m.get("name", ""),
+                name_str,
                 m.get("description", ""),
                 m.get("category", ""),
                 m.get("readme_excerpt", "") or "",
@@ -544,13 +545,18 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
         if match_count < threshold:
             continue
 
-        scored.append((match_count, m))
+        # Boost modules whose name directly contains all query words so that
+        # e.g. "landing-zone-vpc" ranks above "cbr" for a "vpc" query even
+        # though both contain the word once somewhere in their text.
+        name_boost = sum(1 for w in words if w in name_str)
 
-    # Sort by number of matching words — best matches first
-    scored.sort(key=lambda x: x[0], reverse=True)
+        scored.append((match_count, name_boost, m))
+
+    # Sort by (total word matches, name boost) — best matches first
+    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
 
     matched: list[ModuleInfo] = []
-    for _, m in scored:
+    for _, _name_boost, m in scored:
         # The index id is "namespace/name/provider/version" — strip the version
         # so the returned id works directly with other tools
         raw_id = m["id"]
