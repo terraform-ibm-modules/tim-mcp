@@ -27,6 +27,7 @@ The TIM-MCP server acts as a bridge between AI models and the Terraform IBM Modu
 - **Module Details**: Get structured information about inputs, outputs, and dependencies
 - **Repository Exploration**: Navigate examples, submodules, and implementation patterns
 - **Content Retrieval**: Access documentation, example code, and other repository files
+- **Architecture Composition**: Get a recommended module stack, deployment order, and inter-module wiring for common patterns (OpenShift, PostgreSQL, watsonx, Event Streams, VPC landing zone) via `generate_module_composition`
 - **White Paper Resource**: Access the IBM Cloud Terraform Best Practices white paper
 - **AI-Assisted Workflows**: Tools designed to support infrastructure code generation
 

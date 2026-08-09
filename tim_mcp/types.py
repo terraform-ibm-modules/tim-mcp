@@ -226,3 +226,165 @@ class ErrorDetail(BaseModel):
     code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
     details: dict[str, Any] | None = Field(None, description="Additional details")
+
+
+class GenerateModuleCompositionRequest(BaseModel):
+    """Request model for generating a module composition suggestion."""
+
+    service_or_pattern: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "A service name, architecture keyword, or composition name to build "
+            "a stack around (e.g. 'openshift', 'postgresql', 'watsonx', "
+            "'event streams', or the exact composition name 'vpc-landing-zone')."
+        ),
+    )
+    environment: str | None = Field(
+        None,
+        description=(
+            "Optional target environment to bias selection: 'production' or "
+            "'development'. Defaults to no preference."
+        ),
+    )
+
+
+class RecommendedModule(BaseModel):
+    """A module recommended as part of a composition."""
+
+    id: str = Field(..., description="Base module identifier (namespace/name/provider)")
+    instance_name: str = Field(
+        ..., description="Suggested Terraform module block name for this instance"
+    )
+    role: str = Field(
+        "core",
+        description=(
+            "Provenance/role of the module in the stack: 'core' (composed by the "
+            "anchor DA), 'prerequisite' (infra the DA expects to already exist, "
+            "provisioned here for an end-to-end stack), or 'optional' (add-on the "
+            "DA does not include)."
+        ),
+    )
+    purpose: str = Field(..., description="Why this module is part of the composition")
+    version: str | None = Field(
+        None, description="Latest known module version, resolved from the module index"
+    )
+    source: str = Field(
+        ..., description="Terraform Registry source to use in the module block"
+    )
+    registry_url: str | None = Field(
+        None, description="Terraform Registry URL for the module"
+    )
+
+
+class ModuleConnection(BaseModel):
+    """A wiring between two modules (an output feeding an input)."""
+
+    source_module: str = Field(
+        ..., description="Instance name of the module producing the value"
+    )
+    source_output: str = Field(..., description="Output name on the source module")
+    target_module: str = Field(
+        ..., description="Instance name of the module consuming the value"
+    )
+    target_input: str = Field(
+        ..., description="Input variable name on the target module"
+    )
+    note: str | None = Field(
+        None, description="Optional guidance on how to apply this connection"
+    )
+
+
+class CompositionPrerequisite(BaseModel):
+    """An input the consumer must supply for the whole composition."""
+
+    name: str = Field(..., description="Prerequisite name")
+    type: str = Field(..., description="Prerequisite type (e.g. secret, string)")
+    required: bool = Field(..., description="Whether the prerequisite is required")
+    description: str | None = Field(None, description="What the prerequisite is for")
+
+
+class ReferenceSolution(BaseModel):
+    """Pointer to the Deployable Architecture solution a composition is anchored on."""
+
+    module_id: str = Field(
+        ..., description="Base module ID whose repository holds the DA solution"
+    )
+    solution_path: str = Field(
+        ...,
+        description="Path to the solution within the repo (e.g. solutions/fully-configurable)",
+    )
+    source_url: str = Field(..., description="GitHub URL of the DA solution directory")
+    fetch_hint: str | None = Field(
+        None,
+        description=(
+            "Suggested get_content call to retrieve the ground-truth DA wiring "
+            "(module_id resolved with its latest version)."
+        ),
+    )
+
+
+class ModuleComposition(BaseModel):
+    """A full architecture composition recommendation."""
+
+    composition_name: str = Field(..., description="Unique composition identifier")
+    display_name: str = Field(..., description="Human-readable composition name")
+    description: str = Field(..., description="What the composition builds")
+    category: str = Field(..., description="Architecture category")
+    environment: str = Field(
+        ..., description="Environment the composition targets (e.g. production)"
+    )
+    reference_solution: ReferenceSolution | None = Field(
+        None,
+        description="The Deployable Architecture solution this composition is anchored on",
+    )
+    recommended_modules: list[RecommendedModule] = Field(
+        ..., description="Modules that make up the stack"
+    )
+    deployment_order: list[str] = Field(
+        ..., description="Instance names in recommended deployment order"
+    )
+    connections: list[ModuleConnection] = Field(
+        ..., description="How module outputs wire into other module inputs"
+    )
+    prerequisites: list[CompositionPrerequisite] = Field(
+        ..., description="Inputs the consumer must supply"
+    )
+    notes: list[str] = Field(
+        default_factory=list, description="Additional guidance for the composition"
+    )
+
+
+class CompositionSummary(BaseModel):
+    """Brief description of an available composition."""
+
+    composition_name: str = Field(..., description="Unique composition identifier")
+    display_name: str = Field(..., description="Human-readable composition name")
+    category: str = Field(..., description="Architecture category")
+    environment: str = Field(..., description="Environment the composition targets")
+    services: list[str] = Field(
+        ..., description="Services/keywords this composition matches"
+    )
+
+
+class GenerateModuleCompositionResponse(BaseModel):
+    """Response model for a module composition suggestion."""
+
+    matched: bool = Field(
+        ..., description="Whether a composition matched the requested pattern"
+    )
+    query: str = Field(..., description="The original service_or_pattern query")
+    composition: ModuleComposition | None = Field(
+        None, description="The best-matching composition, if any"
+    )
+    alternatives: list[CompositionSummary] = Field(
+        default_factory=list,
+        description="Other compositions that also matched the query",
+    )
+    available_compositions: list[CompositionSummary] = Field(
+        default_factory=list,
+        description="All available compositions (populated when nothing matched)",
+    )
+    message: str | None = Field(
+        None, description="Human-readable guidance about the result"
+    )

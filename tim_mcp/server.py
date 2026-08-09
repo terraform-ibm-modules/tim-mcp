@@ -20,6 +20,7 @@ from .exceptions import TIMError
 from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
+    GenerateModuleCompositionRequest,
     GetContentRequest,
     GetExampleDetailsRequest,
     LatestModuleVersionRequest,
@@ -814,6 +815,107 @@ async def get_module_dependency(module_id: str) -> str:
             error=str(e),
         )
         logger.exception("Unexpected error in get_module_dependency")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def generate_module_composition(
+    service_or_pattern: str,
+    environment: str | None = None,
+) -> str:
+    """
+    Suggest a recommended Terraform IBM Modules (TIM) stack for a common architecture pattern.
+
+    Use this to bootstrap AI-assisted module composition: given a service or
+    pattern, it returns a curated, DA-derived recommendation of which modules to
+    use, the order to deploy them, and exactly how to wire each module's outputs
+    into the next module's inputs. The recommendation is baked-in knowledge
+    distilled from IBM Cloud deployable architectures (DAs).
+
+    WHEN TO USE:
+    - User asks "how do I build X on IBM Cloud" or "what modules do I need for X"
+    - Starting a new multi-module Terraform solution around a service
+    - You need the wiring (outputs -> inputs) between modules, not just a module list
+
+    WHAT THIS PROVIDES:
+    - recommended_modules: modules (with resolved version + registry source) and a suggested instance name for each
+    - deployment_order: the order to apply the modules
+    - connections: which source module output feeds which target module input
+    - prerequisites: top-level inputs the consumer must supply (api key, region, etc.)
+    - notes: caveats and optional add-ons
+
+    RECOMMENDED WORKFLOW:
+    1. generate_module_composition - get the recommended stack and wiring
+    2. get_module_details / get_example_details - confirm exact input/output names per module
+    3. Generate the Terraform that instantiates the modules and wires them per the connections
+
+    Args:
+        service_or_pattern: Service name, architecture keyword, or exact composition
+            name (e.g. "openshift", "postgresql", "watsonx", "event streams",
+            "openshift-production").
+        environment: Optional bias for selection: "production" or "development".
+
+    Returns:
+        JSON with the best-matching composition, any alternatives, and (when
+        nothing matches) the list of available compositions to choose from.
+    """
+    start_time = time.time()
+
+    try:
+        request = GenerateModuleCompositionRequest(
+            service_or_pattern=service_or_pattern,
+            environment=environment,
+        )
+
+        from .tools.composition import generate_module_composition_impl
+
+        response = await generate_module_composition_impl(request, config)
+
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"service_or_pattern": service_or_pattern, "environment": environment},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"service_or_pattern": service_or_pattern, "environment": environment},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"service_or_pattern": service_or_pattern, "environment": environment},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in generate_module_composition")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
