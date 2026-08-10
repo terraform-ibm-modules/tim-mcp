@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-04T05:35:19.504156+00:00",
+  "generated_at": "2026-08-10T04:19:24.027939+00:00",
   "total_modules": 76,
   "namespace": "terraform-ibm-modules",
   "filter_criteria": {
@@ -11,12 +11,12 @@
   },
   "modules": [
     {
-      "id": "terraform-ibm-modules/cbr/ibm/1.36.7",
+      "id": "terraform-ibm-modules/cbr/ibm/1.36.8",
       "name": "cbr",
       "description": "This module can be used to provision and configure Context Based Restrictions.",
       "category": "security",
-      "downloads": 3066253,
-      "published_at": "2026-07-03T23:48:40.891291Z",
+      "downloads": 3105367,
+      "published_at": "2026-08-08T00:58:41.350678Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cbr",
       "submodules": [
         {
@@ -51,7 +51,7 @@
       "name": "resource-group",
       "description": "Looks up or creates an IBM Cloud resource group by name",
       "category": "management",
-      "downloads": 2207216,
+      "downloads": 2226109,
       "published_at": "2026-05-20T17:20:07.86857Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-resource-group",
       "submodules": [],
@@ -62,7 +62,7 @@
       "name": "common-utilities",
       "description": "A collection of common utility terraform modules",
       "category": "other",
-      "downloads": 1477671,
+      "downloads": 1504025,
       "published_at": "2026-06-23T16:13:10.141488Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-common-utilities",
       "submodules": [
@@ -94,12 +94,12 @@
       "readme_excerpt": "Common Terraform utilities that are used in other modules in the terraform-ibm-modules GitHub organization."
     },
     {
-      "id": "terraform-ibm-modules/cos/ibm/10.17.5",
+      "id": "terraform-ibm-modules/cos/ibm/10.17.7",
       "name": "cos",
       "description": "Configures an IBM Cloud Object Storage instance and bucket",
       "category": "storage",
-      "downloads": 1313038,
-      "published_at": "2026-07-11T19:23:35.601535Z",
+      "downloads": 1326681,
+      "published_at": "2026-08-08T23:15:51.374034Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cos",
       "submodules": [
         {
@@ -136,12 +136,12 @@
       "readme_excerpt": "Use this module to provision and configure an IBM [Cloud Object Storage](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-getting-started-cloud-object-storage) instance and bucket."
     },
     {
-      "id": "terraform-ibm-modules/key-protect/ibm/2.13.5",
+      "id": "terraform-ibm-modules/key-protect/ibm/2.13.6",
       "name": "key-protect",
       "description": "Terraform module to create and work with IBM Key Protect",
       "category": "security",
-      "downloads": 948465,
-      "published_at": "2026-07-04T07:57:12.778553Z",
+      "downloads": 960349,
+      "published_at": "2026-08-08T09:43:52.884056Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-key-protect",
       "submodules": [],
       "readme_excerpt": "This module supports: Creating a Key Protect instance, Enabling a rotation policy for the instance, Enabling a dual authorization policy for the instance, Enabling a metrics policy for the instance, Enabling a key create and import access policy for the instance"
@@ -151,19 +151,19 @@
       "name": "kms-all-inclusive",
       "description": "Supports creating a Key Protect instance, KMS Key Rings and Keys.",
       "category": "security",
-      "downloads": 787187,
+      "downloads": 796234,
       "published_at": "2026-05-12T09:42:09.751557Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-kms-all-inclusive",
       "submodules": [],
       "readme_excerpt": "This module combines the following key management service (KMS) modules to create a full end-to-end key infrastructure: Key Protect module, KMS Key module, KMS Key Ring module"
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager-secret-group/ibm/1.5.4",
+      "id": "terraform-ibm-modules/secrets-manager-secret-group/ibm/1.5.5",
       "name": "secrets-manager-secret-group",
       "description": "Creates a secret group in an IBM Cloud Secrets Manager instance.",
       "category": "security",
-      "downloads": 726565,
-      "published_at": "2026-07-11T07:19:21.056644Z",
+      "downloads": 733421,
+      "published_at": "2026-08-08T13:09:19.854063Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-secret-group",
       "submodules": [],
       "readme_excerpt": "This module creates a secret group in an IBM Cloud Secrets Manager instance. For more information, see [Best practices for organizing secrets and assigning access](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-best-practices-organize-secrets#best-practices-secret-groups)."
@@ -173,19 +173,19 @@
       "name": "security-group",
       "description": "Creates a security group with the option to add rules for internal IBM Cloud flows",
       "category": "networking",
-      "downloads": 601942,
+      "downloads": 607894,
       "published_at": "2026-06-26T06:34:53.895065Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-security-group",
       "submodules": [],
       "readme_excerpt": "This module supports most operations on security groups for VPC. For more information, see [About security groups](https://cloud.ibm.com/docs/vpc?topic=vpc-using-security-groups) in the IBM Cloud Docs."
     },
     {
-      "id": "terraform-ibm-modules/landing-zone-vpc/ibm/9.2.1",
+      "id": "terraform-ibm-modules/landing-zone-vpc/ibm/9.2.3",
       "name": "landing-zone-vpc",
       "description": "This module creates the Virtual Private Cloud (VPC) resources in a cloud environment, including subnets and security groups. Also Supports floating IP addresses and multiple load balancers.",
       "category": "networking",
-      "downloads": 522003,
-      "published_at": "2026-07-24T05:10:18.176609Z",
+      "downloads": 525494,
+      "published_at": "2026-08-09T03:16:01.058786Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vpc",
       "submodules": [
         {
@@ -208,7 +208,7 @@
       "name": "base-ocp-vpc",
       "description": "Provisions a Red Hat OpenShift VPC cluster on IBM Cloud",
       "category": "containers",
-      "downloads": 473381,
+      "downloads": 477596,
       "published_at": "2026-07-14T07:02:32.116552Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-base-ocp-vpc",
       "submodules": [
@@ -234,12 +234,12 @@
       "readme_excerpt": "Use this module to provision an [IBM Cloud Red Hat OpenShift cluster](https://cloud.ibm.com/docs/openshift?topic=openshift-getting-started) on VPC Gen2. The module either creates the required Cloud Object Storage instance or uses an existing instance. The module also supports optionally passing a key management configuration for secret encryption and boot volume encryption."
     },
     {
-      "id": "terraform-ibm-modules/iam-access-group/ibm/1.9.1",
+      "id": "terraform-ibm-modules/iam-access-group/ibm/1.9.2",
       "name": "iam-access-group",
       "description": "This module is used to create an access group, adding members to access group, defining the access group policy and adding dynamic rules to access group.",
       "category": "security",
-      "downloads": 435933,
-      "published_at": "2026-07-10T11:23:40.723615Z",
+      "downloads": 442358,
+      "published_at": "2026-08-08T01:00:06.49039Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-access-group",
       "submodules": [
         {
@@ -258,12 +258,30 @@
       "readme_excerpt": "This module is used to create an access group, adding members to access group, defining the access group policy and adding dynamic rules to access group. Access groups can be used to define a set of permissions that you want to grant to a group of users."
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager/ibm/2.15.12",
+      "id": "terraform-ibm-modules/trusted-profile/ibm/4.2.0",
+      "name": "trusted-profile",
+      "description": "Create Trusted profile on IBM Cloud",
+      "category": "other",
+      "downloads": 417717,
+      "published_at": "2026-06-24T09:07:39.383171Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-trusted-profile",
+      "submodules": [
+        {
+          "path": "modules/trusted-profile-template",
+          "name": "trusted-profile-template",
+          "description": "This Terraform submodule provisions a Trusted Profile Template in IBM Cloud IAM.",
+          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-trusted-profile/tree/main/modules/trusted-profile-template"
+        }
+      ],
+      "readme_excerpt": "This module creates a trusted profile, a set of policies given to the profile, a set of claim rules for the profile, and a set of infrastructure links to the profile."
+    },
+    {
+      "id": "terraform-ibm-modules/secrets-manager/ibm/2.15.13",
       "name": "secrets-manager",
       "description": "This module creates a Secrets Manager instance",
       "category": "security",
-      "downloads": 412786,
-      "published_at": "2026-07-11T15:17:02.417091Z",
+      "downloads": 417253,
+      "published_at": "2026-08-08T19:16:54.253885Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager",
       "submodules": [
         {
@@ -282,29 +300,11 @@
       "readme_excerpt": "This module is used to provision and configure an IBM Cloud [Secrets Manager](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-getting-started) instance."
     },
     {
-      "id": "terraform-ibm-modules/trusted-profile/ibm/4.2.0",
-      "name": "trusted-profile",
-      "description": "Create Trusted profile on IBM Cloud",
-      "category": "other",
-      "downloads": 411215,
-      "published_at": "2026-06-24T09:07:39.383171Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-trusted-profile",
-      "submodules": [
-        {
-          "path": "modules/trusted-profile-template",
-          "name": "trusted-profile-template",
-          "description": "This Terraform submodule provisions a Trusted Profile Template in IBM Cloud IAM.",
-          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-trusted-profile/tree/main/modules/trusted-profile-template"
-        }
-      ],
-      "readme_excerpt": "This module creates a trusted profile, a set of policies given to the profile, a set of claim rules for the profile, and a set of infrastructure links to the profile."
-    },
-    {
       "id": "terraform-ibm-modules/landing-zone-vsi/ibm/6.6.2",
       "name": "landing-zone-vsi",
       "description": "Creates Virtual Server Instances (VSI) across multiple subnets with any number of block storage volumes that are connected by any number of load balancers",
       "category": "networking",
-      "downloads": 401194,
+      "downloads": 403250,
       "published_at": "2026-07-06T08:32:13.226958Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi",
       "submodules": [
@@ -318,12 +318,12 @@
       "readme_excerpt": "This module creates Virtual Server Instances (VSI) across multiple subnets with any number of block storage volumes that are connected by any number of load balancers."
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager-private-cert-engine/ibm/2.0.4",
+      "id": "terraform-ibm-modules/secrets-manager-private-cert-engine/ibm/2.0.5",
       "name": "secrets-manager-private-cert-engine",
       "description": "Creates a private certificates engine in a Secrets Manager instance",
       "category": "security",
-      "downloads": 159971,
-      "published_at": "2026-07-04T11:15:28.47861Z",
+      "downloads": 161039,
+      "published_at": "2026-08-08T03:15:38.862012Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-private-cert-engine",
       "submodules": [],
       "readme_excerpt": "This module configures a private certificates engine for a Secrets Manager instance. For more information about enabling Secrets Manager for private certificates, see [Preparing to create private certificates](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-prepare-order-certificates)."
@@ -333,7 +333,7 @@
       "name": "landing-zone",
       "description": "Creates a fully customizable VPC environment and compute resources (VSI, Red Hat OpenShift) with presets designed to meet strict compliance needs.",
       "category": "containers",
-      "downloads": 158377,
+      "downloads": 159198,
       "published_at": "2026-07-30T07:41:04.88273Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone",
       "submodules": [],
@@ -344,7 +344,7 @@
       "name": "scc-workload-protection",
       "description": "Module that supports provisioning a Security and Compliance Center Workload Protection instance",
       "category": "security",
-      "downloads": 151273,
+      "downloads": 152473,
       "published_at": "2026-07-06T05:43:57.328901Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-scc-workload-protection",
       "submodules": [
@@ -364,23 +364,23 @@
       "readme_excerpt": "A module for configuring an [IBM Cloud Security and Compliance Center Workload Protection](https://cloud.ibm.com/docs/workload-protection?topic=workload-protection-getting-started) instance. The module will always create a Manager resource key that connects to the SCC WP instance. Some sub-resources can be created using the [Sysdig Provider](https://registry.terraform.io/providers/sysdiglabs/sysdig/latest/docs) (see [advanced](./examples/advanced) example)."
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager-private-cert/ibm/1.12.6",
+      "id": "terraform-ibm-modules/secrets-manager-private-cert/ibm/1.12.8",
       "name": "secrets-manager-private-cert",
       "description": "Orders a private certificate secret in a Secrets Manager instance that has the private certificates engine configured",
       "category": "security",
-      "downloads": 126287,
-      "published_at": "2026-07-11T15:15:30.31185Z",
+      "downloads": 127363,
+      "published_at": "2026-08-08T19:15:10.588755Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-private-cert",
       "submodules": [],
       "readme_excerpt": "This module creates a private certificate in an existing Secrets Manager instance that has a configured [Private Certificate Engine](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-certificates&interface=ui)."
     },
     {
-      "id": "terraform-ibm-modules/vpe-gateway/ibm/5.3.5",
+      "id": "terraform-ibm-modules/vpe-gateway/ibm/5.3.7",
       "name": "vpe-gateway",
       "description": "Create Virtual Private Endpoint Gateways across VPC subnets.",
       "category": "networking",
-      "downloads": 124045,
-      "published_at": "2026-07-04T03:15:04.75819Z",
+      "downloads": 127290,
+      "published_at": "2026-08-08T12:58:08.825977Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpe-gateway",
       "submodules": [
         {
@@ -397,7 +397,7 @@
       "name": "namespace",
       "description": "Configures a Kubernetes namespace or Openshift project.",
       "category": "management",
-      "downloads": 117069,
+      "downloads": 121673,
       "published_at": "2026-06-19T06:53:24.375231Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-namespace",
       "submodules": [],
@@ -408,19 +408,19 @@
       "name": "client-to-site-vpn",
       "description": "Creates a client-to-site VPN gateway in a VPC",
       "category": "networking",
-      "downloads": 94894,
+      "downloads": 95701,
       "published_at": "2026-07-27T07:44:50.550889Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-client-to-site-vpn",
       "submodules": [],
       "readme_excerpt": "This module automates the provisioning of a client-to-site VPN in a VPC cluster. For more information, see [About client-to-site VPN servers](https://cloud.ibm.com/docs/vpc?topic=vpc-vpn-client-to-site-overview) in the IBM Cloud docs."
     },
     {
-      "id": "terraform-ibm-modules/cloud-logs/ibm/1.14.0",
+      "id": "terraform-ibm-modules/cloud-logs/ibm/1.14.1",
       "name": "cloud-logs",
       "description": "This module supports configuring an IBM Cloud Logs instance, log routing tenants to enable platform logs and cloud logs policies.",
       "category": "observability",
-      "downloads": 92681,
-      "published_at": "2026-07-28T10:55:09.623516Z",
+      "downloads": 94004,
+      "published_at": "2026-08-09T03:21:34.012953Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cloud-logs",
       "submodules": [
         {
@@ -439,23 +439,23 @@
       "readme_excerpt": "This module supports configuring an IBM Cloud Logs instance, log routing tenants to enable platform logs and cloud logs policies."
     },
     {
-      "id": "terraform-ibm-modules/app-configuration/ibm/1.18.11",
+      "id": "terraform-ibm-modules/app-configuration/ibm/1.18.12",
       "name": "app-configuration",
       "description": "Create an App Configuration instance and optionally allows for multiple App Configuration Collections to be created.",
       "category": "management",
-      "downloads": 84157,
-      "published_at": "2026-07-04T11:17:14.813759Z",
+      "downloads": 85471,
+      "published_at": "2026-08-08T09:49:43.29424Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-app-configuration",
       "submodules": [],
       "readme_excerpt": "Create an App Configuration instance and optionally allows for multiple App Configuration Collections to be created."
     },
     {
-      "id": "terraform-ibm-modules/event-notifications/ibm/2.12.25",
+      "id": "terraform-ibm-modules/event-notifications/ibm/2.12.28",
       "name": "event-notifications",
       "description": "A module for creating IBM Cloud Event Notifications",
       "category": "observability",
-      "downloads": 83467,
-      "published_at": "2026-07-12T03:17:00.808562Z",
+      "downloads": 84851,
+      "published_at": "2026-08-08T23:19:12.383418Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-event-notifications",
       "submodules": [
         {
@@ -468,12 +468,12 @@
       "readme_excerpt": "This module is used to create an IBM Cloud Event Notifications instance to filter and route event notifications from IBM Cloud services like monitoring, to communication channels like email, SMS, and webhooks. Event Notifications provides you information about critical events that occur in your IBM Cloud account or triggers automated actions by using webhooks. For more information, see [Getting started with Event Notifications](https://cloud.ibm.com/docs/event-notifications?topic=event-notifications-getting-started)."
     },
     {
-      "id": "terraform-ibm-modules/cloud-monitoring/ibm/1.15.11",
+      "id": "terraform-ibm-modules/cloud-monitoring/ibm/1.15.13",
       "name": "cloud-monitoring",
       "description": "This module supports configuring an IBM Cloud Monitoring instance and IBM Cloud Metrics Routing.",
       "category": "observability",
-      "downloads": 82655,
-      "published_at": "2026-07-04T11:21:56.632305Z",
+      "downloads": 83710,
+      "published_at": "2026-08-08T09:53:37.188584Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cloud-monitoring",
       "submodules": [
         {
@@ -492,12 +492,12 @@
       "readme_excerpt": "This module supports configuring an IBM Cloud Monitoring instance, metrics routing target, routes and settings."
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager-public-cert-engine/ibm/1.8.6",
+      "id": "terraform-ibm-modules/secrets-manager-public-cert-engine/ibm/1.8.7",
       "name": "secrets-manager-public-cert-engine",
       "description": "Creates a public certificates engine in a Secrets Manager instance",
       "category": "security",
-      "downloads": 77206,
-      "published_at": "2026-07-04T03:17:09.887357Z",
+      "downloads": 78616,
+      "published_at": "2026-08-08T19:17:24.735948Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-public-cert-engine",
       "submodules": [],
       "readme_excerpt": "This module configures a public certificates engine for a Secrets Manager instance. For more information about enabling Secrets Manager for public certificates, see [Preparing to order public certificates](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-prepare-order-certificates)."
@@ -507,7 +507,7 @@
       "name": "powervs-workspace",
       "description": "Sets up and configures a Power Virtual Servers workspace and optionally connects it to existing transit gateway",
       "category": "compute",
-      "downloads": 75567,
+      "downloads": 76273,
       "published_at": "2026-06-22T16:03:16.753261Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-workspace",
       "submodules": [],
@@ -518,7 +518,7 @@
       "name": "vpc",
       "description": "Provisions and configures IBM Cloud VPC resources",
       "category": "networking",
-      "downloads": 72462,
+      "downloads": 73615,
       "published_at": "2026-06-23T06:43:33.164562Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc",
       "submodules": [
@@ -620,7 +620,7 @@
       "name": "code-engine",
       "description": "Provisions and configures IBM Cloud Code Engine.",
       "category": "containers",
-      "downloads": 56404,
+      "downloads": 57768,
       "published_at": "2026-07-09T19:30:02.050665Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-code-engine",
       "submodules": [
@@ -680,30 +680,30 @@
       "name": "dedicated-host",
       "description": "This module provisions dedicated hosts and dedicated host groups, which are designed to provide total isolation, control, and security for your heavy, mission-critical workloads.",
       "category": "compute",
-      "downloads": 54161,
+      "downloads": 54311,
       "published_at": "2026-07-06T05:33:35.007885Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-dedicated-host",
       "submodules": [],
       "readme_excerpt": "This module used to provision dedicated Host which is a fully dedicated, single-tenant physical server hosted in IBM Cloud data centers. It is designed for enterprises that require strict isolation of workloads, enhanced security, and consistent performance. With a dedicated host, customers have full control over server allocation, resource usage, and compliance requirements while leveraging the scalability and reliability of the IBM Cloud."
     },
     {
-      "id": "terraform-ibm-modules/activity-tracker/ibm/1.8.17",
+      "id": "terraform-ibm-modules/activity-tracker/ibm/1.8.18",
       "name": "activity-tracker",
       "description": "This module supports provisioning an IBM Cloud Activity Tracker Event Routing target & routes",
       "category": "observability",
-      "downloads": 51466,
-      "published_at": "2026-07-12T03:19:39.130921Z",
+      "downloads": 52783,
+      "published_at": "2026-08-09T07:21:04.816289Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-activity-tracker",
       "submodules": [],
       "readme_excerpt": "This module supports configuring an IBM Cloud Activity Tracker event routing target, routes and settings."
     },
     {
-      "id": "terraform-ibm-modules/iam-account-settings/ibm/2.13.7",
+      "id": "terraform-ibm-modules/iam-account-settings/ibm/2.13.8",
       "name": "iam-account-settings",
       "description": "Configures standard IAM parameters and account settings",
       "category": "security",
-      "downloads": 49854,
-      "published_at": "2026-07-04T08:09:34.720811Z",
+      "downloads": 50608,
+      "published_at": "2026-08-08T09:45:02.521071Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-account-settings",
       "submodules": [
         {
@@ -726,7 +726,7 @@
       "name": "bare-metal-vpc",
       "description": "Configure a Bare Metal Server for VPC",
       "category": "networking",
-      "downloads": 39341,
+      "downloads": 39464,
       "published_at": "2026-07-08T05:55:59.39093Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-bare-metal-vpc",
       "submodules": [
@@ -744,7 +744,7 @@
       "name": "icd-postgresql",
       "description": "Implements an instance of the IBM Cloud Databases for PostgreSQL service.",
       "category": "database",
-      "downloads": 38103,
+      "downloads": 39421,
       "published_at": "2026-07-14T05:58:19.146555Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-postgresql",
       "submodules": [
@@ -758,12 +758,12 @@
       "readme_excerpt": "This module implements an instance of the IBM Cloud Databases for PostgreSQL service supporting IBM classic platform (Gen 1) or the latest VPC platform (Gen 2). For an overview of differentiators and introduction to the latest VPC platform (Gen 2), see [Overview of Gen 1 and Gen 2 compute](https://cloud.ibm.com/docs/cloud-databases-gen2?topic=cloud-databases-gen2-overview-gen1-gen2) and [Databases for PostgreSQL Gen 2](https://cloud.ibm.com/docs/databases-for-postgresql-gen2?topic=databases-for-postgresql-gen2-provisioning&interface=ui)."
     },
     {
-      "id": "terraform-ibm-modules/container-registry/ibm/2.8.4",
+      "id": "terraform-ibm-modules/container-registry/ibm/2.8.6",
       "name": "container-registry",
       "description": "Implements IBM Container Registry namespace and retention policy",
       "category": "containers",
-      "downloads": 37787,
-      "published_at": "2026-07-27T09:40:55.174179Z",
+      "downloads": 39324,
+      "published_at": "2026-08-08T09:42:31.474044Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-container-registry",
       "submodules": [
         {
@@ -788,80 +788,22 @@
       "readme_excerpt": "You can use this module to provision and configure an [IBM Container Registry](https://cloud.ibm.com/docs/Registry?topic=Registry-getting-started) namespace and optionally, a container registry retention policy."
     },
     {
-      "id": "terraform-ibm-modules/vpc-private-path/ibm/1.8.1",
-      "name": "vpc-private-path",
-      "description": "Configure Private Path services to provide private connectivity for IBM Cloud and third-party services.",
-      "category": "networking",
-      "downloads": 28379,
-      "published_at": "2026-07-04T03:19:31.50463Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-private-path",
-      "submodules": [],
-      "readme_excerpt": "The Private Path solution solves security, privacy and complexity problems. Through Private Path, providers can deliver their services over the IBM Cloud private network backbone, ensuring secure and private interactions for consumers. Providers can offer their services to IBM Cloud customers over Private Path using the IBM Cloud infrastructure. Private Path components are used when connecting to IBM Cloud services, and can now be used for third-party applications and services. [Learn more](https://cloud.ibm.com/docs/private-path?topic=private-path-overview)"
-    },
-    {
-      "id": "terraform-ibm-modules/icd-mysql/ibm/2.11.0",
-      "name": "icd-mysql",
-      "description": "Creates and configures an IBM Cloud Databases for MySQL instance",
-      "category": "database",
-      "downloads": 27541,
-      "published_at": "2026-07-24T07:07:31.146516Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-mysql",
-      "submodules": [
-        {
-          "path": "modules/fscloud",
-          "name": "fscloud",
-          "description": "This code is a version of the parent root module that includes a default configuration that complies with the relevant controls from the IBM Cloud Framework for Financial Services.",
-          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-mysql/tree/main/modules/fscloud"
-        }
-      ],
-      "readme_excerpt": "This module implements an instance of the IBM Cloud Databases for MySQL service supporting IBM classic platform (Gen 1) or the latest VPC platform (Gen 2). An [overview](https://cloud.ibm.com/docs/cloud-databases-gen2?topic=cloud-databases-gen2-overview-gen1-gen2) of differentiators and introduction the latest VPC platform (Gen 2)."
-    },
-    {
-      "id": "terraform-ibm-modules/logs-agent/ibm/1.25.0",
+      "id": "terraform-ibm-modules/logs-agent/ibm/1.25.2",
       "name": "logs-agent",
       "description": "Terraform module to deploy the IBM Cloud Logs Agent on a Cluster",
       "category": "observability",
-      "downloads": 27518,
-      "published_at": "2026-07-14T18:09:27.78752Z",
+      "downloads": 29171,
+      "published_at": "2026-08-07T15:12:22.180686Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-logs-agent",
       "submodules": [],
       "readme_excerpt": "This module deploys the following logs agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster: Logs agent"
-    },
-    {
-      "id": "terraform-ibm-modules/monitoring-agent/ibm/1.24.14",
-      "name": "monitoring-agent",
-      "description": "Deploys an agent to monitor metrics and security data on an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster.",
-      "category": "observability",
-      "downloads": 26969,
-      "published_at": "2026-07-11T18:41:39.636586Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-monitoring-agent",
-      "submodules": [],
-      "readme_excerpt": "This module supports the provisioning of an agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster. The agent can be configured for: Metrics monitoring with IBM Cloud Monitoring"
-    },
-    {
-      "id": "terraform-ibm-modules/transit-gateway/ibm/3.1.1",
-      "name": "transit-gateway",
-      "description": "Provisions IBM Cloud Transit Gateway in an IBM Cloud account.",
-      "category": "networking",
-      "downloads": 26664,
-      "published_at": "2026-06-26T06:33:09.268526Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-transit-gateway",
-      "submodules": [
-        {
-          "path": "modules/terraform-ibm-transit-gateway-action",
-          "name": "terraform-ibm-transit-gateway-action",
-          "description": "With the IBM Cloud\u00ae Transit Gateway action module, you can approve or reject connection requests for a cross-account VPCs connection that uses a transit gateway.",
-          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-transit-gateway/tree/main/modules/terraform-ibm-transit-gateway-action"
-        }
-      ],
-      "readme_excerpt": "This module includes the `terraform-ibm-transit-gateway-action` [approval action submodule](terraform-ibm-transit-gateway-action/README.md) that supports approving or rejecting connection requests in cross-account VPC connections."
     },
     {
       "id": "terraform-ibm-modules/site-to-site-vpn/ibm/3.1.0",
       "name": "site-to-site-vpn",
       "description": "Automation for configuring site-to-site VPN gateways.",
       "category": "networking",
-      "downloads": 26611,
+      "downloads": 29017,
       "published_at": "2026-06-26T06:35:57.506243Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-site-to-site-vpn",
       "submodules": [
@@ -881,12 +823,70 @@
       "readme_excerpt": "This module automates the provisioning of a site-to-site VPN. For more information, see [About site-to-site VPN](https://cloud.ibm.com/docs/vpc?topic=vpc-using-vpn) in the IBM Cloud docs."
     },
     {
-      "id": "terraform-ibm-modules/icd-redis/ibm/2.13.0",
+      "id": "terraform-ibm-modules/vpc-private-path/ibm/1.8.2",
+      "name": "vpc-private-path",
+      "description": "Configure Private Path services to provide private connectivity for IBM Cloud and third-party services.",
+      "category": "networking",
+      "downloads": 28612,
+      "published_at": "2026-08-08T03:20:32.057023Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-private-path",
+      "submodules": [],
+      "readme_excerpt": "The Private Path solution solves security, privacy and complexity problems. Through Private Path, providers can deliver their services over the IBM Cloud private network backbone, ensuring secure and private interactions for consumers. Providers can offer their services to IBM Cloud customers over Private Path using the IBM Cloud infrastructure. Private Path components are used when connecting to IBM Cloud services, and can now be used for third-party applications and services. [Learn more](https://cloud.ibm.com/docs/private-path?topic=private-path-overview)"
+    },
+    {
+      "id": "terraform-ibm-modules/monitoring-agent/ibm/1.24.14",
+      "name": "monitoring-agent",
+      "description": "Deploys an agent to monitor metrics and security data on an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster.",
+      "category": "observability",
+      "downloads": 28567,
+      "published_at": "2026-07-11T18:41:39.636586Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-monitoring-agent",
+      "submodules": [],
+      "readme_excerpt": "This module supports the provisioning of an agent to an IBM Cloud Red Hat OpenShift Container Platform or Kubernetes cluster. The agent can be configured for: Metrics monitoring with IBM Cloud Monitoring"
+    },
+    {
+      "id": "terraform-ibm-modules/icd-mysql/ibm/2.12.0",
+      "name": "icd-mysql",
+      "description": "Creates and configures an IBM Cloud Databases for MySQL instance",
+      "category": "database",
+      "downloads": 27979,
+      "published_at": "2026-08-07T13:41:38.624934Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-mysql",
+      "submodules": [
+        {
+          "path": "modules/fscloud",
+          "name": "fscloud",
+          "description": "This code is a version of the parent root module that includes a default configuration that complies with the relevant controls from the IBM Cloud Framework for Financial Services.",
+          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-mysql/tree/main/modules/fscloud"
+        }
+      ],
+      "readme_excerpt": "This module implements an instance of the IBM Cloud Databases for MySQL service supporting IBM classic platform (Gen 1) or the latest VPC platform (Gen 2). An [overview](https://cloud.ibm.com/docs/cloud-databases-gen2?topic=cloud-databases-gen2-overview-gen1-gen2) of differentiators and introduction the latest VPC platform (Gen 2)."
+    },
+    {
+      "id": "terraform-ibm-modules/transit-gateway/ibm/3.1.1",
+      "name": "transit-gateway",
+      "description": "Provisions IBM Cloud Transit Gateway in an IBM Cloud account.",
+      "category": "networking",
+      "downloads": 26785,
+      "published_at": "2026-06-26T06:33:09.268526Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-transit-gateway",
+      "submodules": [
+        {
+          "path": "modules/terraform-ibm-transit-gateway-action",
+          "name": "terraform-ibm-transit-gateway-action",
+          "description": "With the IBM Cloud\u00ae Transit Gateway action module, you can approve or reject connection requests for a cross-account VPCs connection that uses a transit gateway.",
+          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-transit-gateway/tree/main/modules/terraform-ibm-transit-gateway-action"
+        }
+      ],
+      "readme_excerpt": "This module includes the `terraform-ibm-transit-gateway-action` [approval action submodule](terraform-ibm-transit-gateway-action/README.md) that supports approving or rejecting connection requests in cross-account VPC connections."
+    },
+    {
+      "id": "terraform-ibm-modules/icd-redis/ibm/2.13.2",
       "name": "icd-redis",
       "description": "Implements an instance of IBM Cloud Databases for Redis.",
       "category": "database",
-      "downloads": 21587,
-      "published_at": "2026-07-29T05:57:50.821151Z",
+      "downloads": 23864,
+      "published_at": "2026-08-08T09:44:37.19794Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-redis",
       "submodules": [
         {
@@ -899,12 +899,12 @@
       "readme_excerpt": "This module implements an instance of IBM Cloud Databases for Redis."
     },
     {
-      "id": "terraform-ibm-modules/external-secrets-operator/ibm/3.5.3",
+      "id": "terraform-ibm-modules/external-secrets-operator/ibm/3.5.7",
       "name": "external-secrets-operator",
       "description": "Synchronizes secrets between Secrets Manager and an IBM Cloud OpenShift cluster",
       "category": "security",
-      "downloads": 20125,
-      "published_at": "2026-07-11T15:18:53.95569Z",
+      "downloads": 20633,
+      "published_at": "2026-08-09T03:20:34.870655Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-external-secrets-operator",
       "submodules": [
         {
@@ -935,12 +935,23 @@
       "readme_excerpt": "This module automates the installation and configuration of the [External Secrets Operator](https://external-secrets.io/) in a cluster."
     },
     {
-      "id": "terraform-ibm-modules/powervs-infrastructure/ibm/11.2.1",
+      "id": "terraform-ibm-modules/iam-service-id/ibm/1.3.1",
+      "name": "iam-service-id",
+      "description": "Create an IAM service IDs and adds policies to them.",
+      "category": "security",
+      "downloads": 19848,
+      "published_at": "2026-06-19T14:04:23.613695Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-service-id",
+      "submodules": [],
+      "readme_excerpt": "This module is used to create a IAM service IDs and add policies to them. A service ID identifies a service or application similar to how a user ID identifies a user. Create service IDs to enable access to your IBM Cloud services by applications hosted both inside and outside of IBM Cloud."
+    },
+    {
+      "id": "terraform-ibm-modules/powervs-infrastructure/ibm/11.3.0",
       "name": "powervs-infrastructure",
       "description": "Sets up and configures a ready-to-use Power Virtual Servers infrastructure with IBM Cloud landing zone.",
       "category": "compute",
-      "downloads": 19521,
-      "published_at": "2026-06-24T20:04:19.384356Z",
+      "downloads": 19843,
+      "published_at": "2026-08-07T01:38:22.008767Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-powervs-infrastructure",
       "submodules": [
         {
@@ -959,22 +970,11 @@
       "readme_excerpt": "This repository contains deployable architecture solutions that help provision VPC landing zones, PowerVS workspaces, and interconnect them. The solutions are available in the IBM Cloud Catalog and can also be deployed without the catalog, except for the second solution below."
     },
     {
-      "id": "terraform-ibm-modules/iam-service-id/ibm/1.3.1",
-      "name": "iam-service-id",
-      "description": "Create an IAM service IDs and adds policies to them.",
-      "category": "security",
-      "downloads": 19027,
-      "published_at": "2026-06-19T14:04:23.613695Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iam-service-id",
-      "submodules": [],
-      "readme_excerpt": "This module is used to create a IAM service IDs and add policies to them. A service ID identifies a service or application similar to how a user ID identifies a user. Create service IDs to enable access to your IBM Cloud services by applications hosted both inside and outside of IBM Cloud."
-    },
-    {
       "id": "terraform-ibm-modules/event-streams/ibm/5.0.1",
       "name": "event-streams",
       "description": "Module that supports provisioning and configuring IBM Cloud Event Streams",
       "category": "integration",
-      "downloads": 18590,
+      "downloads": 18765,
       "published_at": "2026-06-23T16:01:02.648093Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-event-streams",
       "submodules": [
@@ -988,12 +988,12 @@
       "readme_excerpt": "This module implements IBM Event Streams for IBM Cloud with topics, partitions, throughput, storage size, cleanup policy, retention time, retention size, segment size, and schema."
     },
     {
-      "id": "terraform-ibm-modules/watsonx-ai/ibm/2.17.8",
+      "id": "terraform-ibm-modules/watsonx-ai/ibm/2.17.9",
       "name": "watsonx-ai",
       "description": "Terraform module to create and configure watsonx.ai Project",
       "category": "ai-ml",
-      "downloads": 16563,
-      "published_at": "2026-07-04T03:18:38.913828Z",
+      "downloads": 16903,
+      "published_at": "2026-08-08T07:20:55.205711Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-ai",
       "submodules": [
         {
@@ -1022,19 +1022,19 @@
       "name": "backup-recovery",
       "description": "Backup and Recovery is a managed service for File and folder backup & Database servers (such as MS SQL Server) in VMware and VPC environments running on IBM Cloud.",
       "category": "database",
-      "downloads": 11286,
+      "downloads": 11846,
       "published_at": "2026-07-21T12:53:55.734528Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-backup-recovery",
       "submodules": [],
       "readme_excerpt": "This module provisions an **IBM Backup and Recovery Service (BRS)** instance, a **data source connection**, and generates a **registration token** for agent installation. It supports both creating new resources and referencing existing ones."
     },
     {
-      "id": "terraform-ibm-modules/ocp-service-mesh/ibm/4.2.2",
+      "id": "terraform-ibm-modules/ocp-service-mesh/ibm/4.4.0",
       "name": "ocp-service-mesh",
       "description": "Automation for configuring Red Hat OpenShift Service Mesh",
       "category": "containers",
-      "downloads": 7201,
-      "published_at": "2026-07-27T17:55:34.779187Z",
+      "downloads": 7637,
+      "published_at": "2026-08-06T05:51:35.35862Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-ocp-service-mesh",
       "submodules": [
         {
@@ -1072,17 +1072,40 @@
           "name": "sm-network-policies",
           "description": "This module allows to create a set of Kubernetes Network Policies for a specific RedHat Openshift Service Mesh v3 controlplane to implement a 'Secure by default' pattern: essentially it creates two network policies for ingress type traffic to allow only the Pods members of the same controlplane to reach the controlplane pods and to allow the istiod pods to be reached by all the sources The first rule named `[prefix-][control plane name]-np-is` is performed through the namespaceSelector condition on the label used to enroll the other namespaces in this controlplane `\"istio-injection\" : \"enabled\"` or `\"istio.io/rev\" : \"[control plane name]\"` The second rule `[prefix-][control plane name]-np-istiod` allows all the ingress traffic on the istiod pods.",
           "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-ocp-service-mesh/tree/main/modules/sm-network-policies"
+        },
+        {
+          "path": "modules/waypoint",
+          "name": "waypoint",
+          "description": "This module deploys istio-proxy pods also known as waypoint proxies by creating a Kubernetes deployment specifically for ambient mode.",
+          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-ocp-service-mesh/tree/main/modules/waypoint"
+        },
+        {
+          "path": "modules/ztunnel",
+          "name": "ztunnel",
+          "description": "This module deploys the ztunnel component for Istio ambient mode on OpenShift clusters.",
+          "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-ocp-service-mesh/tree/main/modules/ztunnel"
         }
       ],
       "readme_excerpt": "This module deploys the [Red Hat OpenShift Service Mesh v3](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.0) by configuring Istio and IstioCNI resources through Istio [Sail operator](###), allows to configure the Istio Pilot deployment, to configure two or more Istio controlplanes in the same cluster by setting up Service Mesh discovery selectors and sidecar injection, to deploy and configure Istio ingress and egress gateways for Istio dataplanes."
     },
     {
-      "id": "terraform-ibm-modules/icd-elasticsearch/ibm/2.14.8",
+      "id": "terraform-ibm-modules/s2s-auth/ibm/2.3.3",
+      "name": "s2s-auth",
+      "description": "This module is to set up a list of s2s authorization policies, and cbr rules",
+      "category": "security",
+      "downloads": 6976,
+      "published_at": "2026-08-08T17:57:42.873088Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-s2s-auth",
+      "submodules": [],
+      "readme_excerpt": "This module generates authorization policies and context-based restriction (CBR) rules to enable access and restrictions between a source service and a target service."
+    },
+    {
+      "id": "terraform-ibm-modules/icd-elasticsearch/ibm/2.14.10",
       "name": "icd-elasticsearch",
       "description": "Implements an instance of the IBM Cloud Databases for Elasticsearch service.",
       "category": "database",
-      "downloads": 6589,
-      "published_at": "2026-08-01T11:35:51.292623Z",
+      "downloads": 6614,
+      "published_at": "2026-08-08T23:18:28.040785Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-elasticsearch",
       "submodules": [
         {
@@ -1099,7 +1122,7 @@
       "name": "icd-mongodb",
       "description": "Module that provisions IBM Cloud Databases for MongoDB",
       "category": "database",
-      "downloads": 6442,
+      "downloads": 6445,
       "published_at": "2026-07-14T05:56:16.026595Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-mongodb",
       "submodules": [
@@ -1113,23 +1136,12 @@
       "readme_excerpt": "This module implements an instance of the IBM Cloud Databases for MongoDB service supporting IBM classic platform (Gen 1) or the latest VPC platform (Gen 2). An [overview](https://cloud.ibm.com/docs/cloud-databases-gen2?topic=cloud-databases-gen2-overview-gen1-gen2) of differentiators and introduction the latest VPC platform (Gen 2)."
     },
     {
-      "id": "terraform-ibm-modules/s2s-auth/ibm/2.3.1",
-      "name": "s2s-auth",
-      "description": "This module is to set up a list of s2s authorization policies, and cbr rules",
-      "category": "security",
-      "downloads": 5194,
-      "published_at": "2026-07-10T06:18:49.897067Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-s2s-auth",
-      "submodules": [],
-      "readme_excerpt": "This module generates authorization policies and context-based restriction (CBR) rules to enable access and restrictions between a source service and a target service."
-    },
-    {
-      "id": "terraform-ibm-modules/icd-rabbitmq/ibm/2.15.0",
+      "id": "terraform-ibm-modules/icd-rabbitmq/ibm/2.15.3",
       "name": "icd-rabbitmq",
       "description": "Implements an instance of the IBM Cloud Messages for RabbitMQ.",
       "category": "database",
-      "downloads": 5013,
-      "published_at": "2026-07-30T05:05:55.674573Z",
+      "downloads": 5020,
+      "published_at": "2026-08-08T23:18:17.731459Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-icd-rabbitmq",
       "submodules": [
         {
@@ -1142,12 +1154,12 @@
       "readme_excerpt": "This module implements an instance of the IBM Cloud Messages for RabbitMQ service."
     },
     {
-      "id": "terraform-ibm-modules/catalog-management/ibm/1.5.2",
+      "id": "terraform-ibm-modules/catalog-management/ibm/1.5.3",
       "name": "catalog-management",
       "description": "Automation to manage an IBM Cloud catalog",
       "category": "management",
-      "downloads": 4571,
-      "published_at": "2026-07-04T00:52:00.141585Z",
+      "downloads": 4759,
+      "published_at": "2026-08-08T01:06:42.062238Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-catalog-management",
       "submodules": [
         {
@@ -1160,12 +1172,12 @@
       "readme_excerpt": "Automation to manage an IBM Cloud catalog."
     },
     {
-      "id": "terraform-ibm-modules/secrets-manager-custom-credentials-engine/ibm/1.2.6",
+      "id": "terraform-ibm-modules/secrets-manager-custom-credentials-engine/ibm/1.2.7",
       "name": "secrets-manager-custom-credentials-engine",
       "description": "Creates a custom credentials engine in a Secrets Manager instance",
       "category": "security",
-      "downloads": 4273,
-      "published_at": "2026-07-04T00:52:55.52152Z",
+      "downloads": 4391,
+      "published_at": "2026-08-08T03:21:49.053803Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-secrets-manager-custom-credentials-engine",
       "submodules": [],
       "readme_excerpt": "This module configures a custom credentials engine for a Secrets Manager instance. For more information about enabling Secrets Manager for custom credentials engine, see [Preparing to create custom credentials engine](https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-custom-credentials-prepare)."
@@ -1175,7 +1187,7 @@
       "name": "cis",
       "description": "Terraform module to create and work with internet services on IBM Cloud",
       "category": "networking",
-      "downloads": 3892,
+      "downloads": 3935,
       "published_at": "2026-07-22T09:59:34.253204Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cis",
       "submodules": [
@@ -1213,12 +1225,12 @@
       "readme_excerpt": "This module provisions an IBM Cloud Internet Services (CIS) instance and configures domain to the CIS instance. The module includes the submodules to add the following features to a CIS instance."
     },
     {
-      "id": "terraform-ibm-modules/appid/ibm/1.7.9",
+      "id": "terraform-ibm-modules/appid/ibm/1.7.10",
       "name": "appid",
       "description": "Creates an IBM AppID instance.",
       "category": "security",
-      "downloads": 2540,
-      "published_at": "2026-07-04T11:16:56.473564Z",
+      "downloads": 2606,
+      "published_at": "2026-08-08T01:01:08.128544Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-appid",
       "submodules": [
         {
@@ -1231,12 +1243,12 @@
       "readme_excerpt": "This module creates an IBM AppID instance and a resource key."
     },
     {
-      "id": "terraform-ibm-modules/cloudant/ibm/1.7.5",
+      "id": "terraform-ibm-modules/cloudant/ibm/1.7.6",
       "name": "cloudant",
       "description": "Deploys and configures an IBM Cloudant instance",
       "category": "database",
-      "downloads": 2470,
-      "published_at": "2026-07-03T23:37:46.615461Z",
+      "downloads": 2479,
+      "published_at": "2026-08-08T00:56:43.630119Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-cloudant",
       "submodules": [
         {
@@ -1249,34 +1261,34 @@
       "readme_excerpt": "This module supports provisioning a instance of the IBM Cloudant service. With a Lite plan, the instance is provisioned on a multi-tenant environment. With a standard plan, the instance can be provisioned either on a multi-tenant or on a dedicated environment. For more information, see [Plans and provisioning](https://cloud.ibm.com/docs/Cloudant?topic=Cloudant-ibm-cloud-public)."
     },
     {
-      "id": "terraform-ibm-modules/watsonx-data/ibm/1.16.9",
+      "id": "terraform-ibm-modules/watsonx-data/ibm/1.16.10",
       "name": "watsonx-data",
       "description": "Terraform module to create and work with IBM watsonx.data",
       "category": "ai-ml",
-      "downloads": 1837,
-      "published_at": "2026-07-04T00:49:49.925023Z",
+      "downloads": 1864,
+      "published_at": "2026-08-08T03:19:30.328097Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-data",
       "submodules": [],
       "readme_excerpt": "This module supports provisioning the following: Provisioning watsonx.data instance with a selectable service plan"
     },
     {
-      "id": "terraform-ibm-modules/account-infrastructure-base/ibm/3.4.14",
+      "id": "terraform-ibm-modules/account-infrastructure-base/ibm/3.4.17",
       "name": "account-infrastructure-base",
       "description": "A general base layer module for setting up a newly provisioned account.",
       "category": "management",
-      "downloads": 1213,
-      "published_at": "2026-07-04T16:39:06.664945Z",
+      "downloads": 1219,
+      "published_at": "2026-08-08T15:16:10.914708Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-account-infrastructure-base",
       "submodules": [],
       "readme_excerpt": "This module is a general base layer module for setting up a newly provisioned account with a default provision of: Base Resource Group, IAM Account Settings, Trusted Profile + Access Group for Projects, CBR Rules + Zones"
     },
     {
-      "id": "terraform-ibm-modules/watsonx-orchestrate/ibm/1.14.12",
+      "id": "terraform-ibm-modules/watsonx-orchestrate/ibm/1.14.13",
       "name": "watsonx-orchestrate",
       "description": "Terraform module to create and work with IBM watsonx Orchestrate.",
       "category": "ai-ml",
-      "downloads": 988,
-      "published_at": "2026-07-04T00:49:11.130193Z",
+      "downloads": 990,
+      "published_at": "2026-08-08T15:18:03.803429Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-orchestrate",
       "submodules": [],
       "readme_excerpt": "The IBM watsonx Orchestrate Terraform module is designed to automate the deployment and configuration of the IBM watsonx Orchestrate, a multi-tenant and cloud-native solution that is deployed as a managed software as a service (SaaS) or that you can install on premises.For more information visit [here](https://www.ibm.com/docs/en/watsonx/watson-orchestrate/current)"
@@ -1286,7 +1298,7 @@
       "name": "hpcs",
       "description": "Create and configure an IBM Cloud Hyper Protect Crypto Services instance.",
       "category": "security",
-      "downloads": 872,
+      "downloads": 873,
       "published_at": "2026-06-26T06:32:37.237951Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-hpcs",
       "submodules": [
@@ -1300,12 +1312,12 @@
       "readme_excerpt": "You can use this module to provision an IBM Cloud Hyper Protect Crypto Services (HPCS) instance."
     },
     {
-      "id": "terraform-ibm-modules/watsonx-discovery/ibm/1.14.10",
+      "id": "terraform-ibm-modules/watsonx-discovery/ibm/1.14.11",
       "name": "watsonx-discovery",
       "description": "Terraform module to create and work with IBM watson Discovery.",
       "category": "ai-ml",
-      "downloads": 739,
-      "published_at": "2026-07-04T00:49:20.85001Z",
+      "downloads": 741,
+      "published_at": "2026-08-08T03:19:06.344272Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-discovery",
       "submodules": [],
       "readme_excerpt": "The IBM Watson Discovery terraform module is designed to automate the deployment and configuration of IBM Watson Discovery,which is an intelligent document processing engine that helps to gain insights from complex business documents."
@@ -1333,12 +1345,12 @@
       "readme_excerpt": "This module creates a DB2 instance on IBM Cloud"
     },
     {
-      "id": "terraform-ibm-modules/watsonx-governance/ibm/1.13.12",
+      "id": "terraform-ibm-modules/watsonx-governance/ibm/1.13.13",
       "name": "watsonx-governance",
       "description": "Terraform module to create and work with IBM watsonx.governance.",
       "category": "ai-ml",
-      "downloads": 660,
-      "published_at": "2026-07-04T00:49:56.340916Z",
+      "downloads": 662,
+      "published_at": "2026-08-08T03:19:48.207464Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-watsonx-governance",
       "submodules": [],
       "readme_excerpt": "The IBM watsonx.governance Terraform module is designed to automate the deployment and configuration of IBM watsonx.governance, which is a toolkit which seamlessly integrates with your existing systems to automate and accelerate responsible AI workflows to help save time, reduce costs and comply with regulations."
@@ -1348,19 +1360,19 @@
       "name": "landing-zone-vsi-autoscale",
       "description": "This module creates an Auto Scale for VPC instance group which dynamically creates virtual server instances to meet the demands of your environment.",
       "category": "networking",
-      "downloads": 567,
+      "downloads": 568,
       "published_at": "2026-07-20T08:09:33.208789Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-landing-zone-vsi-autoscale",
       "submodules": [],
       "readme_excerpt": "This module creates an Auto Scale for VPC instance group which dynamically creates virtual server instances to meet the demands of your environment. The virtual server instances (VSI) prescribed via an instance template can be connected to a load balancers."
     },
     {
-      "id": "terraform-ibm-modules/enterprise/ibm/1.6.9",
+      "id": "terraform-ibm-modules/enterprise/ibm/1.6.11",
       "name": "enterprise",
       "description": "Creates accounts and account-groups in an existing enterprise",
       "category": "management",
-      "downloads": 551,
-      "published_at": "2026-08-01T09:01:35.947724Z",
+      "downloads": 555,
+      "published_at": "2026-08-08T09:46:17.124992Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-enterprise",
       "submodules": [
         {
@@ -1385,12 +1397,12 @@
       "readme_excerpt": "This is a collection of sub modules and which will take tree based enterprise inputs and create child accounts and account-groups in an enterprise * [dynamic_values](submodules/dynamic_values) * [enterprise_hierarchy](submodules/enterprise_hierarchy)"
     },
     {
-      "id": "terraform-ibm-modules/vpc-private-path-external-connectivity/ibm/1.5.2",
+      "id": "terraform-ibm-modules/vpc-private-path-external-connectivity/ibm/1.5.3",
       "name": "vpc-private-path-external-connectivity",
       "description": "Automation to create ALB and PPNLB to support on-prem connectivity",
       "category": "networking",
-      "downloads": 477,
-      "published_at": "2026-07-04T11:22:56.229084Z",
+      "downloads": 479,
+      "published_at": "2026-08-08T15:19:48.719657Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-private-path-external-connectivity",
       "submodules": [],
       "readme_excerpt": "This repository contains the following sample deployable architectures: Cloud essentials for private-path external connectivity"
@@ -1400,7 +1412,7 @@
       "name": "terraform-enterprise",
       "description": "This repository provides a top-level Terraform module for deploying and managing HashiCorp Terraform Enterprise (TFE) on IBM Cloud Red Hat OpenShift clusters.",
       "category": "management",
-      "downloads": 408,
+      "downloads": 410,
       "published_at": "2026-07-24T04:56:12.758921Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-terraform-enterprise",
       "submodules": [
@@ -1426,23 +1438,12 @@
       "readme_excerpt": "This repository provides a top-level Terraform module for deploying and managing HashiCorp Terraform Enterprise (TFE) on IBM Cloud Red Hat OpenShift clusters. The module automates the setup of namespaces, secrets, Helm releases, OpenShift routes, and supporting resources required for a TFE installation."
     },
     {
-      "id": "terraform-ibm-modules/iks-ocp-backup-recovery/ibm/3.3.3",
-      "name": "iks-ocp-backup-recovery",
-      "description": "Automation for configuring backup and recovery for Kubernetes and Openshift clusters on IBM Cloud.",
-      "category": "containers",
-      "downloads": 301,
-      "published_at": "2026-08-04T03:46:13.303092Z",
-      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iks-ocp-backup-recovery",
-      "submodules": [],
-      "readme_excerpt": "This module deploys the **Data Source Connector (DSC)** via Helm into an **IBM Kubernetes Service (IKS) or Red Hat OpenShift on IBM Cloud** cluster, registers the cluster with **[IBM Backup & Recovery Service](https://cloud.ibm.com/docs/backup-recovery?topic=backup-recovery-data-source-connector-iks-roks)**, and creates a **configurable protection policy**."
-    },
-    {
-      "id": "terraform-ibm-modules/base-iks-vpc/ibm/1.3.3",
+      "id": "terraform-ibm-modules/base-iks-vpc/ibm/1.3.4",
       "name": "base-iks-vpc",
       "description": "Provisions a Kubernetes VPC cluster on IBM Cloud",
       "category": "containers",
-      "downloads": 281,
-      "published_at": "2026-08-01T03:25:30.123608Z",
+      "downloads": 371,
+      "published_at": "2026-08-08T09:54:40.70063Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-base-iks-vpc",
       "submodules": [
         {
@@ -1453,6 +1454,17 @@
         }
       ],
       "readme_excerpt": "Use this module to provision an [IBM Cloud Kubernetes Service cluster](https://cloud.ibm.com/docs/containers?topic=containers-getting-started) on VPC Gen2. The module supports optionally passing a key management configuration for secret encryption and boot volume encryption."
+    },
+    {
+      "id": "terraform-ibm-modules/iks-ocp-backup-recovery/ibm/3.3.4",
+      "name": "iks-ocp-backup-recovery",
+      "description": "Automation for configuring backup and recovery for Kubernetes and Openshift clusters on IBM Cloud.",
+      "category": "containers",
+      "downloads": 305,
+      "published_at": "2026-08-07T18:49:30.264207Z",
+      "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-iks-ocp-backup-recovery",
+      "submodules": [],
+      "readme_excerpt": "This module deploys the **Data Source Connector (DSC)** via Helm into an **IBM Kubernetes Service (IKS) or Red Hat OpenShift on IBM Cloud** cluster, registers the cluster with **[IBM Backup & Recovery Service](https://cloud.ibm.com/docs/backup-recovery?topic=backup-recovery-data-source-connector-iks-roks)**, and creates a **configurable protection policy**."
     },
     {
       "id": "terraform-ibm-modules/schematics-agent/ibm/1.5.1",
@@ -1477,7 +1489,7 @@
       "name": "security-verify",
       "description": "IBM Verify provides Single Sign-On (SSO), multi-factor authentication (MFA), identity governance, and identity lifecycle controls for internal (workforce) and external (consumer) user types.",
       "category": "security",
-      "downloads": 102,
+      "downloads": 103,
       "published_at": "2026-05-15T06:13:11.21826Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-security-verify",
       "submodules": [],
@@ -1488,7 +1500,7 @@
       "name": "vpc-file-storage",
       "description": "This module creates a File Storage for VPC instance",
       "category": "networking",
-      "downloads": 16,
+      "downloads": 17,
       "published_at": "2026-05-30T19:18:15.27876Z",
       "source_url": "https://github.com/terraform-ibm-modules/terraform-ibm-vpc-file-storage",
       "submodules": [
