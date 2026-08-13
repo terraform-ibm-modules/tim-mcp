@@ -23,32 +23,26 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 
 ## search_modules
 
-Search for IBM Terraform modules by name, keyword, service name, service category, use cases, or tags.
+Find modules in the Terraform Registry based on a search query.
 
 **When to use:**
 - User asks "what modules are available for X"
-- User wants to find modules related to a specific IBM Cloud service or category
-- Starting point for any module discovery workflow before calling other tools
+- User wants to find modules related to a specific IBM Cloud service
+- Starting point for any module discovery
 
 **Parameters:**
 ```
-query (required): What you are looking for — e.g. "vpc", "key protect", "security","create a virtual private cloud"
-limit (optional): Number of results to return, default 5
+query (required): Search term like "vpc", "kubernetes", "observability"
+limit (optional): Number of results, default 5
 ```
 
-**Returns:** JSON with module IDs, descriptions, download counts, and verification status. The `id` field in each result is the `module_id` consumable directly by other tools (`get_module_details`, `list_content`, `get_content`,`get_module_dependency`).
+**Returns:** JSON with module IDs, descriptions, download counts, and verification status
 
 **Example:**
 ```
 search_modules(query="vpc", limit=5)
-search_modules(query="key protect")
-search_modules(query="security", limit=10)
-search_modules(query="create a vpc")
 ```
-**Known limitations:**
 
-- Catalog-only tags (e.g. `ibm_created`, `network_vpc`) and Catalog-only keywords(e.g. `slz`, `IaC`) are not searchable they are not present in the module index
-- Use case searches are limited to phrases present in module descriptions and readme excerpts
 ---
 
 ## get_latest_module_version

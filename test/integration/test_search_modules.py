@@ -78,7 +78,17 @@ class TestSearchModulesImpl:
     @pytest.fixture
     def mock_terraform_client(self):
         """Create a mock Terraform client."""
-        return AsyncMock()
+        client = AsyncMock()
+        # Raise a benign exception by default so the production code's
+        # "failed to fetch latest version" fallback fires — preserving the
+        # version and description already in the search response.
+        # Tests that need specific version/description behaviour override
+        # these explicitly (e.g. TestPrereleaseVersionFiltering).
+        client.get_module_versions.side_effect = Exception(
+            "not configured in this test"
+        )
+        client.get_module_details.side_effect = Exception("not configured in this test")
+        return client
 
     @pytest.fixture
     def sample_registry_response(self):
@@ -894,7 +904,12 @@ class TestRepositoryFiltering:
     @pytest.fixture
     def mock_terraform_client(self):
         """Create a mock Terraform client."""
-        return AsyncMock()
+        client = AsyncMock()
+        client.get_module_versions.side_effect = Exception(
+            "not configured in this test"
+        )
+        client.get_module_details.side_effect = Exception("not configured in this test")
+        return client
 
     @pytest.fixture
     def mock_github_client(self):
@@ -1264,6 +1279,12 @@ class TestTotalFoundBug:
 
         # Create mock clients
         mock_terraform_client = AsyncMock()
+        mock_terraform_client.get_module_versions.side_effect = Exception(
+            "not configured in this test"
+        )
+        mock_terraform_client.get_module_details.side_effect = Exception(
+            "not configured in this test"
+        )
         mock_github_client = (
             MagicMock()
         )  # Use MagicMock for GitHub client since parse_github_url is sync
@@ -1369,7 +1390,9 @@ class TestTotalFoundBug:
 
         request = ModuleSearchRequest(query="vsi", limit=3)
 
-        # Patch the context managers
+        # Patch the context managers.
+        # _search_index must be patched to None so that the live-API path
+        # (and the total_count preservation logic) is actually exercised.
         with (
             patch("tim_mcp.tools.search._search_index", return_value=None),
             patch(
@@ -1890,3 +1913,97 @@ class TestLatestVersionFetching:
         mock_terraform_client.get_module_details.assert_called_once_with(
             "terraform-ibm-modules", "icd-postgresql", "ibm", "4.2.29"
         )
+
+
+class TestSearchIndex:
+    """
+    Tests for the local-index search path (_search_index).
+
+    These tests validate the index-backed search behaviour introduced to
+    eliminate per-module API round-trips. They work against the real
+    static/module_index.json on disk.
+    """
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _module_ids(response: ModuleSearchResponse) -> list[str]:
+        return [m.id for m in response.modules]
+
+    # ------------------------------------------------------------------
+    # Index hit: skip external API calls
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_index_hit_short_circuits_api(self):
+        """Index hit returns results without calling external APIs."""
+        config = Config()
+        request = ModuleSearchRequest(query="vpc", limit=3)
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+        ):
+            result = await search_modules_impl(request, config)
+
+        mock_tf_class.assert_not_called()
+        mock_gh_class.assert_not_called()
+
+        assert result.query == "vpc"
+        assert len(result.modules) >= 1
+        assert result.total_found == len(result.modules)
+
+    # ------------------------------------------------------------------
+    # Index miss: fall back to the Terraform Registry API
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_index_miss_falls_back_to_registry(self):
+        """Index miss falls back to the Terraform Registry API."""
+        config = Config()
+        mock_terraform_client = AsyncMock()
+        mock_terraform_client.search_modules.return_value = {
+            "modules": [],
+            "meta": {"limit": 50, "offset": 0, "total_count": 0},
+        }
+
+        with (
+            patch("tim_mcp.tools.search._search_index", return_value=None),
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim.mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch(
+                "tim_mcp.tools.search._is_repository_valid",
+                return_value=True,
+            ),
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = AsyncMock()
+
+            result = await search_modules_impl(
+                ModuleSearchRequest(query="xyzzy-nonexistent"),
+                config,
+            )
+
+        mock_terraform_client.search_modules.assert_called_once()
+        assert result.total_found == 0
+        assert result.modules == []
+
+    # ------------------------------------------------------------------
+    # Index search: verify ranking, limit, and versionless module IDs
+    # ------------------------------------------------------------------
+
+    def test_index_search_ranking_limit_and_versionless_ids(self):
+        """Index search returns the best match, respects limit, and uses reusable IDs."""
+        from tim_mcp.tools.search import _search_index
+
+        result = _search_index("object storage", limit=3)
+
+        assert result is not None
+        assert len(result.modules) <= 3
+        assert result.modules[0].id == "terraform-ibm-modules/cos/ibm"
+
+        for module in result.modules:
+            assert module.id == (f"{module.namespace}/{module.name}/{module.provider}")
+            assert len(module.id.split("/")) == 3
