@@ -1972,7 +1972,7 @@ class TestSearchIndex:
         with (
             patch("tim_mcp.tools.search._search_index", return_value=None),
             patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
-            patch("tim.mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
             patch(
                 "tim_mcp.tools.search._is_repository_valid",
                 return_value=True,
@@ -1989,6 +1989,76 @@ class TestSearchIndex:
         mock_terraform_client.search_modules.assert_called_once()
         assert result.total_found == 0
         assert result.modules == []
+
+    # ------------------------------------------------------------------
+    # Partial index hit: supplement with API and merge results
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_partial_index_supplements_with_api(self):
+        """When index has fewer results than limit, API is called and results are merged.
+
+        'kms' returns 1 result from the index (fewer than limit=5), so the API
+        is called to supplement. The final result should contain more than what
+        the index alone returned.
+        """
+        config = Config()
+        mock_terraform_client = AsyncMock()
+        mock_terraform_client.search_modules.side_effect = [
+            {
+                "modules": [
+                    {
+                        "id": "terraform-ibm-modules/kms-key/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "kms-key",
+                        "provider": "ibm",
+                        "version": "1.5.0",
+                        "description": "Module for creation of KMS keys",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-kms-key",
+                        "downloads": 973653,
+                        "verified": False,
+                        "published_at": "2025-04-09T00:00:00.000Z",
+                    },
+                    {
+                        "id": "terraform-ibm-modules/kms-key-ring/ibm",
+                        "namespace": "terraform-ibm-modules",
+                        "name": "kms-key-ring",
+                        "provider": "ibm",
+                        "version": "2.7.0",
+                        "description": "Module to create Key Rings in a KMS instance",
+                        "source": "https://github.com/terraform-ibm-modules/terraform-ibm-kms-key-ring",
+                        "downloads": 958117,
+                        "verified": False,
+                        "published_at": "2025-04-09T00:00:00.000Z",
+                    },
+                ],
+                "meta": {"limit": 50, "offset": 0, "total_count": 2},
+            },
+            {"modules": [], "meta": {"limit": 50, "offset": 50, "total_count": 2}},
+        ]
+
+        with (
+            patch("tim_mcp.tools.search.TerraformClient") as mock_tf_class,
+            patch("tim_mcp.tools.search.GitHubClient") as mock_gh_class,
+            patch("tim_mcp.tools.search._is_repository_valid", return_value=True),
+        ):
+            mock_tf_class.return_value.__aenter__.return_value = mock_terraform_client
+            mock_gh_class.return_value.__aenter__.return_value = AsyncMock()
+
+            # limit=5 — index has 1 result for "kms", API is called to supplement
+            result = await search_modules_impl(
+                ModuleSearchRequest(query="kms", limit=5), config
+            )
+
+        # API was called to supplement
+        mock_terraform_client.search_modules.assert_called()
+
+        # Final result has more modules than the index alone returned (1)
+        assert len(result.modules) > 1
+
+        # API results are present in the merged output
+        module_ids = [m.id for m in result.modules]
+        assert "terraform-ibm-modules/kms-key/ibm" in module_ids
+        assert "terraform-ibm-modules/kms-key-ring/ibm" in module_ids
 
     # ------------------------------------------------------------------
     # Index search: verify ranking, limit, and versionless module IDs
