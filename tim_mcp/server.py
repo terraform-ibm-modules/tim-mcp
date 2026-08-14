@@ -179,7 +179,7 @@ async def search_modules(
     limit: int = 5,
 ) -> str:
     """
-    Search Terraform Registry for modules by module name, service category, or relevant multi-word description phrases.
+    Search TIM modules by module name, service category, or relevant multi-word description phrases.
 
     SEARCH TIPS:
     - Use specific terms such as "vpc", "networking", or "secrets manager".
