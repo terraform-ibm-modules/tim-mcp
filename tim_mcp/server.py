@@ -179,13 +179,13 @@ async def search_modules(
     limit: int = 5,
 ) -> str:
     """
-    Search Terraform Registry for modules by module name, service category, or service name.
+    Search Terraform Registry for modules by module name, service category, or relevant multi-word description phrases.
 
     SEARCH TIPS:
     - Use specific terms such as "vpc", "networking", or "secrets manager".
 
     Args:
-        query: Module name, service category, or service name to search for
+        query: Module name, service category, or relevant multi-word description phrases to search for
             (e.g., "vpc", "networking", "secrets manager").
         limit: Maximum number of results (optional; only use if requested).
 

@@ -23,7 +23,7 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 
 ## search_modules
 
-Find Terraform modules based on a module name, service category, or service name.
+Find Terraform modules based on a module name, service category, or relevant multi-word description phrases.
 
 **When to use:**
 - User asks "what modules are available for X"
@@ -32,7 +32,7 @@ Find Terraform modules based on a module name, service category, or service name
 
 **Parameters:**
 ```
-query (required): Module name, service category, or service name(eg:,"vpc", "networking", "secrets manager")
+query (required): Module name, service category, or relevant multi-word description phrases(eg:,"vpc", "networking", "secrets manager")
 limit (optional): Number of results, default 5
 ```
 
