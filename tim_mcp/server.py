@@ -183,7 +183,6 @@ async def search_modules(
 
     SEARCH TIPS:
     - Use specific terms such as "vpc", "networking", or "secrets manager".
-    - Search supports module names, service categories, and service names.
 
     Args:
         query: Module name, service category, or service name to search for
