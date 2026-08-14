@@ -23,20 +23,25 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 
 ## search_modules
 
-Find modules in the Terraform Registry based on a search query.
+Find Terraform modules based on a module name, service category, or service name.
 
 **When to use:**
 - User asks "what modules are available for X"
-- User wants to find modules related to a specific IBM Cloud service
+- User wants to find modules related to a specific IBM Cloud service or category
 - Starting point for any module discovery
 
 **Parameters:**
 ```
-query (required): Search term like "vpc", "kubernetes", "observability"
+query (required): Module name, service category, or service name(eg:,"vpc", "networking", "secrets manager")
 limit (optional): Number of results, default 5
 ```
 
 **Returns:** JSON with module IDs, descriptions, download counts, and verification status
+
+**Search Behaviour:**
+- Searches the `static/module_index.json` first for fast results.
+- If the index returns fewer results than the requested limit or no results, searches the live Terraform Registry.
+- Results are merged, deduplicated by module_id, and ranked by download count.
 
 **Example:**
 ```

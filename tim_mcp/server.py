@@ -179,18 +179,22 @@ async def search_modules(
     limit: int = 5,
 ) -> str:
     """
-    Search Terraform Registry for modules with intelligent result optimization.
+    Search Terraform Registry for modules by module name, service category, or service name.
 
     SEARCH TIPS:
-    - Use specific terms: "vpc" better than "network", "kubernetes" better than "container"
+    - Use specific terms such as "vpc", "networking", or "secrets manager".
+    - Search supports module names, service categories, and service names.
 
     Args:
-        query: Specific search term (e.g., "vpc", "kubernetes", "security")
-        limit: Maximum results based on use case (optional only use if asked)
+        query: Module name, service category, or service name to search for
+            (e.g., "vpc", "networking", "secrets manager").
+        limit: Maximum number of results (optional; only use if requested).
 
     Returns:
-        JSON formatted module search results with download counts, descriptions, and verification status
+        JSON formatted module search results with module IDs, download counts,
+        descriptions, and verification status.
     """
+
     start_time = time.time()
 
     try:
