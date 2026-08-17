@@ -11,7 +11,10 @@ The implementation follows these principles:
 - Data transformation to match the tool specification format
 """
 
+import json
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from ..clients.github_client import GitHubClient
@@ -84,6 +87,27 @@ async def search_modules_impl(
     from ..logging import get_logger
 
     logger = get_logger(__name__)
+
+    # Search the local index first — zero API calls, instant response.
+    # If the index returns enough results (>= limit), return immediately.
+    # If the index returns fewer than requested, fall through to the live
+    # Terraform Registry API to supplement, then merge and deduplicate.
+    index_result = _search_index(request.query, request.limit)
+    if index_result is not None and len(index_result.modules) >= request.limit:
+        logger.info(
+            "Search served from local index",
+            query=request.query,
+            total=index_result.total_found,
+        )
+        return index_result
+
+    if index_result is not None:
+        logger.info(
+            "Index returned partial results, supplementing with API",
+            query=request.query,
+            index_count=len(index_result.modules),
+            limit=request.limit,
+        )
 
     # Use the configured namespace (always the first allowed namespace)
     namespace = config.allowed_namespaces[0] if config.allowed_namespaces else None
@@ -169,8 +193,12 @@ async def search_modules_impl(
                                 )
 
                                 # Use description from latest version (more accurate)
-                                latest_description = latest_module_data.get(
-                                    "description", module.description
+                                latest_description = (
+                                    latest_module_data.get(
+                                        "description", module.description
+                                    )
+                                    if isinstance(latest_module_data, dict)
+                                    else module.description
                                 )
 
                                 # Update the module with latest version and metadata
@@ -248,11 +276,24 @@ async def search_modules_impl(
                 )
 
             # Ensure we don't exceed the requested limit
-            final_modules = validated_modules[: request.limit]
+            # Merge index results with API results — index results take
+            # priority; API results fill in any remaining slots up to limit.
+            # Deduplicate by module id so the same module never appears twice.
+            if index_result is not None:
+                seen_ids = {m.id for m in index_result.modules}
+                merged = list(index_result.modules)
+                for m in validated_modules:
+                    if m.id not in seen_ids:
+                        merged.append(m)
+                        seen_ids.add(m.id)
+                # Re-rank merged list by downloads descending, then trim to limit.
+                merged.sort(key=lambda m: m.downloads, reverse=True)
+                final_modules = merged[: request.limit]
+            else:
+                final_modules = validated_modules[: request.limit]
 
-            # Since the Terraform Registry API doesn't return total_count,
-            # we use the actual number of modules we found and validated
-            # If total_count was provided in the API response, use that; otherwise use our count
+            # If total_count was provided in the API response use that;
+            # otherwise fall back to the actual number of modules returned.
             result_total = total_count if total_count > 0 else len(final_modules)
 
             logger.info(
@@ -442,3 +483,127 @@ async def _is_repository_valid(
             error=str(e),
         )
         return False
+
+
+def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
+    """
+    Search the local module index without making any API calls.
+
+    Matches the query against three fields in module_index.json, in order
+    of relevance:
+        1. Module name     — e.g. "vpc", "cos", "key-protect"
+        2. Module category — e.g. "networking", "security", "storage"
+        3. Description     — multi-word queries only, e.g. "object storage"
+
+    Results are sorted by match quality first, then by download count.
+    Returns None when nothing matched so the caller falls back to the
+    live Terraform Registry API.
+
+    Args:
+        query: Search term entered by the user
+        limit: Maximum number of results to return
+
+    Returns:
+        ModuleSearchResponse if any modules matched, None otherwise
+    """
+    # Locate module_index.json — check both packaged and dev layouts.
+    for candidate in [
+        Path(__file__).parent.parent / "static" / "module_index.json",
+        Path(__file__).parent.parent.parent / "static" / "module_index.json",
+    ]:
+        if candidate.exists():
+            index_path = candidate
+            break
+    else:
+        return None
+
+    with open(index_path) as f:
+        data = json.load(f)
+
+    words = re.findall(r"[a-z0-9]+", query.lower())
+    if not words:
+        return None
+
+    def matches_field(field: str) -> bool:
+        """Return True if every query word appears as a whole word in field."""
+        return all(re.search(r"\b" + re.escape(w) + r"\b", field) for w in words)
+
+    def words_close_together(text: str) -> bool:
+        """Return True if all query words appear within 5 tokens of each other."""
+        tokens = re.findall(r"[a-z0-9]+", text)
+        return any(
+            all(w in tokens[i : i + 5] for w in words) for i in range(len(tokens))
+        )
+
+    # Score each module: 3 = name match, 2 = category match, 1 = description match.
+    # Modules with score 0 are skipped.
+    scored: list[tuple[int, int, dict]] = []
+
+    for m in data["modules"]:
+        name = m.get("name", "").lower()
+        category = m.get("category", "").lower()
+        description = (m.get("description", "") or "").lower()
+
+        if matches_field(name):
+            score = 3
+        elif matches_field(category):
+            score = 2
+        elif (
+            len(words) > 1
+            and matches_field(description)
+            and words_close_together(description)
+        ):
+            # Multi-word only — prevents single words like "storage" from
+            # matching every module that mentions the word in its description.
+            score = 1
+        else:
+            continue
+
+        scored.append((score, m.get("downloads", 0), m))
+
+    if not scored:
+        return None
+
+    # Best score first; break ties by download count (most popular first).
+    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
+    modules: list[ModuleInfo] = []
+    for _, _, m in scored:
+        # Index IDs are stored as "namespace/name/provider/version".
+        # Strip the version so the id works directly with other tools.
+        raw_id = m["id"]
+        parts = raw_id.split("/")
+        module_id = "/".join(parts[:3]) if len(parts) == 4 else raw_id
+        version = parts[3] if len(parts) == 4 else ""
+
+        try:
+            modules.append(
+                ModuleInfo(
+                    id=module_id,
+                    namespace=parts[0] if parts else "",
+                    name=m["name"],
+                    provider=parts[2] if len(parts) >= 3 else "",
+                    version=version,
+                    description=m.get("description", ""),
+                    source_url=m["source_url"],
+                    downloads=m.get("downloads", 0),
+                    verified=False,
+                    published_at=datetime.fromisoformat(
+                        m["published_at"].replace("Z", "+00:00")
+                    ),
+                )
+            )
+        except Exception:
+            continue
+
+        if len(modules) >= limit:
+            break
+
+    if not modules:
+        return None
+
+    return ModuleSearchResponse(
+        query=query,
+        total_found=len(modules),
+        modules=modules,
+    )
