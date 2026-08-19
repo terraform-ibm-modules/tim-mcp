@@ -819,53 +819,50 @@ async def get_module_dependency(module_id: str) -> str:
 
 
 @mcp.tool()
-async def generate_module_composition(
-    service_or_pattern: str,
-    environment: str | None = None,
-) -> str:
+async def generate_module_composition(prompt: str) -> str:
     """
-    Suggest a recommended Terraform IBM Modules (TIM) stack for a common architecture pattern.
+    Assemble a Terraform IBM Modules (TIM) composition from a natural-language prompt.
 
-    Use this to bootstrap AI-assisted module composition: given a service or
-    pattern, it returns a curated, DA-derived recommendation of which modules to
-    use, the order to deploy them, and exactly how to wire each module's outputs
-    into the next module's inputs. The recommendation is baked-in knowledge
-    distilled from IBM Cloud deployable architectures (DAs).
+    Given a request naming a pattern and the pieces to include (e.g. "gimme an
+    openshift composition with kms and cos"), this returns a composition JSON. It
+    builds the composition LIVE by calling the other TIM-MCP tools — nothing is
+    hardcoded: module IDs and versions come from `search_modules`, and connections
+    are derived from the real module interfaces read via `get_module_details`.
 
     WHEN TO USE:
-    - User asks "how do I build X on IBM Cloud" or "what modules do I need for X"
+    - User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
     - Starting a new multi-module Terraform solution around a service
-    - You need the wiring (outputs -> inputs) between modules, not just a module list
 
-    WHAT THIS PROVIDES:
-    - recommended_modules: modules (with resolved version + registry source) and a suggested instance name for each
-    - deployment_order: the order to apply the modules
-    - connections: which source module output feeds which target module input
-    - prerequisites: top-level inputs the consumer must supply (api key, region, etc.)
-    - notes: caveats and optional add-ons
+    WHAT THIS RETURNS (JSON):
+    - composition_name, description, da_grounded, reference_solution (when DA-grounded)
+    - recommended_modules: each module's id, instance_name, role, purpose, resolved version, source, registry_url
+    - deployment_order: instance names in dependency order
+    - connections: source_module.source_output → target_module.target_input (inferred from interfaces)
+    - prerequisites: top-level inputs to supply (api key, region, resource group, prefix)
+    - notes: caveats and unresolved items
 
-    RECOMMENDED WORKFLOW:
-    1. generate_module_composition - get the recommended stack and wiring
-    2. get_module_details / get_example_details - confirm exact input/output names per module
-    3. Generate the Terraform that instantiates the modules and wires them per the connections
+    DA GROUNDING:
+    When the prompt mentions "DA" (or "deployable architecture"), the response
+    includes a reference_solution pointer to the module's deployable-architecture
+    solution. Connections are always inferred from module interfaces (approximate —
+    verify with `get_module_details`); fetch reference_solution with `get_content`
+    for the authoritative DA wiring.
+
+    NOTE: This tool makes live registry/GitHub calls per request, so it is slower
+    than the lightweight tools.
 
     Args:
-        service_or_pattern: Service name, architecture keyword, or exact composition
-            name (e.g. "openshift", "postgresql", "watsonx", "event streams",
-            "openshift-production").
-        environment: Optional bias for selection: "production" or "development".
+        prompt: Natural-language composition request, e.g.
+            "gimme an openshift composition with kms and cos" or
+            "postgresql composition with a DA".
 
     Returns:
-        JSON with the best-matching composition, any alternatives, and (when
-        nothing matches) the list of available compositions to choose from.
+        JSON describing the assembled composition.
     """
     start_time = time.time()
 
     try:
-        request = GenerateModuleCompositionRequest(
-            service_or_pattern=service_or_pattern,
-            environment=environment,
-        )
+        request = GenerateModuleCompositionRequest(prompt=prompt)
 
         from .tools.composition import generate_module_composition_impl
 
@@ -887,7 +884,7 @@ async def generate_module_composition(
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"service_or_pattern": service_or_pattern, "environment": environment},
+            {"prompt": prompt},
             duration_ms,
             success=False,
             error="validation_error",
@@ -899,7 +896,7 @@ async def generate_module_composition(
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"service_or_pattern": service_or_pattern, "environment": environment},
+            {"prompt": prompt},
             duration_ms,
             success=False,
         )
@@ -910,7 +907,7 @@ async def generate_module_composition(
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"service_or_pattern": service_or_pattern, "environment": environment},
+            {"prompt": prompt},
             duration_ms,
             success=False,
             error=str(e),

@@ -151,18 +151,18 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 Keywords to detect this intent: "architecture", "build a solution", "how do I build", "what modules do I need", "compose", "production setup", "stack"
 
-1. Use **`generate_module_composition(service_or_pattern, environment)`** to get a curated, DA-anchored recommendation of the module stack. Pass a service or pattern such as `"openshift"`, `"postgresql"`, `"watsonx"`, `"event streams"`, or an exact composition name like `"vpc-landing-zone"`.
-2. Read the returned `composition`:
-   - `reference_solution` — the anchor Deployable Architecture this composition is distilled from, with a ready-to-run `fetch_hint`
-   - `recommended_modules` — the modules to instantiate (each with a resolved `version`, `source`, `instance_name`, and a `role`: `core` / `prerequisite` / `optional`)
+1. Call **`generate_module_composition(prompt)`** with the user's request verbatim (e.g. `"gimme an openshift composition with kms and cos"`). It returns a **composition JSON**, assembled live from the registry — nothing is hardcoded. (It calls `search_modules` and `get_module_details` internally, so it is slower than the other tools.)
+2. Read the returned composition:
+   - `description` — a one-line summary; `reference_solution` — the anchor DA (only when DA-grounded)
+   - `recommended_modules` — modules with their resolved `id`, `version`, `source`, `instance_name`, a `role` (foundation/support/workload), and a `purpose` (the module's live description)
    - `deployment_order` — the order to apply them
-   - `connections` — how each module's output feeds another module's input
-   - `prerequisites` — the top-level inputs to expose (API key, region, resource group, etc.)
-3. (Recommended) Run the `reference_solution.fetch_hint` (a **`get_content`** call on the DA solution) to read the ground-truth, tested wiring the composition is based on — especially for the `core` modules.
-4. For each recommended module, use **`get_module_details`** to confirm the exact input/output names before generating code — the `connections` describe intent, and the DA plus module tools confirm the precise interface.
-5. Generate the Terraform: emit one `module` block per recommended module using its `source` and `version`, wire every `connections` entry as `target_input = module.<source_module>.<source_output>`, and surface the `prerequisites` as root-level variables. Use `role` to scope the stack — keep `core`, provision `prerequisite` modules (or replace them with existing infra), and drop `optional` modules for a leaner build.
+   - `connections` — output → input wiring inferred from matching module interfaces (`origin: "inferred"`); confirm with `get_module_details`. When DA-grounded, fetch `reference_solution` with `get_content` for the authoritative wiring.
+   - `prerequisites` — top-level inputs to expose (API key, region, resource group, prefix)
+   - `notes` — caveats and anything left unwired
+3. For each `inferred` connection (and anything in `notes`), confirm the exact input/output names with **`get_module_details(<module_id>)`** before generating code. `da` connections are authoritative.
+4. Generate the Terraform: emit one `module` block per recommended module using its `source` and `version`, wire each connection as `target_input = module.<source_module>.<source_output>`, and surface the `prerequisites` as root-level variables.
 
-If `matched` is `false`, choose one of the returned `available_compositions` by name, or fall back to `search_modules` to compose modules manually.
+Mention "DA" (or "deployable architecture") in the prompt to have the wiring extracted from the deployable architecture instead of inferred.
 
 ## Resource and Tool Usage Tips
 

@@ -13,7 +13,7 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 
 | Tool | Context Weight | Primary Use |
 |------|----------------|-------------|
-| `generate_module_composition` | Lightweight | Get a recommended module stack + wiring for a common architecture pattern |
+| `generate_module_composition` | Heavy | Assemble a composition JSON from a prompt (calls the other tools live) |
 | `search_modules` | Lightweight | Find module IDs (essential first step) |
 | `get_latest_module_version` | Lightweight | Get the newest published module version and release info |
 | `list_content` | Lightweight | Discover what examples/content exist |
@@ -53,83 +53,41 @@ search_modules(query="vpc", limit=5)
 
 ## generate_module_composition
 
-Suggest a recommended Terraform IBM Modules (TIM) stack for a common architecture pattern. Given a service or pattern, it returns curated, **DA-anchored** knowledge of **which modules to use, in what order, and how to wire them together** (module outputs into other module inputs). This is the fastest way to bootstrap AI-assisted, multi-module composition.
+Assemble a composition for a natural-language request by calling the *other* TIM-MCP tools live. Given a prompt naming a pattern and the pieces to include (e.g. "gimme an openshift composition with kms and cos"), it returns a **composition JSON** — the modules, deployment order, wiring, and prerequisites — built entirely from live registry data. This is the entry point for AI-assisted, multi-module composition.
 
-Each composition is anchored to a real **Deployable Architecture (DA)** solution (`reference_solution`) — the ground-truth, CI-tested Terraform the wiring is distilled from. Output stays **module-centric** (individual registry modules the agent composes), not a pointer to deploy the DA itself.
+It holds **no static module data**. Module IDs and versions come from `search_modules`; connections are derived from the real interfaces read via `get_module_details`; and when a DA is requested, wiring is extracted from the deployable architecture via `get_content`. The result always reflects the current registry.
 
 **When to use:**
-- User asks "how do I build X on IBM Cloud" or "what modules do I need for X"
-- Starting a new multi-module Terraform solution around a service (OpenShift, PostgreSQL, watsonx, Event Streams, a VPC landing zone, etc.)
-- You need the wiring between modules, not just a flat list of modules
+- User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
+- Starting a new multi-module Terraform solution around a service
+
+**Note:** this tool makes live registry/GitHub calls per request (search + details for every module), so it is **slower** than the lightweight tools — expect a few seconds per module.
 
 **Parameters:**
 ```
-service_or_pattern (required): Service name, architecture keyword, or exact
-  composition name. Examples: "openshift", "postgresql", "watsonx",
-  "event streams", "vpc", "vpc-landing-zone"
-environment (optional): Bias selection toward "production" or "development"
+prompt (required): Natural-language composition request. Examples:
+  "gimme an openshift composition with kms and cos"
+  "postgresql composition with secrets manager"
+  "watsonx deployable architecture"   # mention "DA" for DA-grounded wiring
 ```
 
 **Returns:** JSON with:
-- `matched`: whether a composition matched
-- `composition`: the recommended stack when matched, containing:
-  - `reference_solution`: the anchor DA — `module_id`, `solution_path`, `source_url`, and a ready-to-run `fetch_hint` (a `get_content(...)` call) to pull the ground-truth DA wiring
-  - `recommended_modules`: each module's base `id`, resolved `version`, `source`, `registry_url`, a suggested `instance_name`, its `purpose`, and a `role`
-  - `deployment_order`: instance names in the order they should be applied
-  - `connections`: each `source_module.source_output` → `target_module.target_input` wiring (with an optional `note`)
-  - `prerequisites`: top-level inputs the consumer must supply (API key, region, resource group, etc.)
-  - `notes`: caveats and optional add-ons
-- `alternatives`: other compositions that also matched (summaries)
-- `available_compositions`: the full catalog, returned when nothing matched so the caller can pick one by name
+- `composition_name`, `description` (one-line summary), `prompt`, `da_grounded`
+- `reference_solution`: the anchor DA (`module_id`, `solution_path`, `source_url`) — only present when `da_grounded`
+- `recommended_modules`: each with `id`, `instance_name`, `role` (foundation/support/workload), `purpose` (the module's live registry description), resolved `version`, `source`, `registry_url` (all from `search_modules`)
+- `deployment_order`: instance names in dependency order
+- `connections`: `source_module.source_output` → `target_module.target_input` (`origin: "inferred"`) — derived from matching module interfaces (approximate; verify with `get_module_details`)
+- `prerequisites`: top-level inputs to supply (api key, region, resource group, prefix)
+- `notes`: caveats and unresolved items (e.g. an encryption input that couldn't be auto-wired)
 
-**Module `role`** (per recommended module):
-- `core` — composed by the anchor DA itself (verifiable against `reference_solution`)
-- `prerequisite` — infra the DA expects to already exist (e.g. an existing VPC or COS), provisioned here so the stack is end-to-end
-- `optional` — add-ons the DA does not include (e.g. observability); drop them for a leaner stack
-
-**Available compositions (each anchored to a DA solution):**
-| Name | Pattern | Anchor DA (`reference_solution`) |
-|------|---------|-----------------------------------|
-| `openshift` | Red Hat OpenShift (ROKS) on VPC with KMS, COS registry, Cloud Logs + Monitoring | `base-ocp-vpc/solutions/fully-configurable` |
-| `postgresql` | Managed PostgreSQL with customer-managed KMS encryption and Secrets Manager | `icd-postgresql/solutions/fully-configurable` |
-| `watsonx-ai` | watsonx.ai Studio + Runtime backed by KMS-encrypted COS storage | `watsonx-ai/solutions/fully-configurable` |
-| `vpc-landing-zone` | Multi-zone VPC with KMS-encrypted COS flow logs and Cloud Logs | `landing-zone-vpc/solutions/fully-configurable` |
-| `event-streams` | Enterprise Event Streams (Kafka) with customer-managed KMS encryption | `event-streams/solutions/security-enforced` |
+**DA grounding is opt-in:** when the prompt mentions "DA" (or "deployable architecture"), the response includes a `reference_solution` pointer to the module's deployable-architecture `solutions/` directory. Connections are always inferred from interfaces — real DAs route their wiring through locals/interpolation that can't be extracted reliably, so `reference_solution` points you at the authoritative wiring (fetch it with `get_content`) rather than the tool guessing it.
 
 **Example:**
 ```
-generate_module_composition(service_or_pattern="openshift", environment="production")
+generate_module_composition(prompt="gimme an openshift composition with kms and cos")
 ```
 
-**Recommended follow-up:** After getting a composition:
-1. Optionally run the `reference_solution.fetch_hint` (`get_content` on the DA solution) to see the live, tested wiring the composition is distilled from.
-2. Use `get_module_details` on each module to confirm exact input/output names before generating the final Terraform. The `connections` describe intent; the DA and module tools confirm the precise interface.
-
-**From response to Terraform:** each `recommended_modules` entry becomes a `module` block, and each `connections` entry becomes a `target_input = module.<source_module>.<source_output>` reference. For example, part of the `postgresql` composition maps to:
-
-```hcl
-module "resource_group" {
-  source  = "terraform-ibm-modules/resource-group/ibm"
-  version = "1.6.1"
-  # ...prerequisite inputs (resource_group_name, etc.)
-}
-
-module "kms" {
-  source            = "terraform-ibm-modules/kms-all-inclusive/ibm"
-  version           = "5.6.5"
-  resource_group_id = module.resource_group.resource_group_id   # connection
-  # ...
-}
-
-module "postgresql" {
-  source                       = "terraform-ibm-modules/icd-postgresql/ibm"
-  version                      = "4.15.3"
-  resource_group_id            = module.resource_group.resource_group_id                       # connection
-  use_ibm_owned_encryption_key = false                                                          # per connection note
-  kms_key_crn                  = module.kms.keys["postgresql-key-ring.postgresql-key"].crn      # connection
-  # ...
-}
-```
+**How to use the result:** emit one `module` block per `recommended_modules` entry (registry `source` + `version`), wire each `connections` entry as `target_input = module.<source_module>.<source_output>`, and surface `prerequisites` as root variables. Treat `inferred` connections as suggestions — confirm exact input/output names with `get_module_details` before finalizing.
 
 ---
 
@@ -416,9 +374,8 @@ For production use cases, recommend pinned versions for consistency.
 
 ### "Build a full architecture for X" (multi-module composition)
 **Goal**: Wire several modules together into a working solution
-1. `generate_module_composition` - get the recommended module stack, roles, deployment order, connections, and the `reference_solution` anchor DA (lightweight)
-2. (Optional, recommended) run `reference_solution.fetch_hint` - `get_content` on the anchor DA solution to read the live, tested wiring the composition is distilled from (heavy but authoritative)
-3. `get_module_details` - confirm the exact input/output names for each module in the stack (medium)
-4. Generate the Terraform: one `module` block per `recommended_modules` entry (using its `source` + `version`), wiring each `connections` entry as `target_input = module.<source_module>.<source_output>`, and surfacing the `prerequisites` as root variables. Use `role` to decide scope — keep `core`, provision `prerequisite` modules (or swap them for existing infra), drop `optional` ones for a leaner stack.
+1. `generate_module_composition` - returns a composition JSON assembled live (modules + versions from `search_modules`, wiring derived from interfaces, or from the DA when the prompt says "DA"); heavier, a few seconds per module
+2. Review the `connections` — `origin: "da"` are authoritative; `origin: "inferred"` are approximate, so confirm those with `get_module_details` (medium)
+3. Generate the Terraform: one `module` block per `recommended_modules` entry (registry `source` + `version`), wiring each `connections` entry as `target_input = module.<source_module>.<source_output>`, and surfacing `prerequisites` as root variables. Address anything in `notes` (e.g. an unwired encryption input).
 
-**Why start here?** The composition encodes DA-proven wiring so you don't have to rediscover how the modules fit together; the `reference_solution` gives you the ground-truth DA to verify against, and the per-module tools confirm the precise interface before you emit code.
+**Why start here?** Everything — module IDs, versions, and wiring — comes from live discovery, so nothing is hardcoded to go stale.
