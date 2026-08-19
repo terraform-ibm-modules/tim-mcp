@@ -205,6 +205,30 @@ async def test_modules_have_role_and_purpose(config):
 
 
 @pytest.mark.asyncio
+async def test_no_recognized_service_is_flagged(config):
+    """A prompt with no mapped service (only the RG foundation) is flagged."""
+    c = await _run(config, "help me build a cool web application")
+    assert [m.instance_name for m in c.recommended_modules] == ["resource_group"]
+    assert any("No IBM Cloud services were recognised" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_unmapped_workload_is_flagged(config):
+    """A recognised support service but an unmapped workload (Db2) is flagged."""
+    c = await _run(config, "set up a Db2 database with kms encryption")
+    instances = {m.instance_name for m in c.recommended_modules}
+    assert instances == {"resource_group", "kms"}  # Db2 isn't mapped
+    assert any("No primary workload/service was recognised" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_recognised_workload_has_no_unmapped_note(config):
+    """A fully-recognised request doesn't get the unmapped/unrecognised notes."""
+    c = await _run(config, "postgresql with kms")
+    assert not any("recognised" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
 async def test_unresolvable_request_raises(config, monkeypatch):
     async def none_search(svc, config):
         return None

@@ -186,6 +186,28 @@ _SERVICES: list[_Service] = [
 # Workload services imply a VPC network foundation.
 _NEEDS_VPC = {"openshift", "iks"}
 
+# Generic words signalling the user wants a primary service/workload. Used only to
+# warn when none of our mapped services matched as the workload (e.g. a Db2 request);
+# this is intent detection, not a catalog of unsupported services.
+_WORKLOAD_INTENT = (
+    "database",
+    "db",
+    "cluster",
+    "service",
+    "instance",
+    "application",
+    "app",
+    "workload",
+    "platform",
+)
+
+
+def _wants_workload(prompt: str) -> bool:
+    """Whether the prompt seems to ask for a primary service/workload."""
+    p = prompt.lower()
+    return any(re.search(rf"\b{w}\b", p) for w in _WORKLOAD_INTENT)
+
+
 # Input names that are top-level prerequisites, not inter-module connections.
 _PREREQ_INPUTS = {
     "region",
@@ -531,6 +553,26 @@ async def generate_module_composition_impl(
                     f"{e['instance']}.{inp} expects a KMS key CRN — wire it from your key "
                     "management module (confirm the exact output with get_module_details)."
                 )
+
+    # Flag when we recognised no service, or no primary workload, so unmapped
+    # services aren't dropped silently. Derived from the current service map (no
+    # separate list of "unsupported" services to maintain).
+    resolved_services = [e["svc"] for e in resolved]
+    non_foundation = [s for s in resolved_services if s.key != "resource_group"]
+    has_workload = any(s.priority >= 5 for s in resolved_services)
+    if not non_foundation:
+        notes.insert(
+            0,
+            "No IBM Cloud services were recognised in the request. Name the services "
+            "you want (e.g. 'openshift with kms and cos'), or use search_modules to "
+            "find modules and add them.",
+        )
+    elif not has_workload and _wants_workload(request.prompt):
+        notes.insert(
+            0,
+            "No primary workload/service was recognised. If you named a service the "
+            "tool doesn't map yet, find it with search_modules and add it manually.",
+        )
 
     primary = next((e for e in resolved if e["svc"].priority == 5), resolved[-1])
     composition_name = f"{primary['svc'].key}-composition"
