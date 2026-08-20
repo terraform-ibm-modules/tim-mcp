@@ -8,7 +8,7 @@ the TIM-MCP server for request/response validation and schema generation.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
 class ModuleSearchRequest(BaseModel):
@@ -231,16 +231,37 @@ class ErrorDetail(BaseModel):
 class GenerateModuleCompositionRequest(BaseModel):
     """Request model for the module composition tool."""
 
-    prompt: str = Field(
-        ...,
-        min_length=1,
+    services: list[str] | None = Field(
+        None,
         description=(
-            "A natural-language composition request naming a pattern and the "
-            "pieces to include, e.g. 'gimme an openshift composition with kms "
-            "and cos'. Mention 'DA' to ground the wiring in the deployable "
-            "architecture."
+            "Preferred: the services to compose, as plain terms the caller "
+            "identified from the user's request (e.g. ['openshift', 'kms', "
+            "'cos']). Each is resolved to a real module via search_modules. Use "
+            "this instead of relying on the tool's keyword parsing of 'prompt'."
         ),
     )
+    prompt: str | None = Field(
+        None,
+        description=(
+            "Fallback: a natural-language request (e.g. 'gimme an openshift "
+            "composition with kms and cos'). Used when 'services' is not given; "
+            "the tool then parses services from it. Mention 'DA' to ground the "
+            "wiring in the deployable architecture."
+        ),
+    )
+    include_da: bool = Field(
+        False,
+        description=(
+            "Set true to add a deployable-architecture reference_solution "
+            "pointer (equivalent to mentioning 'DA' in the prompt)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _require_input(self) -> "GenerateModuleCompositionRequest":
+        if not self.services and not (self.prompt and self.prompt.strip()):
+            raise ValueError("Provide 'services' or a non-empty 'prompt'.")
+        return self
 
 
 class RecommendedModule(BaseModel):

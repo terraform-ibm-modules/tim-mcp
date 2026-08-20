@@ -151,7 +151,7 @@ Keywords to detect this intent: "create", "build", "inputs", "outputs", "develop
 
 Keywords to detect this intent: "architecture", "build a solution", "how do I build", "what modules do I need", "compose", "production setup", "stack"
 
-1. Call **`generate_module_composition(prompt)`** with the user's request verbatim (e.g. `"gimme an openshift composition with kms and cos"`). It returns a **composition JSON**, assembled live from the registry — nothing is hardcoded. (It calls `search_modules` and `get_module_details` internally, so it is slower than the other tools.)
+1. Call **`generate_module_composition`**. Prefer passing the **`services`** you identified from the user's request (e.g. `services=["openshift", "kms", "cos"]`) — this is more reliable than having the tool re-parse text. Use `prompt` only as a fallback, and set `include_da=true` (or mention "DA") for DA grounding. It returns a **composition JSON**, assembled live from the registry — nothing is hardcoded. (It calls `search_modules` and `get_module_details` internally, so it is slower than the other tools.)
 2. Read the returned composition:
    - `description` — a one-line summary; `reference_solution` — the anchor DA (only when DA-grounded)
    - `recommended_modules` — modules with their resolved `id`, `version`, `source`, `instance_name`, a `role` (foundation/support/workload), and a `purpose` (the module's live description)

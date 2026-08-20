@@ -819,15 +819,25 @@ async def get_module_dependency(module_id: str) -> str:
 
 
 @mcp.tool()
-async def generate_module_composition(prompt: str) -> str:
+async def generate_module_composition(
+    services: list[str] | None = None,
+    prompt: str | None = None,
+    include_da: bool = False,
+) -> str:
     """
-    Assemble a Terraform IBM Modules (TIM) composition from a natural-language prompt.
+    Assemble a Terraform IBM Modules (TIM) composition JSON.
 
-    Given a request naming a pattern and the pieces to include (e.g. "gimme an
-    openshift composition with kms and cos"), this returns a composition JSON. It
-    builds the composition LIVE by calling the other TIM-MCP tools — nothing is
-    hardcoded: module IDs and versions come from `search_modules`, and connections
-    are derived from the real module interfaces read via `get_module_details`.
+    Returns the modules, deployment order, and wiring for an IBM Cloud
+    architecture. It builds the composition LIVE by calling the other TIM-MCP
+    tools — nothing is hardcoded: module IDs and versions come from
+    `search_modules`, and connections are derived from the real module interfaces
+    read via `get_module_details`.
+
+    PREFERRED USAGE — pass `services`:
+    You (the model) already understand the user's request, so extract the services
+    and pass them as `services` (e.g. ["openshift", "kms", "cos"]). Each is
+    resolved to a real module. This is more reliable than the tool re-parsing free
+    text. Use `prompt` only as a fallback when you don't want to pre-extract.
 
     WHEN TO USE:
     - User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
@@ -842,19 +852,18 @@ async def generate_module_composition(prompt: str) -> str:
     - notes: caveats and unresolved items
 
     DA GROUNDING:
-    When the prompt mentions "DA" (or "deployable architecture"), the response
-    includes a reference_solution pointer to the module's deployable-architecture
-    solution. Connections are always inferred from module interfaces (approximate —
-    verify with `get_module_details`); fetch reference_solution with `get_content`
-    for the authoritative DA wiring.
+    Set `include_da=true` (or mention "DA" in `prompt`) to add a reference_solution
+    pointer to the module's deployable-architecture solution. Connections are always
+    inferred from module interfaces (approximate — verify with `get_module_details`);
+    fetch reference_solution with `get_content` for the authoritative DA wiring.
 
     NOTE: This tool makes live registry/GitHub calls per request, so it is slower
     than the lightweight tools.
 
     Args:
-        prompt: Natural-language composition request, e.g.
-            "gimme an openshift composition with kms and cos" or
-            "postgresql composition with a DA".
+        services: Preferred — service terms you extracted, e.g. ["openshift", "kms", "cos"].
+        prompt: Fallback natural-language request, e.g. "openshift composition with kms and cos".
+        include_da: Add a deployable-architecture reference_solution pointer.
 
     Returns:
         JSON describing the assembled composition.
@@ -862,7 +871,9 @@ async def generate_module_composition(prompt: str) -> str:
     start_time = time.time()
 
     try:
-        request = GenerateModuleCompositionRequest(prompt=prompt)
+        request = GenerateModuleCompositionRequest(
+            services=services, prompt=prompt, include_da=include_da
+        )
 
         from .tools.composition import generate_module_composition_impl
 
@@ -884,7 +895,7 @@ async def generate_module_composition(prompt: str) -> str:
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"prompt": prompt},
+            {"services": services, "prompt": prompt, "include_da": include_da},
             duration_ms,
             success=False,
             error="validation_error",
@@ -896,7 +907,7 @@ async def generate_module_composition(prompt: str) -> str:
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"prompt": prompt},
+            {"services": services, "prompt": prompt, "include_da": include_da},
             duration_ms,
             success=False,
         )
@@ -907,7 +918,7 @@ async def generate_module_composition(prompt: str) -> str:
         log_tool_execution(
             logger,
             "generate_module_composition",
-            {"prompt": prompt},
+            {"services": services, "prompt": prompt, "include_da": include_da},
             duration_ms,
             success=False,
             error=str(e),

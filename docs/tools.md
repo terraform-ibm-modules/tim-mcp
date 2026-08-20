@@ -55,7 +55,7 @@ search_modules(query="vpc", limit=5)
 
 Assemble a composition for a natural-language request by calling the *other* TIM-MCP tools live. Given a prompt naming a pattern and the pieces to include (e.g. "gimme an openshift composition with kms and cos"), it returns a **composition JSON** — the modules, deployment order, wiring, and prerequisites — built entirely from live registry data. This is the entry point for AI-assisted, multi-module composition.
 
-It holds **no static module data**. Module IDs and versions come from `search_modules`; connections are derived from the real interfaces read via `get_module_details`; and when a DA is requested, wiring is extracted from the deployable architecture via `get_content`. The result always reflects the current registry.
+It holds **no static module data**. Module IDs and versions come from `search_modules`; connections are derived from the real interfaces read via `get_module_details`; and when a DA is requested, a `reference_solution` pointer to the deployable architecture is added (fetch it with `get_content` for the authoritative wiring). The result always reflects the current registry.
 
 **When to use:**
 - User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
@@ -65,11 +65,14 @@ It holds **no static module data**. Module IDs and versions come from `search_mo
 
 **Parameters:**
 ```
-prompt (required): Natural-language composition request. Examples:
-  "gimme an openshift composition with kms and cos"
-  "postgresql composition with secrets manager"
-  "watsonx deployable architecture"   # mention "DA" for DA-grounded wiring
+services (preferred): The services to compose, as plain terms you extracted from
+  the user's request, e.g. ["openshift", "kms", "cos"]. Each is resolved to a real
+  module — more reliable than having the tool re-parse free text.
+prompt (fallback): Natural-language request, used when `services` is not given, e.g.
+  "gimme an openshift composition with kms and cos". Mention "DA" for DA grounding.
+include_da (optional): true to add a deployable-architecture reference_solution pointer.
 ```
+Provide `services` or `prompt` (at least one).
 
 **Returns:** JSON with:
 - `composition_name`, `description` (one-line summary), `prompt`, `da_grounded`

@@ -88,9 +88,12 @@ def mock_live_calls(monkeypatch):
     monkeypatch.setattr(comp, "_fetch_interface", fake_fetch_interface)
 
 
-async def _run(config, prompt):
+async def _run(config, prompt=None, services=None, include_da=False):
     return await comp.generate_module_composition_impl(
-        GenerateModuleCompositionRequest(prompt=prompt), config
+        GenerateModuleCompositionRequest(
+            prompt=prompt, services=services, include_da=include_da
+        ),
+        config,
     )
 
 
@@ -229,10 +232,43 @@ async def test_recognised_workload_has_no_unmapped_note(config):
 
 
 @pytest.mark.asyncio
+async def test_services_input_bypasses_prompt_parsing(config):
+    """An explicit services list is resolved directly (no prompt needed)."""
+    c = await _run(config, services=["openshift", "kms", "cos"])
+    instances = {m.instance_name for m in c.recommended_modules}
+    # known terms map to known services; cluster still pulls in a VPC
+    assert {"resource_group", "openshift", "kms", "cos", "vpc"} <= instances
+
+
+@pytest.mark.asyncio
+async def test_services_input_skips_unrecognized_notes(config):
+    """The keyword-path 'nothing recognised' notes don't fire for explicit services."""
+    c = await _run(config, services=["kms"])
+    assert not any("recognised" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_include_da_flag_sets_reference_solution(config, monkeypatch):
+    async def fake_solution(module, config):
+        return "solutions/fully-configurable"
+
+    monkeypatch.setattr(comp, "_resolve_da_solution", fake_solution)
+    c = await _run(config, services=["postgresql", "kms"], include_da=True)
+    assert c.da_grounded is True
+    assert c.reference_solution is not None
+
+
+def test_request_requires_services_or_prompt():
+    """The request model rejects empty input."""
+    with pytest.raises(ValueError):
+        GenerateModuleCompositionRequest()
+
+
+@pytest.mark.asyncio
 async def test_unresolvable_request_raises(config, monkeypatch):
     async def none_search(svc, config):
         return None
 
     monkeypatch.setattr(comp, "_search_best", none_search)
     with pytest.raises(TIMError):
-        await _run(config, "openshift with kms")
+        await _run(config, prompt="openshift with kms")

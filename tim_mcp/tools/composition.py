@@ -229,6 +229,18 @@ def _mentions_da(prompt: str) -> bool:
     return re.search(r"\bda\b", p) is not None
 
 
+_SVC_BY_KEY = {s.key: s for s in _SERVICES}
+
+
+def _finalize(picked: dict[str, _Service]) -> list[_Service]:
+    """Add the RG foundation + a VPC for clusters, then sort by deployment order."""
+    if "resource_group" not in picked:
+        picked["resource_group"] = _SVC_BY_KEY["resource_group"]
+    if _NEEDS_VPC & set(picked) and "vpc" not in picked:
+        picked["vpc"] = _SVC_BY_KEY["vpc"]
+    return sorted(picked.values(), key=lambda s: (s.priority, s.key))
+
+
 def _detect_services(prompt: str) -> list[_Service]:
     """Classify which services the prompt asks for (deduped, deployment-ordered)."""
     p = f" {prompt.lower()} "
@@ -238,17 +250,45 @@ def _detect_services(prompt: str) -> list[_Service]:
             continue
         if any(kw in p for kw in svc.keywords):
             picked[svc.key] = svc
+    return _finalize(picked)
 
-    # Always include a resource group foundation.
-    if "resource_group" not in picked:
-        picked["resource_group"] = next(
-            s for s in _SERVICES if s.key == "resource_group"
-        )
-    # Cluster workloads need a VPC.
-    if _NEEDS_VPC & set(picked) and "vpc" not in picked:
-        picked["vpc"] = next(s for s in _SERVICES if s.key == "vpc")
 
-    return sorted(picked.values(), key=lambda s: (s.priority, s.key))
+def _match_known(term: str) -> _Service | None:
+    """Map a caller-supplied service term to a known _Service, or None."""
+    t = f" {term.lower().strip()} "
+    slug_key = re.sub(r"[^a-z0-9]+", "_", term.lower().strip()).strip("_")
+    for svc in _SERVICES:
+        if svc.key == slug_key or svc.instance == slug_key:
+            return svc
+        if any(kw in t for kw in svc.keywords):
+            return svc
+    return None
+
+
+def _adhoc_service(term: str) -> _Service:
+    """Build a generic workload _Service for a term not in the known map."""
+    slug = re.sub(r"[^a-z0-9]+", "-", term.lower().strip()).strip("-") or "service"
+    inst = slug.replace("-", "_")
+    return _Service(
+        key=inst,
+        display=term.strip(),
+        instance=inst,
+        query=term.strip(),
+        keywords=[term.lower()],
+        name_match=[slug],
+        priority=5,
+    )
+
+
+def _services_from_terms(terms: list[str]) -> list[_Service]:
+    """Resolve caller-supplied service terms into _Service entries (ordered)."""
+    picked: dict[str, _Service] = {}
+    for term in terms:
+        if not term or not term.strip():
+            continue
+        svc = _match_known(term) or _adhoc_service(term)
+        picked.setdefault(svc.key, svc)
+    return _finalize(picked)
 
 
 def _is_connectable(input_name: str) -> bool:
@@ -465,9 +505,14 @@ def _standard_prerequisites() -> list[CompositionPrerequisite]:
 async def generate_module_composition_impl(
     request: GenerateModuleCompositionRequest, config: Config
 ) -> ModuleComposition:
-    """Assemble a composition live from the registry for the given prompt."""
-    services = _detect_services(request.prompt)
-    da = _mentions_da(request.prompt)
+    """Assemble a composition live from the registry for the request."""
+    prompt_text = (request.prompt or "").strip()
+    # Prefer the caller-supplied service list; fall back to parsing the prompt.
+    if request.services:
+        services = _services_from_terms(request.services)
+    else:
+        services = _detect_services(prompt_text)
+    da = request.include_da or (bool(prompt_text) and _mentions_da(prompt_text))
     notes: list[str] = []
 
     # 1. Resolve each service to a real module + version via search_modules.
@@ -554,32 +599,35 @@ async def generate_module_composition_impl(
                     "management module (confirm the exact output with get_module_details)."
                 )
 
-    # Flag when we recognised no service, or no primary workload, so unmapped
-    # services aren't dropped silently. Derived from the current service map (no
-    # separate list of "unsupported" services to maintain).
-    resolved_services = [e["svc"] for e in resolved]
-    non_foundation = [s for s in resolved_services if s.key != "resource_group"]
-    has_workload = any(s.priority >= 5 for s in resolved_services)
-    if not non_foundation:
-        notes.insert(
-            0,
-            "No IBM Cloud services were recognised in the request. Name the services "
-            "you want (e.g. 'openshift with kms and cos'), or use search_modules to "
-            "find modules and add them.",
-        )
-    elif not has_workload and _wants_workload(request.prompt):
-        notes.insert(
-            0,
-            "No primary workload/service was recognised. If you named a service the "
-            "tool doesn't map yet, find it with search_modules and add it manually.",
-        )
+    # For the prompt path, flag when we recognised no service or no primary
+    # workload, so unmapped services aren't dropped silently. Skipped when the
+    # caller passed an explicit `services` list (nothing was guessed).
+    if not request.services:
+        resolved_services = [e["svc"] for e in resolved]
+        non_foundation = [s for s in resolved_services if s.key != "resource_group"]
+        has_workload = any(s.priority >= 5 for s in resolved_services)
+        if not non_foundation:
+            notes.insert(
+                0,
+                "No IBM Cloud services were recognised in the request. Name the "
+                "services you want (e.g. 'openshift with kms and cos'), or use "
+                "search_modules to find modules and add them.",
+            )
+        elif not has_workload and _wants_workload(prompt_text):
+            notes.insert(
+                0,
+                "No primary workload/service was recognised. If you named a service "
+                "the tool doesn't map yet, find it with search_modules and add it "
+                "manually.",
+            )
 
     primary = next((e for e in resolved if e["svc"].priority == 5), resolved[-1])
     composition_name = f"{primary['svc'].key}-composition"
+    effective_prompt = prompt_text or "services: " + ", ".join(request.services or [])
 
     logger.info(
         "Assembled composition",
-        prompt=request.prompt,
+        request=effective_prompt,
         modules=len(resolved),
         connections=len(connections),
         da_grounded=reference_solution is not None,
@@ -588,7 +636,7 @@ async def generate_module_composition_impl(
     return ModuleComposition(
         composition_name=composition_name,
         description=_describe([e["svc"] for e in resolved]),
-        prompt=request.prompt,
+        prompt=effective_prompt,
         da_grounded=reference_solution is not None,
         reference_solution=reference_solution,
         recommended_modules=[
