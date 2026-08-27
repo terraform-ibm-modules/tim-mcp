@@ -15,42 +15,74 @@ from tim_mcp.exceptions import TIMError
 from tim_mcp.tools import composition as comp
 from tim_mcp.types import GenerateModuleCompositionRequest
 
+
+def _inputs(*names, required=(), types=None):
+    """Build the {name: metadata} interface shape returned by _fetch_interface."""
+    types = types or {}
+    return {
+        n: {"type": types.get(n, "string"), "required": n in required} for n in names
+    }
+
+
 # Fake module interfaces keyed by service instance name.
 _FAKE = {
     "resource_group": {
         "id": "terraform-ibm-modules/resource-group/ibm",
         "version": "1.6.1",
-        "inputs": {"resource_group_name"},
+        "inputs": _inputs("resource_group_name"),
         "outputs": {"resource_group_id"},
     },
     "kms": {
         "id": "terraform-ibm-modules/kms-all-inclusive/ibm",
         "version": "5.6.5",
-        "inputs": {"resource_group_id", "region"},
+        "inputs": _inputs("resource_group_id", "region"),
         "outputs": {"key_crn", "kms_guid"},
     },
     "vpc": {
         "id": "terraform-ibm-modules/landing-zone-vpc/ibm",
         "version": "9.2.1",
-        "inputs": {"resource_group_id", "region"},
+        "inputs": _inputs("resource_group_id", "region"),
         "outputs": {"vpc_id", "subnet_detail_map"},
     },
     "cos": {
         "id": "terraform-ibm-modules/cos/ibm",
         "version": "10.17.5",
-        "inputs": {"resource_group_id", "kms_key_crn"},
-        "outputs": {"cos_instance_id", "cos_instance_crn"},
+        "inputs": _inputs("resource_group_id", "kms_key_crn"),
+        # cos re-exports the key CRN it was given — a name-identical output
+        # that must not be mistaken for the source of that value.
+        "outputs": {"cos_instance_id", "cos_instance_crn", "kms_key_crn"},
     },
     "openshift": {
         "id": "terraform-ibm-modules/base-ocp-vpc/ibm",
         "version": "3.90.4",
-        "inputs": {"resource_group_id", "vpc_id", "existing_cos_id", "region"},
+        "inputs": _inputs(
+            "resource_group_id",
+            "vpc_id",
+            "existing_cos_id",
+            "region",
+            "worker_pools",
+            "security_group_id",
+            "cluster_name",
+            required=("existing_cos_id",),
+            types={
+                "worker_pools": (
+                    "list(object({ pool_name = string, "
+                    "boot_volume_encryption_kms_config = string }))"
+                )
+            },
+        ),
         "outputs": {"cluster_id"},
+    },
+    "secrets_manager": {
+        "id": "terraform-ibm-modules/secrets-manager/ibm",
+        "version": "2.6.0",
+        "inputs": _inputs("resource_group_id", "region"),
+        "outputs": {"secrets_manager_crn", "secrets_manager_guid"},
     },
     "postgresql": {
         "id": "terraform-ibm-modules/icd-postgresql/ibm",
         "version": "4.15.3",
-        "inputs": {"resource_group_id", "kms_key_crn"},
+        "inputs": _inputs("resource_group_id", "kms_key_crn"),
         "outputs": {"id"},
     },
 }
@@ -145,6 +177,110 @@ async def test_exact_and_alias_connections_inferred(config):
     assert ("kms", "key_crn", "cos", "kms_key_crn") in pairs
 
 
+def _by_target(composition, instance, input_name):
+    return next(
+        (
+            cn
+            for cn in composition.connections
+            if cn.target_module == instance and cn.target_input == input_name
+        ),
+        None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_renamed_link_wired_by_kind(config):
+    """existing_cos_id wires to the cos module's *_id output, and is marked."""
+    c = await _run(config, "openshift with kms and cos")
+    cn = _by_target(c, "openshift", "existing_cos_id")
+    assert cn is not None
+    assert (cn.source_module, cn.source_output) == ("cos", "cos_instance_id")
+    assert cn.origin == "inferred-kind"
+
+
+@pytest.mark.asyncio
+async def test_exact_match_keeps_high_confidence_origin(config):
+    """Tier 0 wins where it applies and stays plain 'inferred'."""
+    c = await _run(config, "openshift with kms and cos")
+    cn = _by_target(c, "openshift", "vpc_id")
+    assert cn is not None and cn.origin == "inferred"
+
+
+@pytest.mark.asyncio
+async def test_kind_match_does_not_drift_to_unrelated_id(config):
+    """
+    security_group_id names no module in the composition, so it must stay
+    unwired rather than grabbing some other module's *_id output.
+    """
+    c = await _run(config, "openshift with kms and cos")
+    assert _by_target(c, "openshift", "security_group_id") is None
+    assert any("security_group_id" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_self_reference_is_not_wired(config):
+    """cluster_name can't wire from the cluster module consuming it."""
+    c = await _run(config, "openshift with kms and cos")
+    assert _by_target(c, "openshift", "cluster_name") is None
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_output_is_flagged_not_guessed(config, monkeypatch):
+    """Two equally-plausible *_id outputs: refuse to wire, and say so."""
+    monkeypatch.setitem(
+        _FAKE["cos"], "outputs", {"primary_id", "secondary_id", "cos_instance_crn"}
+    )
+    c = await _run(config, "openshift with kms and cos")
+    assert _by_target(c, "openshift", "existing_cos_id") is None
+    assert any(
+        "existing_cos_id" in n and "primary_id, secondary_id" in n for n in c.notes
+    )
+
+
+@pytest.mark.asyncio
+async def test_unwired_input_is_reported_with_reason(config):
+    """A required input with no source module is named in the notes."""
+    c = await _run(config, "openshift with kms")
+    note = next(n for n in c.notes if n.startswith("openshift:"))
+    assert "existing_cos_id (required)" in note
+    assert "no 'cos' module in this composition" in note
+
+
+@pytest.mark.asyncio
+async def test_nested_object_input_is_flagged(config):
+    """worker_pools carries KMS config inside a list(object) — detect and note."""
+    c = await _run(config, "openshift with kms and cos")
+    assert any("worker_pools" in n and "nested" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_re_exported_output_is_not_treated_as_the_source(config):
+    """
+    cos re-exports kms_key_crn under the same name. The key comes from kms —
+    wiring it from cos would invent a dependency on the wrong module.
+    """
+    c = await _run(config, "postgresql with kms and cos")
+    cn = _by_target(c, "postgresql", "kms_key_crn")
+    assert cn is not None
+    assert (cn.source_module, cn.source_output) == ("kms", "key_crn")
+    assert cn.origin == "inferred-alias"
+
+
+@pytest.mark.asyncio
+async def test_re_export_not_wired_when_the_owning_kind_is_absent(config):
+    """With no kms module, cos's same-named output is still not the source."""
+    c = await _run(config, services=["postgresql", "cos"])
+    assert _by_target(c, "postgresql", "kms_key_crn") is None
+    assert any("kms_key_crn" in n and "no 'kms' module" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
+async def test_secrets_manager_is_not_a_kms_source(config):
+    """Secrets Manager consumes key CRNs, it doesn't produce them."""
+    c = await _run(config, services=["postgresql", "secrets_manager"])
+    assert _by_target(c, "postgresql", "kms_key_crn") is None
+
+
 @pytest.mark.asyncio
 async def test_cluster_pulls_in_vpc(config):
     c = await _run(config, "openshift with kms")
@@ -164,7 +300,7 @@ async def test_deployment_order_is_dependency_ordered(config):
 async def test_no_da_means_no_da_grounding(config):
     c = await _run(config, "postgresql with kms")
     assert c.da_grounded is False
-    assert all(cn.origin == "inferred" for cn in c.connections)
+    assert all(cn.origin.startswith("inferred") for cn in c.connections)
 
 
 @pytest.mark.asyncio
@@ -178,7 +314,7 @@ async def test_da_prompt_sets_reference_solution(config, monkeypatch):
     assert c.da_grounded is True
     assert c.reference_solution is not None
     assert c.reference_solution.solution_path == "solutions/fully-configurable"
-    assert all(cn.origin == "inferred" for cn in c.connections)
+    assert all(cn.origin.startswith("inferred") for cn in c.connections)
 
 
 @pytest.mark.asyncio

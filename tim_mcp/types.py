@@ -300,7 +300,14 @@ class ModuleConnection(BaseModel):
     )
     origin: str = Field(
         "inferred",
-        description="How the connection was derived (currently always 'inferred' from module interface names)",
+        description=(
+            "How the connection was derived from module interface names: "
+            "'inferred' (exact output-name match, high confidence), "
+            "'inferred-kind' (matched on resource kind + value type), or "
+            "'inferred-alias' (matched via a naming convention such as "
+            "kms_key_crn). The latter two are name-derived — confirm them with "
+            "get_module_details before relying on them."
+        ),
     )
 
 

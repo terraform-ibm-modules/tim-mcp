@@ -7,7 +7,11 @@ by calling the *other* TIM-MCP tools live:
 
 - ``search_modules`` resolves each service to a real module ID + latest version
 - ``get_module_details`` reads each module's real inputs/outputs
-- connections are inferred from those interfaces (output name → input name)
+- connections are inferred from those interfaces: an exact output-name match
+  first, then a kind-scoped match (``existing_cos_id`` can only wire from the
+  module whose kind is ``cos``), then a small alias table for names that don't
+  carry their kind (``kms_key_crn``). Anything left unwired is reported in
+  ``notes`` rather than guessed at.
 - when the prompt mentions a DA, a ``reference_solution`` pointer to the module's
   deployable-architecture ``solutions/`` directory is added (the authoritative
   wiring the agent can fetch with ``get_content``)
@@ -300,6 +304,127 @@ def _is_connectable(input_name: str) -> bool:
     ) or input_name in {"vpc_subnets"}
 
 
+# --- Kind vocabulary ------------------------------------------------------
+#
+# A module's "kind" is its service instance name (cos, kms, vpc, ...). Inputs
+# name the kind of the thing they want (existing_cos_id wants a cos), so an
+# input can be matched to a module without the names having to be identical.
+# Matching is always scoped to the modules in *this* composition, so an input
+# can never drift onto an unrelated module's similarly-typed output.
+
+# Extra spellings a kind may appear under inside an input name.
+_KIND_ALIASES: dict[str, set[str]] = {
+    # "group" is what resource_group_id reduces to once the filler token
+    # "resource" is dropped.
+    "resource_group": {"group"},
+    "cos": {"object_storage", "cos_bucket"},
+    "kms": {"key_protect", "key_management", "hpcs", "kp"},
+    "vpc": {"network"},
+    "openshift": {"ocp", "cluster"},
+    "iks": {"kubernetes", "cluster"},
+    "secrets_manager": {"sm"},
+    "event_streams": {"kafka"},
+    "cloud_logs": {"logs"},
+    "cloud_monitoring": {"monitoring"},
+    "postgresql": {"postgres"},
+    "mongodb": {"mongo"},
+}
+
+# Prefixes that mark a "bring your own" input rather than part of the kind.
+_NOISE_PREFIXES = ("use_existing_", "existing_", "provided_", "source_")
+# The value-type token an input asks for. Required: a name with no type token
+# is never wired.
+_TYPE_TOKENS = {
+    "id",
+    "ids",
+    "crn",
+    "crns",
+    "guid",
+    "guids",
+    "name",
+    "names",
+    "endpoint",
+}
+# Tokens that carry no identity and are dropped before matching the kind.
+_FILLER_TOKENS = {"instance", "resource", "service", "cloud"}
+
+# Inputs whose names don't carry their own kind, mapped to the kind that
+# produces them plus the output names to prefer, most specific first. This is
+# the deliberate escape hatch for conventions like kms_key_crn; every entry is
+# still subject to the "exactly one source module, exactly one output" guards.
+_INPUT_ALIASES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (r"kms.*key.*crn|encryption_key_crn|^key_crn$", "kms", (r"key.*crn", r"crn")),
+    (r"kms.*key.*id$", "kms", (r"key.*id", r"_id$")),
+    (r"^vpc_subnets$|^subnet_(ids|names)$", "vpc", (r"^subnets$", r"subnet")),
+    (r"bucket.*(name|crn)$", "cos", (r"bucket.*(name|crn)$",)),
+)
+
+
+def _aliases_for(entry: dict) -> set[str]:
+    """Every kind spelling that identifies this module."""
+    instance = entry["instance"]
+    return {instance} | _KIND_ALIASES.get(instance, set())
+
+
+def _split_input(input_name: str) -> tuple[str, str] | None:
+    """
+    Split an input name into (kind, type), or None when it names no kind.
+
+    ``existing_cos_id`` -> ("cos", "id"); ``kms_key_crn`` -> ("kms_key", "crn")
+    (no module is a "kms_key", so that one falls through to the alias table).
+    """
+    name = input_name.lower()
+    for prefix in _NOISE_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix) :]
+            break
+    parts = name.split("_")
+    if len(parts) < 2 or parts[-1] not in _TYPE_TOKENS:
+        return None
+    kind_parts = [p for p in parts[:-1] if p and p not in _FILLER_TOKENS]
+    if not kind_parts:
+        return None
+    return "_".join(kind_parts), parts[-1]
+
+
+def _pick_output(
+    instance: str, outputs: set[str], kind: str, type_token: str
+) -> tuple[str | None, str]:
+    """
+    Choose the one output of ``instance`` that satisfies (kind, type).
+
+    Returns (output, "") on a unique match, else (None, reason). Ambiguity is
+    never resolved by guessing — an unwired input with a stated reason is
+    better than a confidently wrong wire.
+    """
+    candidates = sorted(
+        o for o in outputs if o == type_token or o.endswith(f"_{type_token}")
+    )
+    if not candidates:
+        return None, f"{instance} exposes no '{type_token}' output"
+    kind_tokens = set(kind.split("_"))
+    ranks = (
+        [
+            o
+            for o in candidates
+            if o in {f"{kind}_{type_token}", f"{kind}_instance_{type_token}"}
+        ],
+        [o for o in candidates if kind_tokens <= set(o.split("_"))],
+        # ICD-style modules expose a bare `id`/`crn` as their primary output.
+        [o for o in candidates if o == type_token],
+        candidates,
+    )
+    for rank in ranks:
+        if len(rank) == 1:
+            return rank[0], ""
+        if len(rank) > 1:
+            return None, (
+                f"{instance} exposes several '{type_token}' outputs "
+                f"({', '.join(rank)}) — confirm the right one with get_module_details"
+            )
+    return None, f"{instance} exposes no '{type_token}' output"
+
+
 # --- Live tool calls (isolated so tests can mock them) ---------------------
 
 
@@ -332,15 +457,28 @@ async def _search_best(svc: _Service, config: Config):
 
 async def _fetch_interface(
     module_id: str, version: str, config: Config
-) -> tuple[set[str], set[str]]:
-    """Return (input_names, output_names) for a module via the registry."""
+) -> tuple[dict[str, dict], set[str]]:
+    """
+    Return (inputs, output_names) for a module via the registry.
+
+    Inputs are keyed by name and carry the registry's ``type``/``required``
+    metadata: the matcher needs the type to spot nested (object) inputs it
+    cannot wire, and ``required`` to rank the gaps it reports.
+    """
     namespace, name, provider = parse_module_id(module_id)
     async with TerraformClient(
         config, cache=get_cache(), rate_limiter=get_rate_limiter()
     ) as tc:
         data = await tc.get_module_details(namespace, name, provider, version)
     root = data.get("root", {})
-    inputs = {i.get("name", "") for i in root.get("inputs", [])}
+    inputs = {
+        i["name"]: {
+            "type": i.get("type", "") or "",
+            "required": bool(i.get("required", False)),
+        }
+        for i in root.get("inputs", [])
+        if i.get("name")
+    }
     outputs = {o.get("name", "") for o in root.get("outputs", [])}
     return inputs, outputs
 
@@ -396,62 +534,256 @@ async def _resolve_da_solution(module, config: Config) -> str | None:
 # --- Assembly -------------------------------------------------------------
 
 
-def _infer_connections(modules: list[dict]) -> list[ModuleConnection]:
+def _conn(source, output, target, input_name, origin) -> ModuleConnection:
+    return ModuleConnection(
+        source_module=source["instance"],
+        source_output=output,
+        target_module=target["instance"],
+        target_input=input_name,
+        origin=origin,
+    )
+
+
+def _match_input(
+    input_name: str, target: dict, earlier: list[dict], later: list[dict]
+) -> tuple[ModuleConnection | None, str, bool]:
+    """
+    Resolve one input against the modules deployed before it.
+
+    Returns (connection, reason, source_found). On a miss the reason explains
+    the gap, and source_found says whether a plausible source module was in the
+    composition at all (i.e. whether this is a refusal or simply absent).
+    """
+    # Which module *owns* this input's value: the one whose kind the input
+    # names (existing_cos_id -> cos), or the kind the alias table points at
+    # (kms_key_crn -> kms). Identity beats name coincidence — modules re-export
+    # values they consumed (cos also outputs kms_key_crn), and wiring from the
+    # re-exporter would invent a dependency on the wrong module.
+    kind, type_token, preferences = "", "", ()
+    matches: list[dict] = []
+    split = _split_input(input_name)
+    if split:
+        kind, type_token = split
+        matches = [s for s in earlier if kind in _aliases_for(s)]
+    wanted_kind = ""
+    if not matches:
+        for pattern, alias_kind, alias_preferences in _INPUT_ALIASES:
+            if not re.search(pattern, input_name):
+                continue
+            alias_matches = [s for s in earlier if alias_kind in _aliases_for(s)]
+            if alias_matches:
+                kind, preferences, matches = (
+                    alias_kind,
+                    alias_preferences,
+                    alias_matches,
+                )
+                break
+            wanted_kind = wanted_kind or alias_kind
+
+    if len(matches) > 1:
+        names = ", ".join(m["instance"] for m in matches)
+        return None, f"'{kind}' matches more than one module ({names})", True
+
+    if matches:
+        source = matches[0]
+        # Exact output name, from the owning module: the confident match.
+        if input_name in source["outputs"]:
+            return _conn(source, input_name, target, input_name, "inferred"), "", True
+        if preferences:
+            # Alias tier: the input doesn't carry its kind, so the output to
+            # use is named by convention rather than derived from the name.
+            for preference in preferences:
+                hits = sorted(o for o in source["outputs"] if re.search(preference, o))
+                if len(hits) == 1:
+                    return (
+                        _conn(source, hits[0], target, input_name, "inferred-alias"),
+                        "",
+                        True,
+                    )
+                if len(hits) > 1:
+                    return (
+                        None,
+                        (
+                            f"{source['instance']} exposes several matching outputs "
+                            f"({', '.join(hits)}) — confirm the right one with "
+                            "get_module_details"
+                        ),
+                        True,
+                    )
+            return None, f"{source['instance']} exposes no matching output", True
+        # Kind tier: same kind, same value type, one unambiguous output.
+        output, reason = _pick_output(
+            source["instance"], source["outputs"], kind, type_token
+        )
+        if output:
+            return _conn(source, output, target, input_name, "inferred-kind"), "", True
+        return None, reason, True
+
+    # No module owns this input's kind. An exact output-name match anywhere in
+    # the composition is still a strong signal, so fall back to it — unless the
+    # alias table already told us which kind this input wants and that kind is
+    # missing, in which case a same-named output is a re-export, not the source.
+    if not wanted_kind:
+        for source in earlier:
+            if input_name in source["outputs"]:
+                return (
+                    _conn(source, input_name, target, input_name, "inferred"),
+                    "",
+                    True,
+                )
+
+    kind = wanted_kind or kind
+    if not kind:
+        return None, "no matching module in this composition", False
+    # The counterpart may be in the composition but deployed later — a real
+    # link that the current (priority-based) order can't express.
+    downstream = [s["instance"] for s in later if kind in _aliases_for(s)]
+    if downstream:
+        return (
+            None,
+            f"{', '.join(downstream)} is deployed after {target['instance']} in this "
+            "order — reorder the modules or wire this one manually",
+            True,
+        )
+    return None, f"no '{kind}' module in this composition", False
+
+
+def _worth_reporting(input_name: str, target: dict, source_found: bool) -> bool:
+    """
+    Whether an unwired input is a real gap worth a note.
+
+    ``_is_connectable`` is deliberately generous, so it also catches inputs that
+    were never cross-module references: a module naming its own resource
+    (``cluster_name`` on the cluster, ``existing_cos_instance_id`` on cos) and
+    plain naming inputs (``dns_binding_name``). Reporting those buries the
+    genuine gaps.
+    """
+    if source_found:
+        return True
+    split = _split_input(input_name)
+    if not split:
+        return True
+    kind, type_token = split
+    if kind in _aliases_for(target):
+        return False  # names or re-uses the resource this module owns
+    byo = input_name.lower().startswith(_NOISE_PREFIXES)
+    return type_token not in {"name", "names"} or byo
+
+
+def _infer_connections(
+    modules: list[dict],
+) -> tuple[list[ModuleConnection], list[dict]]:
     """
     Infer connections from module interfaces.
 
     modules is an ordered list (deployment order) of dicts with keys:
-    instance, inputs (set), outputs (set).
+    instance, inputs (dict name -> metadata), outputs (set).
+
+    Returns (connections, gaps) — gaps being every connectable input that was
+    deliberately left unwired, so nothing goes missing silently.
     """
     connections: list[ModuleConnection] = []
+    gaps: list[dict] = []
     for i, target in enumerate(modules):
         for input_name in sorted(target["inputs"]):
             if not _is_connectable(input_name):
                 continue
-            # Exact output-name match from an earlier module.
-            wired = False
-            for source in modules[:i]:
-                if input_name in source["outputs"]:
-                    connections.append(
-                        ModuleConnection(
-                            source_module=source["instance"],
-                            source_output=input_name,
-                            target_module=target["instance"],
-                            target_input=input_name,
-                            origin="inferred",
-                        )
-                    )
-                    wired = True
-                    break
-            if wired:
+            connection, reason, source_found = _match_input(
+                input_name, target, modules[:i], modules[i + 1 :]
+            )
+            if connection is not None:
+                connections.append(connection)
                 continue
-            # Encryption alias: *kms*key*crn input ← a KMS module's CRN output.
-            if re.search(r"kms.*key.*crn|kms_key_crn", input_name):
-                for source in modules[:i]:
-                    if source["instance"] not in {"kms", "secrets_manager"}:
-                        continue
-                    crn_out = next(
-                        (
-                            o
-                            for o in sorted(source["outputs"])
-                            if "crn" in o and "key" in o
-                        ),
-                        None,
-                    ) or next(
-                        (o for o in sorted(source["outputs"]) if "crn" in o), None
-                    )
-                    if crn_out:
-                        connections.append(
-                            ModuleConnection(
-                                source_module=source["instance"],
-                                source_output=crn_out,
-                                target_module=target["instance"],
-                                target_input=input_name,
-                                origin="inferred",
-                            )
-                        )
-                        break
-    return connections
+            if not _worth_reporting(input_name, target, source_found):
+                continue
+            gaps.append(
+                {
+                    "instance": target["instance"],
+                    "input": input_name,
+                    "required": bool(target["inputs"][input_name].get("required")),
+                    "reason": reason,
+                    "source_found": source_found,
+                }
+            )
+    return connections, gaps
+
+
+# How many gaps to spell out per module, and how many modules to report on,
+# before falling back to a count. Real modules expose dozens of optional
+# reference inputs; the notes are a signal, not a dump.
+_GAPS_PER_MODULE = 5
+_GAP_NAMES_ONLY = 8
+_MODULES_WITH_GAPS = 8
+
+
+def _gap_notes(gaps: list[dict]) -> list[str]:
+    """One note per module summarising the inputs left unwired."""
+    by_module: dict[str, list[dict]] = {}
+    for gap in gaps:
+        by_module.setdefault(gap["instance"], []).append(gap)
+
+    notes: list[str] = []
+    for instance, module_gaps in list(by_module.items())[:_MODULES_WITH_GAPS]:
+        # Spell out what the reader can act on: required inputs, and the ones
+        # where the counterpart module is present but we refused to guess.
+        ranked = sorted(
+            module_gaps,
+            key=lambda g: (not g["required"], not g["source_found"], g["input"]),
+        )
+        shown, rest = ranked[:_GAPS_PER_MODULE], ranked[_GAPS_PER_MODULE:]
+        detail = "; ".join(
+            f"{g['input']}{' (required)' if g['required'] else ''} — {g['reason']}"
+            for g in shown
+        )
+        # The rest are named without reasons, so nothing is silently dropped.
+        tail = ""
+        if rest:
+            names = [g["input"] for g in rest[:_GAP_NAMES_ONLY]]
+            more = len(rest) - len(names)
+            tail = f" Also unwired: {', '.join(names)}"
+            tail += f" (+{more} more)." if more > 0 else "."
+        notes.append(f"{instance}: unwired inputs — {detail}.{tail}")
+    return notes
+
+
+# Nested field names that look like a reference to another module's resource.
+_NESTED_FIELD = re.compile(
+    r"\b[a-z0-9_]+(?:crn|kms)[a-z0-9_]*\b|\b[a-z0-9_]+_ids?\b", re.I
+)
+_MAX_NESTED_NOTES = 3
+
+
+def _nested_notes(modules: list[dict]) -> list[str]:
+    """
+    Flag object/list(object) inputs that carry references inside them.
+
+    ``worker_pools`` holds its own KMS config; that wiring lives inside a
+    nested field and can't be expressed as a module-level connection, so we
+    say so rather than pretend the input isn't there.
+    """
+    found: list[tuple[int, int, str]] = []
+    for order, module in enumerate(modules):
+        for name, meta in sorted(module["inputs"].items()):
+            declared = (meta.get("type") or "").strip()
+            if not declared.startswith(("object(", "list(object(")):
+                continue
+            fields = sorted({f.lower() for f in _NESTED_FIELD.findall(declared)})[:3]
+            if not fields:
+                continue
+            # Encryption/CRN references are the ones worth the reader's
+            # attention; plain nested ids (CBR rules and friends) rank below.
+            rank = 0 if any(re.search(r"crn|kms", f) for f in fields) else 1
+            found.append(
+                (
+                    rank,
+                    order,
+                    f"{module['instance']}.{name} is a nested {declared.split('(')[0]} "
+                    f"input carrying references ({', '.join(fields)}) — nested wiring "
+                    "can't be expressed as a module-level connection; read the schema "
+                    "with get_module_details.",
+                )
+            )
+    return [note for _, _, note in sorted(found)[:_MAX_NESTED_NOTES]]
 
 
 def _role_for(priority: int) -> str:
@@ -545,7 +877,7 @@ async def generate_module_composition_impl(
             logger.warning(
                 "get_module_details failed", module_id=module.id, error=str(e)
             )
-            inputs, outputs = set(), set()
+            inputs, outputs = {}, set()
             notes.append(
                 f"Could not read the interface for {module.id}; wiring may be incomplete."
             )
@@ -555,10 +887,9 @@ async def generate_module_composition_impl(
     deployment_order = [e["instance"] for e in resolved]
 
     # 3. Connections: inferred from interfaces; reference the DA when requested.
-    connections: list[ModuleConnection] = []
     # Connections are always inferred from module interfaces (real DAs route
     # their wiring through locals/interpolation that can't be extracted reliably).
-    connections = _infer_connections(resolved)
+    connections, gaps = _infer_connections(resolved)
 
     # When a DA is requested, point the agent at the authoritative DA solution.
     reference_solution: ReferenceSolution | None = None
@@ -587,17 +918,10 @@ async def generate_module_composition_impl(
                 "connections are inferred from module interfaces."
             )
 
-    # Note encryption inputs we could not wire.
-    for e in resolved:
-        for inp in e["inputs"]:
-            if re.search(r"kms.*key.*crn|kms_key_crn", inp) and not any(
-                c.target_module == e["instance"] and c.target_input == inp
-                for c in connections
-            ):
-                notes.append(
-                    f"{e['instance']}.{inp} expects a KMS key CRN — wire it from your key "
-                    "management module (confirm the exact output with get_module_details)."
-                )
+    # Report every connectable input left unwired, plus nested inputs whose
+    # references can't be expressed as module-level connections.
+    notes.extend(_gap_notes(gaps))
+    notes.extend(_nested_notes(resolved))
 
     # For the prompt path, flag when we recognised no service or no primary
     # workload, so unmapped services aren't dropped silently. Skipped when the
