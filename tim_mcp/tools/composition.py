@@ -21,6 +21,7 @@ time. The only baked-in knowledge is a lightweight map of service keywords →
 search terms used to classify the prompt.
 """
 
+import asyncio
 import re
 
 from ..clients.terraform_client import TerraformClient
@@ -838,6 +839,27 @@ def _standard_prerequisites() -> list[CompositionPrerequisite]:
     ]
 
 
+async def _resolve_service(svc: _Service, config: Config):
+    """Search for one service's module; None when it can't be resolved."""
+    try:
+        return await _search_best(svc, config)
+    except Exception as e:  # noqa: BLE001 - one service failing isn't fatal
+        logger.warning("search_modules failed", service=svc.key, error=str(e))
+        return None
+
+
+async def _interface_for(
+    entry: dict, config: Config
+) -> tuple[dict[str, dict], set[str]] | None:
+    """Read one module's interface; None when it can't be read."""
+    module = entry["module"]
+    try:
+        return await _fetch_interface(module.id, module.version, config)
+    except Exception as e:  # noqa: BLE001 - wiring degrades, the tool still answers
+        logger.warning("get_module_details failed", module_id=module.id, error=str(e))
+        return None
+
+
 async def generate_module_composition_impl(
     request: GenerateModuleCompositionRequest, config: Config
 ) -> ModuleComposition:
@@ -852,13 +874,10 @@ async def generate_module_composition_impl(
     notes: list[str] = []
 
     # 1. Resolve each service to a real module + version via search_modules.
+    #    The searches are independent, so they all go out at once.
+    modules = await asyncio.gather(*(_resolve_service(s, config) for s in services))
     resolved: list[dict] = []
-    for svc in services:
-        try:
-            module = await _search_best(svc, config)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("search_modules failed", service=svc.key, error=str(e))
-            module = None
+    for svc, module in zip(services, modules, strict=True):
         if module is None:
             notes.append(
                 f"Could not resolve a module for '{svc.display}' via search_modules."
@@ -872,21 +891,17 @@ async def generate_module_composition_impl(
             "services (e.g. 'openshift with kms and cos')."
         )
 
-    # 2. Fetch each module's interface (inputs/outputs) via get_module_details.
-    for entry in resolved:
-        module = entry["module"]
-        try:
-            inputs, outputs = await _fetch_interface(module.id, module.version, config)
-        except Exception as e:  # noqa: BLE001
-            logger.warning(
-                "get_module_details failed", module_id=module.id, error=str(e)
-            )
-            inputs, outputs = {}, set()
+    # 2. Fetch each module's interface (inputs/outputs) via get_module_details,
+    #    again in parallel.
+    interfaces = await asyncio.gather(*(_interface_for(e, config) for e in resolved))
+    for entry, interface in zip(resolved, interfaces, strict=True):
+        if interface is None:
             notes.append(
-                f"Could not read the interface for {module.id}; wiring may be incomplete."
+                f"Could not read the interface for {entry['module'].id}; "
+                "wiring may be incomplete."
             )
-        entry["inputs"] = inputs
-        entry["outputs"] = outputs
+            interface = ({}, set())
+        entry["inputs"], entry["outputs"] = interface
 
     deployment_order = [e["instance"] for e in resolved]
 

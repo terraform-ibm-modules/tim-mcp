@@ -189,6 +189,40 @@ def _by_target(composition, instance, input_name):
 
 
 @pytest.mark.asyncio
+async def test_live_calls_run_in_parallel(config, monkeypatch):
+    """
+    Searches fan out together, and so do the interface reads — the tool makes
+    one round of each rather than one call per module in series.
+    """
+    import asyncio
+
+    peak = {"search": 0, "interface": 0}
+    live = {"search": 0, "interface": 0}
+
+    def _tracked(kind, inner):
+        async def wrapper(*args, **kwargs):
+            live[kind] += 1
+            peak[kind] = max(peak[kind], live[kind])
+            try:
+                await asyncio.sleep(0.01)
+                return await inner(*args, **kwargs)
+            finally:
+                live[kind] -= 1
+
+        return wrapper
+
+    monkeypatch.setattr(comp, "_search_best", _tracked("search", comp._search_best))
+    monkeypatch.setattr(
+        comp, "_fetch_interface", _tracked("interface", comp._fetch_interface)
+    )
+
+    c = await _run(config, "openshift with kms and cos")
+    assert len(c.recommended_modules) == 5
+    assert peak["search"] == 5
+    assert peak["interface"] == 5
+
+
+@pytest.mark.asyncio
 async def test_renamed_link_wired_by_kind(config):
     """existing_cos_id wires to the cos module's *_id output, and is marked."""
     c = await _run(config, "openshift with kms and cos")
