@@ -630,7 +630,10 @@ def _match_input(
     # missing, in which case a same-named output is a re-export, not the source.
     if not wanted_kind:
         for source in earlier:
-            if input_name in source["outputs"]:
+            # A module that both consumes and exposes the same name is passing
+            # the value through, not producing it (cos echoes the resource group
+            # it was given). Wiring from it would depend on the wrong module.
+            if input_name in source["outputs"] and input_name not in source["inputs"]:
                 return (
                     _conn(source, input_name, target, input_name, "inferred"),
                     "",
@@ -673,6 +676,62 @@ def _worth_reporting(input_name: str, target: dict, source_found: bool) -> bool:
         return False  # names or re-uses the resource this module owns
     byo = input_name.lower().startswith(_NOISE_PREFIXES)
     return type_token not in {"name", "names"} or byo
+
+
+def _dependency_edges(modules: list[dict]) -> dict[str, set[str]]:
+    """
+    Which modules each module consumes a value from, ignoring deployment order.
+
+    The matcher normally only looks at modules deployed earlier, which makes the
+    result depend on the order it is trying to establish. Here every other
+    module is a candidate, so the edges describe the composition itself.
+    """
+    edges: dict[str, set[str]] = {m["instance"]: set() for m in modules}
+    for target in modules:
+        others = [m for m in modules if m["instance"] != target["instance"]]
+        for input_name in sorted(target["inputs"]):
+            if not _is_connectable(input_name):
+                continue
+            connection, _, _ = _match_input(input_name, target, others, [])
+            if connection is not None:
+                edges[target["instance"]].add(connection.source_module)
+    return edges
+
+
+def _order_modules(modules: list[dict]) -> tuple[list[dict], list[str]]:
+    """
+    Order modules so every module follows the ones it consumes values from.
+
+    A topological sort of the inferred connection graph, with the static
+    service priority breaking ties, so a composition whose dependencies say
+    nothing keeps the order it had. Returns (ordered, notes).
+    """
+    edges = _dependency_edges(modules)
+    by_instance = {m["instance"]: m for m in modules}
+    rank = {m["instance"]: (m["svc"].priority, m["svc"].key) for m in modules}
+    pending = {i: set(deps) for i, deps in edges.items()}
+
+    ordered: list[str] = []
+    notes: list[str] = []
+    while pending:
+        ready = [i for i, deps in pending.items() if not deps]
+        if not ready:
+            # A cycle: two modules each want a value from the other. No order
+            # satisfies both, so fall back to priority and say which ones.
+            stuck = sorted(pending, key=lambda i: rank[i])
+            notes.append(
+                f"Circular references between {', '.join(stuck)} — no deployment "
+                "order satisfies them all, so these are ordered by service "
+                "priority and at least one link is left unwired."
+            )
+            ordered.extend(stuck)
+            break
+        nxt = min(ready, key=lambda i: rank[i])
+        ordered.append(nxt)
+        del pending[nxt]
+        for deps in pending.values():
+            deps.discard(nxt)
+    return [by_instance[i] for i in ordered], notes
 
 
 def _infer_connections(
@@ -903,9 +962,13 @@ async def generate_module_composition_impl(
             interface = ({}, set())
         entry["inputs"], entry["outputs"] = interface
 
+    # 3. Order the modules by what they actually consume from each other,
+    #    rather than by static service priority alone.
+    resolved, order_notes = _order_modules(resolved)
+    notes.extend(order_notes)
     deployment_order = [e["instance"] for e in resolved]
 
-    # 3. Connections: inferred from interfaces; reference the DA when requested.
+    # 4. Connections: inferred from interfaces; reference the DA when requested.
     # Connections are always inferred from module interfaces (real DAs route
     # their wiring through locals/interpolation that can't be extracted reliably).
     connections, gaps = _infer_connections(resolved)

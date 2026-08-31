@@ -331,6 +331,23 @@ async def test_re_exported_output_is_not_treated_as_the_source(config):
 
 
 @pytest.mark.asyncio
+async def test_pass_through_output_is_not_treated_as_the_source(config, monkeypatch):
+    """
+    With no resource_group module, cos's echoed resource_group_id must not
+    become vpc's source for it — cos consumes that value, it doesn't own it.
+    """
+    monkeypatch.delitem(_FAKE, "resource_group")  # unresolvable via search
+    monkeypatch.setitem(
+        _FAKE["cos"],
+        "outputs",
+        {"cos_instance_id", "cos_instance_crn", "resource_group_id"},
+    )
+    c = await _run(config, services=["cos", "vpc"])
+    assert _by_target(c, "vpc", "resource_group_id") is None
+    assert any("resource_group_id" in n and "no 'group' module" in n for n in c.notes)
+
+
+@pytest.mark.asyncio
 async def test_re_export_not_wired_when_the_owning_kind_is_absent(config):
     """With no kms module, cos's same-named output is still not the source."""
     c = await _run(config, services=["postgresql", "cos"])
@@ -343,6 +360,48 @@ async def test_secrets_manager_is_not_a_kms_source(config):
     """Secrets Manager consumes key CRNs, it doesn't produce them."""
     c = await _run(config, services=["postgresql", "secrets_manager"])
     assert _by_target(c, "postgresql", "kms_key_crn") is None
+
+
+@pytest.mark.asyncio
+async def test_order_follows_the_connection_graph(config, monkeypatch):
+    """
+    vpc consuming a COS id must put cos first, even though cos sorts after vpc
+    by static service priority.
+    """
+    monkeypatch.setitem(
+        _FAKE["vpc"]["inputs"],
+        "existing_cos_id",
+        {"type": "string", "required": False},
+    )
+    c = await _run(config, "openshift with kms and cos")
+    order = c.deployment_order
+    assert order.index("cos") < order.index("vpc")
+    # and the link the old priority order could not express is now wired
+    cn = _by_target(c, "vpc", "existing_cos_id")
+    assert cn is not None and cn.source_module == "cos"
+
+
+@pytest.mark.asyncio
+async def test_order_falls_back_to_priority_on_a_cycle(config, monkeypatch):
+    """Mutually-dependent modules can't be ordered — say so, don't hang."""
+    monkeypatch.setitem(
+        _FAKE["vpc"]["inputs"],
+        "existing_cos_id",
+        {"type": "string", "required": False},
+    )
+    monkeypatch.setitem(
+        _FAKE["cos"]["inputs"], "vpc_id", {"type": "string", "required": False}
+    )
+    c = await _run(config, "openshift with kms and cos")
+    assert set(c.deployment_order) == {
+        "resource_group",
+        "kms",
+        "vpc",
+        "cos",
+        "openshift",
+    }
+    assert c.deployment_order.index("vpc") < c.deployment_order.index("cos")  # priority
+    assert any("Circular references" in n and "cos" in n for n in c.notes)
 
 
 @pytest.mark.asyncio
