@@ -355,7 +355,11 @@ _FILLER_TOKENS = {"instance", "resource", "service", "cloud"}
 _INPUT_ALIASES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (r"kms.*key.*crn|encryption_key_crn|^key_crn$", "kms", (r"key.*crn", r"crn")),
     (r"kms.*key.*id$", "kms", (r"key.*id", r"_id$")),
-    (r"^vpc_subnets$|^subnet_(ids|names)$", "vpc", (r"^subnets$", r"subnet")),
+    # Cluster modules take vpc_subnets as map(list(object({id, zone,
+    # cidr_block}))), which is the shape of the VPC's subnet_detail_map —
+    # the wiring shipped DAs use.
+    (r"^vpc_subnets$", "vpc", (r"^subnet_detail_map$", r"^subnets$")),
+    (r"^subnet_ids$", "vpc", (r"^subnet_ids$",)),
     (r"bucket.*(name|crn)$", "cos", (r"bucket.*(name|crn)$",)),
 )
 

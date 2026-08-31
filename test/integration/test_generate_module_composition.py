@@ -254,6 +254,36 @@ async def test_nested_object_input_is_flagged(config):
 
 
 @pytest.mark.asyncio
+async def test_vpc_subnets_wires_to_the_subnet_detail_map(config, monkeypatch):
+    """
+    vpc_subnets takes map(list(object({id, zone, cidr_block}))) — the shape of
+    subnet_detail_map, and the wiring shipped DAs use — so it must not be left
+    ambiguous against the VPC's other subnet outputs.
+    """
+    monkeypatch.setitem(
+        _FAKE["vpc"],
+        "outputs",
+        {
+            "vpc_id",
+            "subnet_detail_map",
+            "subnet_detail_list",
+            "subnet_ids",
+            "subnet_zone_list",
+        },
+    )
+    monkeypatch.setitem(
+        _FAKE["openshift"]["inputs"],
+        "vpc_subnets",
+        {"type": "map(list(object({})))", "required": True},
+    )
+    c = await _run(config, "openshift with kms and cos")
+    cn = _by_target(c, "openshift", "vpc_subnets")
+    assert cn is not None
+    assert (cn.source_module, cn.source_output) == ("vpc", "subnet_detail_map")
+    assert cn.origin == "inferred-alias"
+
+
+@pytest.mark.asyncio
 async def test_re_exported_output_is_not_treated_as_the_source(config):
     """
     cos re-exports kms_key_crn under the same name. The key comes from kms —
