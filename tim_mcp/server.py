@@ -20,6 +20,7 @@ from .exceptions import TIMError
 from .exceptions import ValidationError as TIMValidationError
 from .logging import configure_logging, get_logger, log_tool_execution
 from .types import (
+    GenerateModuleCompositionRequest,
     GetContentRequest,
     GetExampleDetailsRequest,
     LatestModuleVersionRequest,
@@ -814,6 +815,115 @@ async def get_module_dependency(module_id: str) -> str:
             error=str(e),
         )
         logger.exception("Unexpected error in get_module_dependency")
+        raise TIMError(f"Unexpected error: {e}") from e
+
+
+@mcp.tool()
+async def generate_module_composition(
+    services: list[str] | None = None,
+    prompt: str | None = None,
+    include_da: bool = False,
+) -> str:
+    """
+    Assemble a Terraform IBM Modules (TIM) composition JSON.
+
+    Returns the modules, deployment order, and wiring for an IBM Cloud
+    architecture. It builds the composition LIVE by calling the other TIM-MCP
+    tools — nothing is hardcoded: module IDs and versions come from
+    `search_modules`, and connections are derived from the real module interfaces
+    read via `get_module_details`.
+
+    PREFERRED USAGE — pass `services`:
+    You (the model) already understand the user's request, so extract the services
+    and pass them as `services` (e.g. ["openshift", "kms", "cos"]). Each is
+    resolved to a real module. This is more reliable than the tool re-parsing free
+    text. Use `prompt` only as a fallback when you don't want to pre-extract.
+
+    WHEN TO USE:
+    - User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
+    - Starting a new multi-module Terraform solution around a service
+
+    WHAT THIS RETURNS (JSON):
+    - composition_name, description, da_grounded, reference_solution (when DA-grounded)
+    - recommended_modules: each module's id, instance_name, role, purpose, resolved version, source, registry_url
+    - deployment_order: instance names in dependency order
+    - connections: source_module.source_output → target_module.target_input (inferred from interfaces)
+    - prerequisites: top-level inputs to supply (api key, region, resource group, prefix)
+    - notes: caveats and unresolved items
+
+    DA GROUNDING:
+    Set `include_da=true` (or mention "DA" in `prompt`) to add a reference_solution
+    pointer to the module's deployable-architecture solution. Connections are always
+    inferred from module interfaces (approximate — verify with `get_module_details`);
+    fetch reference_solution with `get_content` for the authoritative DA wiring.
+
+    NOTE: This tool makes live registry/GitHub calls per request, so it is slower
+    than the lightweight tools.
+
+    Args:
+        services: Preferred — service terms you extracted, e.g. ["openshift", "kms", "cos"].
+        prompt: Fallback natural-language request, e.g. "openshift composition with kms and cos".
+        include_da: Add a deployable-architecture reference_solution pointer.
+
+    Returns:
+        JSON describing the assembled composition.
+    """
+    start_time = time.time()
+
+    try:
+        request = GenerateModuleCompositionRequest(
+            services=services, prompt=prompt, include_da=include_da
+        )
+
+        from .tools.composition import generate_module_composition_impl
+
+        response = await generate_module_composition_impl(request, config)
+
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            request.model_dump(),
+            duration_ms,
+            success=True,
+        )
+
+        return response.model_dump_json(indent=2)
+
+    except ValidationError as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"services": services, "prompt": prompt, "include_da": include_da},
+            duration_ms,
+            success=False,
+            error="validation_error",
+        )
+        raise TIMValidationError(f"Invalid parameters: {e}") from e
+
+    except TIMError:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"services": services, "prompt": prompt, "include_da": include_da},
+            duration_ms,
+            success=False,
+        )
+        raise
+
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_tool_execution(
+            logger,
+            "generate_module_composition",
+            {"services": services, "prompt": prompt, "include_da": include_da},
+            duration_ms,
+            success=False,
+            error=str(e),
+        )
+        logger.exception("Unexpected error in generate_module_composition")
         raise TIMError(f"Unexpected error: {e}") from e
 
 
