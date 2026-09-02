@@ -50,7 +50,12 @@ _FAKE = {
         "inputs": _inputs("resource_group_id", "kms_key_crn"),
         # cos re-exports the key CRN it was given — a name-identical output
         # that must not be mistaken for the source of that value.
-        "outputs": {"cos_instance_id", "cos_instance_crn", "kms_key_crn"},
+        "outputs": {
+            "cos_instance_id",
+            "cos_instance_crn",
+            "cos_instance_name",
+            "kms_key_crn",
+        },
     },
     "openshift": {
         "id": "terraform-ibm-modules/base-ocp-vpc/ibm",
@@ -63,15 +68,20 @@ _FAKE = {
             "worker_pools",
             "security_group_id",
             "cluster_name",
+            "cos_name",
+            "use_existing_cos",
             required=("existing_cos_id",),
             types={
+                "use_existing_cos": "bool",
                 "worker_pools": (
                     "list(object({ pool_name = string, "
                     "boot_volume_encryption_kms_config = string }))"
-                )
+                ),
             },
         ),
         "outputs": {"cluster_id"},
+        # the real base-ocp-vpc instantiates COS itself for registry storage
+        "provisions": ["terraform-ibm-modules/cos/ibm"],
     },
     "secrets_manager": {
         "id": "terraform-ibm-modules/secrets-manager/ibm",
@@ -119,8 +129,8 @@ def mock_live_calls(monkeypatch):
     async def fake_fetch_interface(module_id, version, config):
         for entry in _FAKE.values():
             if entry["id"] == module_id:
-                return entry["inputs"], entry["outputs"]
-        return set(), set()
+                return entry["inputs"], entry["outputs"], entry.get("provisions", [])
+        return {}, set(), []
 
     monkeypatch.setattr(comp, "_search_best", fake_search_best)
     monkeypatch.setattr(comp, "_fetch_interface", fake_fetch_interface)
@@ -226,6 +236,51 @@ async def test_live_calls_run_in_parallel(config, monkeypatch):
     assert len(c.recommended_modules) == 5
     assert peak["search"] == 5
     assert peak["interface"] == 5
+
+
+@pytest.mark.asyncio
+async def test_declared_dependencies_are_reported(config):
+    """A module's declared whole-module dependencies reach the output."""
+    c = await _run(config, "openshift with kms and cos")
+    by_instance = {m.instance_name: m for m in c.recommended_modules}
+    assert by_instance["openshift"].provisions == ["terraform-ibm-modules/cos/ibm"]
+    assert by_instance["cos"].provisions == []
+
+
+@pytest.mark.asyncio
+async def test_duplicate_provisioning_is_flagged_with_its_toggle(config):
+    """
+    The cluster creates its own COS unless told otherwise, so wiring
+    existing_cos_id isn't enough — the note has to name the flag too.
+    """
+    c = await _run(config, "openshift with kms and cos")
+    note = next(n for n in c.notes if "instantiates" in n)
+    assert "terraform-ibm-modules/cos/ibm" in note
+    assert "existing_cos_id is wired" in note
+    assert "use_existing_cos is true" in note
+
+
+@pytest.mark.asyncio
+async def test_no_duplicate_note_when_the_module_is_not_in_the_composition(config):
+    """Provisioning something the composition doesn't deploy isn't a clash."""
+    c = await _run(config, services=["openshift", "kms"])
+    assert not any("instantiates" in n for n in c.notes)
+
+
+def test_utility_submodules_are_not_reported_as_provisioned():
+    """crn-parser and friends are plumbing, not architecture."""
+    provisions = comp._provisioned_modules(
+        [
+            {
+                "source": "terraform-ibm-modules/common-utilities/ibm//modules/crn-parser"
+            },
+            {"source": "terraform-ibm-modules/cbr/ibm//modules/cbr-rule-module"},
+            {"source": "terraform-ibm-modules/cos/ibm"},
+            {"source": "terraform-ibm-modules/cos/ibm"},  # deduped
+            {"source": ""},
+        ]
+    )
+    assert provisions == ["terraform-ibm-modules/cos/ibm"]
 
 
 @pytest.mark.asyncio

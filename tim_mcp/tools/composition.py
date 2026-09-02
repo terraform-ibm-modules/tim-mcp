@@ -606,13 +606,16 @@ async def _search_best(svc: _Service, config: Config):
 
 async def _fetch_interface(
     module_id: str, version: str, config: Config
-) -> tuple[dict[str, dict], set[str]]:
+) -> tuple[dict[str, dict], set[str], list[str]]:
     """
-    Return (inputs, output_names) for a module via the registry.
+    Return (inputs, output_names, provisions) for a module via the registry.
 
     Inputs are keyed by name and carry the registry's ``type``/``required``
     metadata: the matcher needs the type to spot nested (object) inputs it
     cannot wire, and ``required`` to rank the gaps it reports.
+
+    ``provisions`` are the whole modules this one instantiates itself, read
+    from the same payload — no extra call.
     """
     namespace, name, provider = parse_module_id(module_id)
     async with TerraformClient(
@@ -629,7 +632,28 @@ async def _fetch_interface(
         if i.get("name")
     }
     outputs = {o.get("name", "") for o in root.get("outputs", [])}
-    return inputs, outputs
+    return inputs, outputs, _provisioned_modules(root.get("dependencies", []))
+
+
+def _provisioned_modules(dependencies: list[dict]) -> list[str]:
+    """
+    The whole modules a module instantiates internally, from its dependencies.
+
+    The registry lists every ``module`` block, most of which are plumbing —
+    crn-parser, cbr-rule-module, icd-versions. Those are submodules of a
+    utility repo (``//modules/...``) and say nothing about the architecture.
+    A dependency on a whole module does: base-ocp-vpc instantiating
+    terraform-ibm-modules/cos/ibm means the cluster can create its own COS.
+    """
+    provisions: list[str] = []
+    for dependency in dependencies:
+        source = (dependency.get("source") or "").strip()
+        if not source or "//" in source or source in provisions:
+            continue
+        if len(source.split("/")) != 3:  # namespace/name/provider
+            continue
+        provisions.append(source)
+    return sorted(provisions)
 
 
 # Preferred DA solution flavours, in order.
@@ -994,6 +1018,77 @@ def _nested_notes(modules: list[dict]) -> list[str]:
     return [note for _, _, note in sorted(found)[:_MAX_NESTED_NOTES]]
 
 
+def _existing_toggle(module: dict, aliases: set[str]) -> str | None:
+    """
+    The boolean input that switches a module to an existing instance.
+
+    base-ocp-vpc creates its own COS unless ``use_existing_cos`` is true, so
+    wiring ``existing_cos_id`` alone changes nothing. Found by shape rather
+    than by name: a bool input mentioning "existing" and the other module's
+    kind.
+    """
+    for name, meta in sorted(module["inputs"].items()):
+        if (meta.get("type") or "").strip() != "bool":
+            continue
+        tokens = set(name.split("_"))
+        if "existing" in tokens and tokens & aliases:
+            return name
+    return None
+
+
+def _provision_notes(
+    modules: list[dict], connections: list[ModuleConnection]
+) -> list[str]:
+    """
+    Flag modules that would provision a service the composition already has.
+
+    A cluster that creates its own COS alongside a COS module in the same
+    composition is two instances, not one — and the wiring that avoids it
+    usually needs a flag set as well as an input wired.
+    """
+    by_source = {m["module"].id: m for m in modules if m.get("module")}
+    notes: list[str] = []
+    for module in modules:
+        for source in module.get("provisions", []):
+            other = by_source.get(source)
+            if other is None or other["instance"] == module["instance"]:
+                continue
+            # Prefer the "bring your own" wire: that's the one the toggle
+            # governs, and naming any other link here would misdirect.
+            candidates = sorted(
+                (
+                    c
+                    for c in connections
+                    if c.target_module == module["instance"]
+                    and c.source_module == other["instance"]
+                ),
+                key=lambda c: ("existing" not in c.target_input, c.target_input),
+            )
+            wired = candidates[0] if candidates else None
+            toggle = _existing_toggle(module, _aliases_for(other))
+            note = (
+                f"{module['instance']} instantiates {source} itself, and this "
+                f"composition also deploys it as '{other['instance']}'"
+            )
+            if wired and toggle:
+                note += (
+                    f" — {wired.target_input} is wired from it, but {module['instance']} "
+                    f"only uses that when {toggle} is true; set it or you get two."
+                )
+            elif wired:
+                note += (
+                    f" — {wired.target_input} is wired from it; confirm with "
+                    "get_module_details that no further flag is needed to stop "
+                    f"{module['instance']} creating its own."
+                )
+            elif toggle:
+                note += f" — set {toggle} and wire it, or you get two instances."
+            else:
+                note += " — expect two instances unless it is told to reuse one."
+            notes.append(note)
+    return notes
+
+
 def _role_for(priority: int) -> str:
     """Classify a module's role from its deployment priority."""
     if priority == 0:
@@ -1053,7 +1148,7 @@ async def _resolve_service(svc: _Service, config: Config):
 
 async def _interface_for(
     entry: dict, config: Config
-) -> tuple[dict[str, dict], set[str]] | None:
+) -> tuple[dict[str, dict], set[str], list[str]] | None:
     """Read one module's interface; None when it can't be read."""
     module = entry["module"]
     try:
@@ -1103,8 +1198,8 @@ async def generate_module_composition_impl(
                 f"Could not read the interface for {entry['module'].id}; "
                 "wiring may be incomplete."
             )
-            interface = ({}, set())
-        entry["inputs"], entry["outputs"] = interface
+            interface = ({}, set(), [])
+        entry["inputs"], entry["outputs"], entry["provisions"] = interface
 
     # 3. Order the modules by what they actually consume from each other,
     #    rather than by static service priority alone.
@@ -1148,6 +1243,7 @@ async def generate_module_composition_impl(
     # references can't be expressed as module-level connections.
     notes.extend(_gap_notes(gaps))
     notes.extend(_nested_notes(resolved))
+    notes.extend(_provision_notes(resolved, connections))
 
     # For the prompt path, flag when we recognised no service or no primary
     # workload, so unmapped services aren't dropped silently. Skipped when the
@@ -1199,6 +1295,7 @@ async def generate_module_composition_impl(
                 version=e["module"].version,
                 source=e["module"].id,
                 registry_url=f"https://registry.terraform.io/modules/{e['module'].id}/{e['module'].version}",
+                provisions=e.get("provisions", []),
             )
             for e in resolved
         ],

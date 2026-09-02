@@ -283,6 +283,14 @@ class RecommendedModule(BaseModel):
         ..., description="Terraform Registry source to use in the module block"
     )
     registry_url: str = Field(..., description="Terraform Registry URL for the module")
+    provisions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Whole modules this one instantiates internally (declared registry "
+            "dependencies, excluding utility submodules). Deploying one of these "
+            "separately as well may create a duplicate resource — see notes."
+        ),
+    )
 
 
 class ModuleConnection(BaseModel):
