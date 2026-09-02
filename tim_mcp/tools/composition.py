@@ -627,6 +627,7 @@ async def _fetch_interface(
         i["name"]: {
             "type": i.get("type", "") or "",
             "required": bool(i.get("required", False)),
+            "description": (i.get("description", "") or "").strip(),
         }
         for i in root.get("inputs", [])
         if i.get("name")
@@ -1109,6 +1110,7 @@ def _describe(services: list[_Service]) -> str:
 
 
 def _standard_prerequisites() -> list[CompositionPrerequisite]:
+    """Fallback when no interface could be read and nothing can be derived."""
     return [
         CompositionPrerequisite(
             name="ibmcloud_api_key",
@@ -1135,6 +1137,119 @@ def _standard_prerequisites() -> list[CompositionPrerequisite]:
             description="Prefix prepended to resource names.",
         ),
     ]
+
+
+# A per-module label, not something supplied once for the whole composition.
+_NOT_COMPOSITION_WIDE = {"name", "ibmcloud_api_key"}
+# How many "use existing" options to list before saying how many remain.
+_MAX_REUSE_PREREQS = 6
+
+
+def _summarise(text: str, fallback: str) -> str:
+    """First sentence of a registry description, trimmed."""
+    first = (text or "").strip().split("\n")[0].strip()
+    if not first:
+        return fallback
+    sentence = first.split(". ")[0].rstrip(".")
+    if len(sentence) >= 40:
+        return sentence + "."
+    if len(first) > 160:
+        first = first[:157].rsplit(" ", 1)[0] + "..."
+    return first
+
+
+def _derive_prerequisites(
+    modules: list[dict], gaps: list[dict]
+) -> tuple[list[CompositionPrerequisite], list[str]]:
+    """
+    Build the prerequisite list from what the modules actually declare.
+
+    Three kinds, in the order a consumer meets them:
+      1. the API key, which is provider-level and never a module input
+      2. values supplied once for the whole stack (region, prefix, tags) —
+         only those the resolved modules really take
+      3. inputs nothing in the composition can supply: the ones left unwired,
+         and the "use existing" options that let you bring your own instance
+         instead of creating one, which is how DAs present them.
+    """
+    prerequisites = [
+        CompositionPrerequisite(
+            name="ibmcloud_api_key",
+            type="secret",
+            required=True,
+            description="IBM Cloud API key for the provider.",
+        )
+    ]
+
+    # 2. Composition-wide values, required if any module requires them.
+    shared: dict[str, dict] = {}
+    for module in modules:
+        for name, meta in module["inputs"].items():
+            if name not in _PREREQ_INPUTS or name in _NOT_COMPOSITION_WIDE:
+                continue
+            entry = shared.setdefault(
+                name,
+                {"type": meta.get("type") or "string", "required": False, "takers": []},
+            )
+            entry["required"] = entry["required"] or bool(meta.get("required"))
+            entry["takers"].append(module["instance"])
+    for name in sorted(shared, key=lambda n: (not shared[n]["required"], n)):
+        entry = shared[name]
+        # Deliberately not the registry description: each module words these
+        # in terms of itself ("tags for the Key Protect instance"), which
+        # reads as wrong once the value is supplied to the whole stack.
+        prerequisites.append(
+            CompositionPrerequisite(
+                name=name,
+                type=entry["type"],
+                required=entry["required"],
+                description=f"Supplied once, to: {', '.join(entry['takers'])}.",
+            )
+        )
+
+    # 3. What the wiring could not supply.
+    reuse, notes = [], []
+    for gap in gaps:
+        module = next(m for m in modules if m["instance"] == gap["instance"])
+        meta = module["inputs"][gap["input"]]
+        name = f"{gap['instance']}.{gap['input']}"
+        byo = gap["input"].lower().startswith(_NOISE_PREFIXES)
+        if gap["required"]:
+            prerequisites.append(
+                CompositionPrerequisite(
+                    name=name,
+                    type=meta.get("type") or "string",
+                    required=True,
+                    description=_summarise(
+                        meta.get("description", ""),
+                        f"Required by {gap['instance']} and not produced by any "
+                        "module here.",
+                    ),
+                )
+            )
+        elif byo:
+            reuse.append(
+                CompositionPrerequisite(
+                    name=name,
+                    type=meta.get("type") or "string",
+                    required=False,
+                    description=_summarise(
+                        meta.get("description", ""),
+                        "Supply an existing resource instead of creating one.",
+                    ),
+                )
+            )
+
+    reuse.sort(key=lambda p: p.name)
+    prerequisites.extend(reuse[:_MAX_REUSE_PREREQS])
+    if len(reuse) > _MAX_REUSE_PREREQS:
+        remaining = len(reuse) - _MAX_REUSE_PREREQS
+        notes.append(
+            f"{remaining} further 'use existing' input"
+            f"{'s' if remaining > 1 else ''} can also take an existing resource; "
+            "the full set is in each module's get_module_details."
+        )
+    return prerequisites, notes
 
 
 async def _resolve_service(svc: _Service, config: Config):
@@ -1245,6 +1360,13 @@ async def generate_module_composition_impl(
     notes.extend(_nested_notes(resolved))
     notes.extend(_provision_notes(resolved, connections))
 
+    # Prerequisites come from what the modules actually declare; fall back to
+    # the standard set when no interface could be read.
+    prerequisites, prereq_notes = _derive_prerequisites(resolved, gaps)
+    notes.extend(prereq_notes)
+    if len(prerequisites) == 1:
+        prerequisites = _standard_prerequisites()
+
     # For the prompt path, flag when we recognised no service or no primary
     # workload, so unmapped services aren't dropped silently. Skipped when the
     # caller passed an explicit `services` list (nothing was guessed).
@@ -1301,6 +1423,6 @@ async def generate_module_composition_impl(
         ],
         deployment_order=deployment_order,
         connections=connections,
-        prerequisites=_standard_prerequisites(),
+        prerequisites=prerequisites,
         notes=notes,
     )

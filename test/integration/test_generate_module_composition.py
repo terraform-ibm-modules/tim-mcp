@@ -238,6 +238,80 @@ async def test_live_calls_run_in_parallel(config, monkeypatch):
     assert peak["interface"] == 5
 
 
+def _prereqs(composition):
+    return {p.name: p for p in composition.prerequisites}
+
+
+@pytest.mark.asyncio
+async def test_prerequisites_are_derived_from_the_modules(config):
+    """Only values the resolved modules actually take, with real requiredness."""
+    c = await _run(config, "openshift with kms and cos")
+    p = _prereqs(c)
+    assert p["ibmcloud_api_key"].required  # provider-level, always there
+    assert "region" in p
+    # nothing in the fixture marks region required, so it must not claim to be
+    assert p["region"].required is False
+    assert "resource_group_name" in p
+
+
+@pytest.mark.asyncio
+async def test_prerequisites_omit_values_no_module_takes(config):
+    """A composition whose modules take no region gets no region prerequisite."""
+    c = await _run(config, services=["cloudant"])
+    p = _prereqs(c)
+    assert "region" not in p
+    assert "ibmcloud_api_key" in p
+
+
+@pytest.mark.asyncio
+async def test_required_unwired_input_becomes_a_prerequisite(config):
+    """
+    With no cos module, the cluster's required existing_cos_id can't be wired,
+    so the consumer has to supply it.
+    """
+    c = await _run(config, services=["openshift", "kms"])
+    p = _prereqs(c)
+    assert "openshift.existing_cos_id" in p
+    assert p["openshift.existing_cos_id"].required is True
+
+
+@pytest.mark.asyncio
+async def test_use_existing_inputs_are_offered_as_optional(config, monkeypatch):
+    """Optional existing_* inputs are reuse options, not requirements."""
+    monkeypatch.setitem(
+        _FAKE["vpc"]["inputs"],
+        "existing_dns_instance_id",
+        {
+            "type": "string",
+            "required": False,
+            "description": "An existing DNS instance.",
+        },
+    )
+    c = await _run(config, "openshift with kms and cos")
+    p = _prereqs(c)
+    assert "vpc.existing_dns_instance_id" in p
+    assert p["vpc.existing_dns_instance_id"].required is False
+
+
+@pytest.mark.asyncio
+async def test_prerequisites_fall_back_when_interfaces_cannot_be_read(
+    config, monkeypatch
+):
+    """Nothing to derive from means the standard set, not an empty list."""
+
+    async def boom(module_id, version, config):
+        raise RuntimeError("registry down")
+
+    monkeypatch.setattr(comp, "_fetch_interface", boom)
+    c = await _run(config, "openshift with kms and cos")
+    assert {p.name for p in c.prerequisites} == {
+        "ibmcloud_api_key",
+        "region",
+        "resource_group_name",
+        "prefix",
+    }
+
+
 @pytest.mark.asyncio
 async def test_declared_dependencies_are_reported(config):
     """A module's declared whole-module dependencies reach the output."""
