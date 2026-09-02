@@ -79,6 +79,12 @@ _FAKE = {
         "inputs": _inputs("resource_group_id", "region"),
         "outputs": {"secrets_manager_crn", "secrets_manager_guid"},
     },
+    "cloudant": {
+        "id": "terraform-ibm-modules/cloudant/ibm",
+        "version": "1.3.0",
+        "inputs": _inputs("resource_group_id"),
+        "outputs": {"id"},
+    },
     "postgresql": {
         "id": "terraform-ibm-modules/icd-postgresql/ibm",
         "version": "4.15.3",
@@ -476,11 +482,72 @@ async def test_no_recognized_service_is_flagged(config):
 
 @pytest.mark.asyncio
 async def test_unmapped_workload_is_flagged(config):
-    """A recognised support service but an unmapped workload (Db2) is flagged."""
-    c = await _run(config, "set up a Db2 database with kms encryption")
+    """A support service but a workload in no catalog (Snowflake) is flagged."""
+    c = await _run(config, "set up a Snowflake database with kms encryption")
     instances = {m.instance_name for m in c.recommended_modules}
-    assert instances == {"resource_group", "kms"}  # Db2 isn't mapped
+    assert instances == {"resource_group", "kms"}  # Snowflake isn't a TIM module
     assert any("No primary workload/service was recognised" in n for n in c.notes)
+
+
+def test_index_recognises_a_service_the_keyword_map_lacks():
+    """Db2 and Elasticsearch are in no keyword entry — the index supplies them."""
+    assert "db2_cloud" in [
+        s.instance for s in comp._detect_services("set up a Db2 database")
+    ]
+    assert "icd_elasticsearch" in [
+        s.instance for s in comp._detect_services("elasticsearch with cos backups")
+    ]
+
+
+def test_index_ignores_words_that_merely_appear_in_module_names():
+    """
+    "terraform", "app" and "secure" each occur in a module name, but none of
+    them names a service — matching on them would fill every composition with
+    terraform-enterprise, app-configuration and security-group.
+    """
+    picked = [
+        s.instance for s in comp._detect_services("terraform modules for a secure app")
+    ]
+    assert picked == ["resource_group"]
+
+
+def test_index_prefers_the_more_specific_module():
+    """ "watsonx orchestrate" beats the broader "watsonx" keyword..."""
+    picked = [
+        s.instance for s in comp._detect_services("watsonx orchestrate for my team")
+    ]
+    assert "watsonx_orchestrate" in picked
+    assert "watsonx_ai" not in picked
+    # ...unless watsonx.ai is asked for by name too
+    both = [
+        s.instance for s in comp._detect_services("watsonx ai and watsonx orchestrate")
+    ]
+    assert {"watsonx_ai", "watsonx_orchestrate"} <= set(both)
+
+
+def test_curated_keyword_wins_over_the_index():
+    """ "object storage" is COS, not the module literally named *-file-storage."""
+    picked = [s.instance for s in comp._detect_services("i need object storage")]
+    assert "cos" in picked
+    assert "vpc_file_storage" not in picked
+
+
+def test_index_service_priority_comes_from_its_category():
+    """An index-derived service is placed by category, not lumped in as a workload."""
+    picked = {
+        s.instance: s for s in comp._detect_services("event notifications please")
+    }
+    assert picked["event_notifications"].priority == 4  # observability -> support
+    assert comp._role_for(picked["event_notifications"].priority) == "support"
+
+
+@pytest.mark.asyncio
+async def test_services_input_resolves_via_the_index(config):
+    """An explicit service the keyword map doesn't know still resolves."""
+    c = await _run(config, services=["cloudant"])
+    by_instance = {m.instance_name: m for m in c.recommended_modules}
+    assert "cloudant" in by_instance
+    assert by_instance["cloudant"].id == "terraform-ibm-modules/cloudant/ibm"
 
 
 @pytest.mark.asyncio

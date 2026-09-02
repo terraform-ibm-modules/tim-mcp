@@ -23,6 +23,8 @@ search terms used to classify the prompt.
 
 import asyncio
 import re
+from collections import Counter
+from functools import lru_cache
 
 from ..clients.terraform_client import TerraformClient
 from ..config import Config
@@ -207,6 +209,130 @@ _WORKLOAD_INTENT = (
 )
 
 
+# --- Index-driven recognition --------------------------------------------
+#
+# The keyword map above covers the services people ask for most, with curated
+# choices behind them (kms -> kms-all-inclusive, vpc -> landing-zone-vpc). It
+# can't cover the whole catalog, so anything it doesn't recognise is looked up
+# in the bundled module index instead.
+#
+# The index is a filtered subset, not the full catalog, and its refresh job
+# drops modules on transient errors — so it augments the keyword map rather
+# than replacing it. A service the keyword map claims always wins.
+
+# Deployment priority per index category; anything else is a workload.
+_CATEGORY_PRIORITY = {
+    "management": 1,
+    "security": 1,
+    "networking": 2,
+    "storage": 3,
+    "observability": 4,
+}
+
+# Catalog naming conventions that wrap a product name. Stripping these is what
+# lets "postgresql" select icd-postgresql and "db2" select db2-cloud.
+#
+# Only the full module name and these strippings are ever matched. Matching on
+# any old token of a name would let single English words select modules —
+# "terraform" would mean terraform-enterprise, "code" code-engine, "container"
+# container-registry, "security" security-group — so a partial name has to be
+# a product name, not a word that happens to appear in one.
+_FAMILY_PREFIXES = ("icd-",)
+_FAMILY_SUFFIXES = ("-cloud",)
+
+
+def _phrase(text: str) -> str:
+    """Normalise a name or term to space-separated lowercase tokens."""
+    return " ".join(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+@lru_cache(maxsize=1)
+def _index_phrases() -> tuple[dict[str, str], dict[str, dict]]:
+    """
+    Build (phrase -> module name, module name -> index entry) from the index.
+
+    A phrase only survives if it identifies exactly one module: the module's
+    full name always does, and so does its name minus a family affix when no
+    other module claims that phrase. Anything ambiguous is left out, so
+    "watsonx" selects nothing while "watsonx ai" selects one module.
+    """
+    from .search import load_module_index
+
+    index = load_module_index()
+    if not index:
+        return {}, {}
+    entries = {m["name"]: m for m in index.get("modules", []) if m.get("name")}
+
+    phrases = {_phrase(name): name for name in entries}
+    stripped_counts: Counter[str] = Counter()
+    stripped_owner: dict[str, str] = {}
+    for name in entries:
+        stripped = _strip_family_affix(name)
+        if stripped:
+            stripped_counts[stripped] += 1
+            stripped_owner.setdefault(stripped, name)
+    for stripped, count in stripped_counts.items():
+        if count == 1 and stripped not in phrases:
+            phrases[stripped] = stripped_owner[stripped]
+    return phrases, entries
+
+
+def _strip_family_affix(name: str) -> str:
+    """The product name inside a family name (icd-redis -> redis), else ""."""
+    for prefix in _FAMILY_PREFIXES:
+        if name.startswith(prefix):
+            return _phrase(name[len(prefix) :])
+    for suffix in _FAMILY_SUFFIXES:
+        if name.endswith(suffix):
+            return _phrase(name[: -len(suffix)])
+    return ""
+
+
+def _service_from_index(entry: dict) -> _Service:
+    """Build a _Service from an index entry, with priority from its category."""
+    name = entry["name"]
+    return _Service(
+        key=name.replace("-", "_"),
+        display=name,
+        instance=name.replace("-", "_"),
+        query=name,
+        keywords=[_phrase(name)],
+        name_match=[name],
+        priority=_CATEGORY_PRIORITY.get(entry.get("category", ""), 5),
+    )
+
+
+def _claimed(picked: dict[str, _Service]) -> set[str]:
+    """Phrases the keyword map has already answered for."""
+    claimed: set[str] = set()
+    for svc in picked.values():
+        claimed.update(_phrase(k) for k in svc.keywords)
+        claimed.update(_phrase(n) for n in svc.name_match)
+        claimed.add(_phrase(svc.key))
+    return claimed
+
+
+def _index_matches(prompt: str, picked: dict[str, _Service]) -> list[_Service]:
+    """Modules the index recognises in the prompt that the keyword map missed."""
+    phrases, entries = _index_phrases()
+    if not phrases:
+        return []
+    text = f" {_phrase(prompt)} "
+    claimed = _claimed(picked)
+    taken = {n for svc in picked.values() for n in svc.name_match}
+    found: dict[str, _Service] = {}
+    # Longest phrases first, so "event notifications" is preferred over a
+    # single token that also appears in it.
+    for phrase in sorted(phrases, key=lambda p: (-len(p.split()), p)):
+        if phrase in claimed or f" {phrase} " not in text:
+            continue
+        name = phrases[phrase]
+        if name in taken or name in found:
+            continue
+        found[name] = _service_from_index(entries[name])
+    return list(found.values())
+
+
 def _wants_workload(prompt: str) -> bool:
     """Whether the prompt seems to ask for a primary service/workload."""
     p = prompt.lower()
@@ -250,11 +376,26 @@ def _detect_services(prompt: str) -> list[_Service]:
     """Classify which services the prompt asks for (deduped, deployment-ordered)."""
     p = f" {prompt.lower()} "
     picked: dict[str, _Service] = {}
+    matched_on: dict[str, str] = {}
     for svc in _SERVICES:
         if svc.key in picked:
             continue
-        if any(kw in p for kw in svc.keywords):
+        hit = next((kw for kw in svc.keywords if kw in p), None)
+        if hit:
             picked[svc.key] = svc
+            matched_on[svc.key] = _phrase(hit)
+    # Anything the keyword map didn't recognise, the index might.
+    text = f" {_phrase(prompt)} "
+    for svc in _index_matches(prompt, picked):
+        phrase = svc.keywords[0]
+        # "watsonx orchestrate" is a better answer than the "watsonx" keyword
+        # that also fired — unless that service was itself named outright.
+        for key, keyword in list(matched_on.items()):
+            named = f" {_phrase(picked[key].name_match[0])} " in text
+            if not named and keyword != phrase and f" {keyword} " in f" {phrase} ":
+                picked.pop(key, None)
+                matched_on.pop(key, None)
+        picked.setdefault(svc.key, svc)
     return _finalize(picked)
 
 
@@ -267,7 +408,10 @@ def _match_known(term: str) -> _Service | None:
             return svc
         if any(kw in t for kw in svc.keywords):
             return svc
-    return None
+    # Fall back to the index before treating the term as an unknown workload.
+    phrases, entries = _index_phrases()
+    name = phrases.get(_phrase(term))
+    return _service_from_index(entries[name]) if name else None
 
 
 def _adhoc_service(term: str) -> _Service:
