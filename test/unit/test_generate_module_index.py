@@ -18,6 +18,8 @@ from scripts.generate_module_index import (
     categorize_module,
     clean_excerpt,
     fetch_submodule_description,
+    is_module_maintained,
+    process_module,
 )
 
 
@@ -902,3 +904,171 @@ class TestParallelProcessing:
         for batch in batches:
             all_items.extend(batch)
         assert sorted(all_items) == list(range(total_modules))
+
+
+class TestIsModuleMaintained:
+    """
+    Tests for is_module_maintained -- the check the index's own
+    filter_criteria has always claimed to run (required_topics,
+    exclude_archived) but never actually did until now.
+    """
+
+    @pytest.mark.asyncio
+    async def test_unarchived_with_required_topic_is_maintained(self):
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-x")
+        )
+        gh.get_repository_info = AsyncMock(
+            return_value={
+                "archived": False,
+                "topics": ["core-team", "terraform-module"],
+            }
+        )
+        assert (
+            await is_module_maintained(
+                gh,
+                "terraform-ibm-modules/x/ibm",
+                "https://github.com/terraform-ibm-modules/terraform-ibm-x",
+            )
+            is True
+        )
+
+    @pytest.mark.asyncio
+    async def test_archived_repo_is_excluded(self):
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-x")
+        )
+        gh.get_repository_info = AsyncMock(
+            return_value={"archived": True, "topics": ["core-team"]}
+        )
+        assert (
+            await is_module_maintained(
+                gh, "x", "https://github.com/terraform-ibm-modules/terraform-ibm-x"
+            )
+            is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_missing_required_topic_is_excluded(self):
+        """A repo without the core-team topic is excluded, however popular."""
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-x")
+        )
+        gh.get_repository_info = AsyncMock(
+            return_value={"archived": False, "topics": ["terraform-module"]}
+        )
+        assert (
+            await is_module_maintained(
+                gh, "x", "https://github.com/terraform-ibm-modules/terraform-ibm-x"
+            )
+            is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_unparsable_url_is_excluded(self):
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(return_value=None)
+        assert await is_module_maintained(gh, "x", "not-a-github-url") is False
+
+    @pytest.mark.asyncio
+    async def test_repository_lookup_failure_is_excluded_not_raised(self):
+        """
+        Defaults to excluding, matching search.py's _is_repository_valid --
+        a module the check can't verify should not appear as verified.
+        """
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-x")
+        )
+        gh.get_repository_info = AsyncMock(side_effect=RuntimeError("rate limited"))
+        assert (
+            await is_module_maintained(
+                gh, "x", "https://github.com/terraform-ibm-modules/terraform-ibm-x"
+            )
+            is False
+        )
+
+
+class TestProcessModuleFiltering:
+    """
+    process_module used to filter on Terraform Registry release recency
+    (published_at, 90 days). That filter is gone: this org's dependency bot
+    pushes to every repo regardless of real module activity, so neither
+    release nor push recency can separate a maintained module from an
+    abandoned one -- these tests lock in the replacement (topic + archived).
+    """
+
+    @staticmethod
+    def _module(**overrides):
+        base = {
+            "id": "terraform-ibm-modules/resource-group/ibm/1.6.1",
+            "namespace": "terraform-ibm-modules",
+            "name": "resource-group",
+            "provider": "ibm",
+            "description": "Creates a resource group",
+            "source": "https://github.com/terraform-ibm-modules/terraform-ibm-resource-group",
+            "published_at": "2026-05-20T00:00:00Z",  # >90 days old at time of writing
+            "downloads": 2_282_006,
+        }
+        base.update(overrides)
+        return base
+
+    @pytest.mark.asyncio
+    async def test_stable_module_with_old_release_is_kept(self):
+        """
+        The motivating case: resource-group has 2.3M downloads and is
+        actively maintained, but rarely needs a release. The old age filter
+        dropped it; the topic-based check keeps it.
+        """
+        tf = MagicMock()
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-resource-group")
+        )
+        gh.get_repository_info = AsyncMock(
+            return_value={"archived": False, "topics": ["core-team"]}
+        )
+        gh.get_file_content = AsyncMock(return_value={"decoded_content": ""})
+        tf.get_module_details = AsyncMock(return_value={"submodules": []})
+
+        result = await process_module(self._module(), tf, gh)
+
+        assert result is not None
+        assert result["id"] == "terraform-ibm-modules/resource-group/ibm/1.6.1"
+
+    @pytest.mark.asyncio
+    async def test_wrong_org_is_still_excluded(self):
+        tf, gh = MagicMock(), MagicMock()
+        module = self._module(
+            source="https://github.com/someone-else/terraform-ibm-resource-group"
+        )
+
+        result = await process_module(module, tf, gh)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_missing_topic_excludes_a_recently_released_module(self):
+        """Being fresh by release date doesn't bypass the topic check."""
+        tf = MagicMock()
+        gh = MagicMock()
+        gh.parse_github_url = MagicMock(
+            return_value=("terraform-ibm-modules", "terraform-ibm-community-module")
+        )
+        gh.get_repository_info = AsyncMock(
+            return_value={"archived": False, "topics": ["terraform-module"]}
+        )
+
+        module = self._module(
+            id="terraform-ibm-modules/community-module/ibm/1.0.0",
+            name="community-module",
+            source="https://github.com/terraform-ibm-modules/terraform-ibm-community-module",
+            published_at=datetime.now(UTC).isoformat(),
+        )
+
+        result = await process_module(module, tf, gh)
+
+        assert result is None

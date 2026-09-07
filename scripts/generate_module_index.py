@@ -13,7 +13,7 @@ import json
 import os
 import re
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from tim_mcp.clients.github_client import GitHubClient
 from tim_mcp.clients.terraform_client import TerraformClient
 from tim_mcp.config import load_config
+from tim_mcp.tools.search import REQUIRED_TOPICS
 from tim_mcp.utils.cache import Cache
 
 # Category mappings (same as in list_modules.py)
@@ -126,7 +127,6 @@ CATEGORY_KEYWORDS = {
 
 
 # Configuration constants
-MODULE_AGE_THRESHOLD_DAYS = 90
 OUTPUT_FILENAME = "module_index.json"
 
 
@@ -194,23 +194,6 @@ def clean_excerpt(text: str) -> str:
     text = re.sub(r" *\n\n *", "\n\n", text)
 
     return text.strip()
-
-
-def parse_iso_date(date_str: str) -> datetime | None:
-    """
-    Parse an ISO format date string into a datetime object.
-
-    Args:
-        date_str: ISO format date string
-
-    Returns:
-        Datetime object or None if parsing fails
-    """
-    try:
-        # Handle 'Z' timezone designator by replacing with +00:00
-        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
 
 
 async def fetch_submodule_description(
@@ -712,18 +695,60 @@ async def extract_readme_excerpt(gh_client: GitHubClient, source: str) -> str:
     return readme_excerpt
 
 
+async def is_module_maintained(
+    gh_client: GitHubClient, module_id: str, source: str
+) -> bool:
+    """
+    Whether the module's GitHub repo is unarchived and carries every topic in
+    ``REQUIRED_TOPICS`` -- the two checks this index's own ``filter_criteria``
+    has always claimed to apply, but never actually ran.
+
+    A release-recency or push-recency cutoff was tried instead and dropped:
+    this org's dependency bot pushes to every repo roughly weekly regardless
+    of real module activity, so neither can tell a small, stable, still-
+    maintained module (e.g. resource-group) from an abandoned one -- the
+    topic can, and does not need a time window at all.
+
+    Defaults to excluding the module when the repo can't be checked, matching
+    how search.py's ``_is_repository_valid`` treats the same failure.
+    """
+    repo_info = gh_client.parse_github_url(source)
+    if not repo_info:
+        print(f"Skipping {module_id} - could not parse GitHub URL: {source}")
+        return False
+
+    owner, repo = repo_info
+    try:
+        repo_data = await gh_client.get_repository_info(owner, repo)
+    except Exception as e:  # noqa: BLE001 - any failure means: don't include it
+        print(f"Skipping {module_id} - could not fetch repository info: {e}")
+        return False
+
+    if repo_data.get("archived", False):
+        print(f"Skipping {module_id} - repository is archived")
+        return False
+
+    topics = repo_data.get("topics", [])
+    missing = [t for t in REQUIRED_TOPICS if t not in topics]
+    if missing:
+        print(f"Skipping {module_id} - missing required topics: {missing}")
+        return False
+
+    return True
+
+
 async def process_module(
     module: dict[str, Any],
     tf_client: TerraformClient,
     gh_client: GitHubClient,
-    cutoff_date: datetime,
 ) -> dict[str, Any] | None:
     """
     Process a single module, filtering and enriching with additional data.
 
     This function:
     1. Extracts basic module information (ID, name, description, etc.)
-    2. Filters out modules that are too old or from incorrect sources
+    2. Filters out modules from the wrong org, archived, or missing the
+       required GitHub topic
     3. Categorizes the module based on its name and description
     4. Fetches submodules and README excerpts to enrich the data
 
@@ -731,7 +756,6 @@ async def process_module(
         module: Raw module data from the Terraform registry
         tf_client: TerraformClient instance for API calls
         gh_client: GitHubClient instance for GitHub API calls
-        cutoff_date: Date cutoff for filtering modules
 
     Returns:
         Processed module entry or None if module should be filtered out
@@ -744,18 +768,12 @@ async def process_module(
     description = module.get("description", "")
     published_at = module.get("published_at", "")
 
-    # Parse published date
-    published_date = parse_iso_date(published_at)
-    if published_date and published_date < cutoff_date:
-        print(f"Skipping {module_id} - last updated {published_date.date()}")
-        return None
-    elif not published_date:
-        print(f"Warning: Could not parse date for {module_id}: {published_at}")
-        # Include module if we can't parse the date (safer default)
-
     # Validate it's from terraform-ibm-modules GitHub org
     if "github.com/terraform-ibm-modules" not in source:
         print(f"Skipping {module_id} - not from terraform-ibm-modules org")
+        return None
+
+    if not await is_module_maintained(gh_client, module_id, source):
         return None
 
     # Categorize module
@@ -791,7 +809,8 @@ async def generate_module_index(output_path: Path | None = None):
 
     This function:
     1. Fetches all modules from the terraform-ibm-modules namespace
-    2. Filters out modules older than the threshold (default: 90 days)
+    2. Filters out modules that are archived or missing the required
+       GitHub topic (see ``is_module_maintained``)
     3. Categorizes modules based on name and description
     4. Fetches submodules for each module
     5. Extracts meaningful excerpts from README files
@@ -829,9 +848,6 @@ async def generate_module_index(output_path: Path | None = None):
         all_modules = await tf_client.list_all_modules(namespace)
         print(f"Found {len(all_modules)} total modules")
 
-        # Calculate cutoff date (3 months ago)
-        cutoff_date = datetime.now(UTC) - timedelta(days=MODULE_AGE_THRESHOLD_DAYS)
-
         # Process modules in parallel (with concurrency limit to avoid overwhelming the API)
         print("Processing modules in parallel...")
 
@@ -842,10 +858,7 @@ async def generate_module_index(output_path: Path | None = None):
         for i in range(0, len(all_modules), batch_size):
             batch = all_modules[i : i + batch_size]
             batch_results = await asyncio.gather(
-                *[
-                    process_module(module, tf_client, gh_client, cutoff_date)
-                    for module in batch
-                ],
+                *[process_module(module, tf_client, gh_client) for module in batch],
                 return_exceptions=True,
             )
 
@@ -874,8 +887,7 @@ async def generate_module_index(output_path: Path | None = None):
             "total_modules": len(filtered_modules),
             "namespace": namespace,
             "filter_criteria": {
-                "min_age_days": MODULE_AGE_THRESHOLD_DAYS,
-                "required_topics": ["core-team"],
+                "required_topics": REQUIRED_TOPICS,
                 "exclude_archived": True,
             },
             "modules": filtered_modules,
