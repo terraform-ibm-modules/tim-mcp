@@ -719,8 +719,11 @@ async def is_module_maintained(
 
     owner, repo = repo_info
     try:
+        # get_repository_info raises ModuleNotFoundError, GitHubError, or
+        # RateLimitError -- broad on purpose: any of them means this run
+        # couldn't confirm the repo, so exclude it rather than guess.
         repo_data = await gh_client.get_repository_info(owner, repo)
-    except Exception as e:  # noqa: BLE001 - any failure means: don't include it
+    except Exception as e:  # noqa: BLE001
         print(f"Skipping {module_id} - could not fetch repository info: {e}")
         return False
 
@@ -766,7 +769,9 @@ async def process_module(
     provider = module.get("provider", "")
     source = module.get("source", "")
     description = module.get("description", "")
-    published_at = module.get("published_at", "")
+    published_at = module.get(
+        "published_at", ""
+    )  # stored in the output only, not filtered on
 
     # Validate it's from terraform-ibm-modules GitHub org
     if "github.com/terraform-ibm-modules" not in source:

@@ -8,7 +8,7 @@ import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -18,6 +18,7 @@ from scripts.generate_module_index import (
     categorize_module,
     clean_excerpt,
     fetch_submodule_description,
+    generate_module_index,
     is_module_maintained,
     process_module,
 )
@@ -162,6 +163,10 @@ def mock_terraform_client():
 
     mock_client.list_all_modules = AsyncMock(return_value=mock_modules)
 
+    # Mock get_module_versions: fetch_submodules asks for the latest stable
+    # version before fetching details, regardless of which module it's for.
+    mock_client.get_module_versions = AsyncMock(return_value=["1.0.0"])
+
     # Mock get_module_details method
     mock_module_details = {
         "terraform-ibm-modules/vpc/ibm": {
@@ -198,9 +203,26 @@ def mock_github_client():
             return "terraform-ibm-modules", "terraform-ibm-cos"
         elif "terraform-ibm-watsonx" in source_url:
             return "terraform-ibm-modules", "terraform-ibm-watsonx"
+        elif "terraform-ibm-old-module" in source_url:
+            return "terraform-ibm-modules", "terraform-ibm-old-module"
         return None
 
     mock_client.parse_github_url = MagicMock(side_effect=mock_parse_github_url)
+
+    # Mock get_repository_info: every repo is core-team and unarchived except
+    # old-module, which lacks the required topic -- with the age filter gone,
+    # that (not its age) is what excludes it now.
+    mock_repo_info = {
+        "terraform-ibm-vpc": {"archived": False, "topics": ["core-team"]},
+        "terraform-ibm-cos": {"archived": False, "topics": ["core-team"]},
+        "terraform-ibm-watsonx": {"archived": False, "topics": ["core-team"]},
+        "terraform-ibm-old-module": {"archived": False, "topics": ["community"]},
+    }
+
+    async def mock_get_repository_info(owner, repo):
+        return mock_repo_info.get(repo, {"archived": False, "topics": []})
+
+    mock_client.get_repository_info = AsyncMock(side_effect=mock_get_repository_info)
 
     # Mock get_file_content method
     mock_readme_contents = {
@@ -225,190 +247,56 @@ def mock_github_client():
     return mock_client
 
 
-# Create a test-specific version of generate_module_index
-async def _generate_module_index_impl(output_path, tf_client, gh_client):
-    """Test-specific implementation of generate_module_index."""
-    print("Starting module index generation...")
-
-    # Use fixed namespace for tests
-    namespace = "terraform-ibm-modules"
-    print(f"Fetching modules from namespace: {namespace}")
-
-    # Get modules from the mock client
-    all_modules = await tf_client.list_all_modules(namespace)
-    print(f"Found {len(all_modules)} total modules")
-
-    # Calculate cutoff date (3 months ago)
-    three_months_ago = datetime.now(UTC) - timedelta(days=90)
-
-    # Process modules
-    filtered_modules = []
-    for module in all_modules:
-        module_id = module.get("id", "")
-        namespace = module.get("namespace", "")
-        name = module.get("name", "")
-        provider = module.get("provider", "")
-
-        # Parse published date
-        published_at = module.get("published_at", "")
-        try:
-            published_date = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-
-            # Filter: skip modules older than 3 months
-            if published_date < three_months_ago:
-                print(f"Skipping {module_id} - last updated {published_date.date()}")
-                continue
-        except (ValueError, AttributeError):
-            print(f"Warning: Could not parse date for {module_id}: {published_at}")
-
-        source = module.get("source", "")
-
-        # Validate it's from terraform-ibm-modules GitHub org
-        if "github.com/terraform-ibm-modules" not in source:
-            print(f"Skipping {module_id} - not from terraform-ibm-modules org")
-            continue
-
-        # Categorize module
-        description = module.get("description", "")
-        category = categorize_module(name, description)
-
-        # Fetch submodules for this module
-        print(f"Fetching submodules for {module_id}...")
-        submodules = []
-        try:
-            module_details = await tf_client.get_module_details(
-                namespace, name, provider, "latest"
-            )
-
-            # Parse owner/repo from source URL for README fetching
-            owner_repo = gh_client.parse_github_url(source)
-            if not owner_repo:
-                owner, repo = None, None
-            else:
-                owner, repo = owner_repo
-
-            # Extract submodules
-            raw_submodules = module_details.get("submodules", [])
-            for submodule in raw_submodules:
-                submodule_path = submodule.get("path", "")
-                submodule_name = submodule_path.split("/")[-1] if submodule_path else ""
-
-                # Generate GitHub source URL for submodule
-                submodule_source_url = (
-                    f"{source}/tree/main/{submodule_path}" if submodule_path else source
-                )
-
-                # For tests, use empty description (actual implementation would fetch from README)
-                description = ""
-
-                submodules.append(
-                    {
-                        "path": submodule_path,
-                        "name": submodule_name,
-                        "description": description,
-                        "source_url": submodule_source_url,
-                    }
-                )
-
-            # Sort submodules by name
-            submodules.sort(key=lambda x: x["name"])
-
-        except Exception as e:
-            print(f"Warning: Could not fetch submodules for {module_id}: {e}")
-
-        # Fetch README excerpt
-        readme_excerpt = ""
-        try:
-            # Parse owner/repo from source URL
-            owner_repo = gh_client.parse_github_url(source)
-            if owner_repo:
-                owner, repo = owner_repo
-                readme_data = await gh_client.get_file_content(owner, repo, "README.md")
-                content = readme_data.get("decoded_content", "")
-
-                # Extract meaningful description paragraph
-                if content:
-                    readme_excerpt = content[:200]  # Simplified for testing
-                    readme_excerpt = clean_excerpt(readme_excerpt)
-
-        except Exception as e:
-            print(f"Warning: Could not fetch README for {module_id}: {e}")
-
-        # Build module entry with submodules and readme_excerpt
-        module_entry = {
-            "id": module_id,
-            "name": name,
-            "description": description,
-            "category": category,
-            "downloads": module.get("downloads", 0),
-            "published_at": published_at,
-            "source_url": source,
-            "submodules": submodules,
-            "readme_excerpt": readme_excerpt,
-        }
-
-        filtered_modules.append(module_entry)
-
-    # Sort by downloads (descending)
-    filtered_modules.sort(key=lambda x: x["downloads"], reverse=True)
-
-    print(f"\nFiltered to {len(filtered_modules)} modules")
-
-    # Create output structure
-    output = {
-        "generated_at": datetime.now(UTC).isoformat(),
-        "total_modules": len(filtered_modules),
-        "namespace": namespace,
-        "filter_criteria": {
-            "min_age_days": 90,
-            "required_topics": ["core-team"],
-            "exclude_archived": True,
-        },
-        "modules": filtered_modules,
-    }
-
-    # Write to output path
-    output_path.parent.mkdir(exist_ok=True)
-
-    with open(output_path, "w") as f:
-        json.dump(output, f, indent=2)
-
-    print(f"\n✅ Module index generated: {output_path}")
-    print(f"   Total modules: {len(filtered_modules)}")
-    print(f"   Categories: {len({m['category'] for m in filtered_modules})}")
-
-    return output
+def _as_async_context_manager(mock_obj):
+    """Wrap a mock client so ``async with ClientClass(...) as x`` yields it."""
+    cm = MagicMock(return_value=mock_obj)
+    mock_obj.__aenter__ = AsyncMock(return_value=mock_obj)
+    mock_obj.__aexit__ = AsyncMock(return_value=None)
+    return cm
 
 
 @pytest.mark.asyncio
 async def test_generate_module_index(
     mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path
 ):
-    """Test the generate_module_index function."""
-    # Create a temporary directory for the output
+    """
+    Test the real generate_module_index function end to end.
+
+    This used to run against a local reimplementation that duplicated (and
+    drifted from) the actual filtering logic -- it still applied the old
+    90-day age filter after that filter was removed from the real code, so
+    it kept passing regardless of whether generate_module_index was correct.
+    Runs the real function now, with load_config/TerraformClient/GitHubClient
+    patched the way the integration test patches them.
+    """
     static_dir = tmp_path / "static"
     static_dir.mkdir()
-
-    # Create the output path
     output_path = static_dir / "module_index.json"
 
-    # Run our test implementation directly with the mocks
-    output_data = await _generate_module_index_impl(
-        output_path, mock_terraform_client, mock_github_client
-    )
+    with (
+        patch("scripts.generate_module_index.load_config", return_value=mock_config),
+        patch(
+            "scripts.generate_module_index.TerraformClient",
+            _as_async_context_manager(mock_terraform_client),
+        ),
+        patch(
+            "scripts.generate_module_index.GitHubClient",
+            _as_async_context_manager(mock_github_client),
+        ),
+    ):
+        await generate_module_index(output_path=output_path)
 
-    # Check that the output file was created
-    output_path = static_dir / "module_index.json"
     assert output_path.exists()
 
-    # Load and validate the output
     with open(output_path) as f:
         output_data = json.load(f)
 
     # Verify the structure and content
     assert "generated_at" in output_data
     assert output_data["namespace"] == "terraform-ibm-modules"
-    assert output_data["total_modules"] == 3  # Should exclude the old module
+    # old-module lacks the core-team topic -- see mock_github_client's
+    # get_repository_info -- not filtered by age (that filter is gone).
+    assert output_data["total_modules"] == 3
 
     # Verify modules are sorted by downloads
     modules = output_data["modules"]
@@ -439,8 +327,7 @@ async def test_generate_module_index(
 async def test_generate_module_index_with_exceptions(
     mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path
 ):
-    """Test the generate_module_index function with exceptions."""
-    # Create a temporary directory for the output
+    """Test the real generate_module_index function when per-module fetches fail."""
     static_dir = tmp_path / "static"
     static_dir.mkdir()
 
@@ -478,19 +365,23 @@ async def test_generate_module_index_with_exceptions(
         side_effect=mock_get_module_details_with_exception
     )
 
-    # Create the output path
     output_path = static_dir / "module_index.json"
 
-    # Run our test implementation directly with the mocks
-    output_data = await _generate_module_index_impl(
-        output_path, mock_terraform_client, mock_github_client
-    )
+    with (
+        patch("scripts.generate_module_index.load_config", return_value=mock_config),
+        patch(
+            "scripts.generate_module_index.TerraformClient",
+            _as_async_context_manager(mock_terraform_client),
+        ),
+        patch(
+            "scripts.generate_module_index.GitHubClient",
+            _as_async_context_manager(mock_github_client),
+        ),
+    ):
+        await generate_module_index(output_path=output_path)
 
-    # Check that the output file was created despite exceptions
-    output_path = static_dir / "module_index.json"
     assert output_path.exists()
 
-    # Load and validate the output
     with open(output_path) as f:
         output_data = json.load(f)
 
@@ -1066,7 +957,7 @@ class TestProcessModuleFiltering:
             id="terraform-ibm-modules/community-module/ibm/1.0.0",
             name="community-module",
             source="https://github.com/terraform-ibm-modules/terraform-ibm-community-module",
-            published_at=datetime.now(UTC).isoformat(),
+            published_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 
         result = await process_module(module, tf, gh)
