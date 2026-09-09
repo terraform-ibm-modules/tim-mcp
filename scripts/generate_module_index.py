@@ -769,9 +769,8 @@ async def process_module(
     provider = module.get("provider", "")
     source = module.get("source", "")
     description = module.get("description", "")
-    published_at = module.get(
-        "published_at", ""
-    )  # stored in the output only, not filtered on
+    # included in output, not used for filtering
+    published_at = module.get("published_at", "")
 
     # Validate it's from terraform-ibm-modules GitHub org
     if "github.com/terraform-ibm-modules" not in source:
@@ -867,14 +866,18 @@ async def generate_module_index(output_path: Path | None = None):
                 return_exceptions=True,
             )
 
-            # Filter out None results and exceptions
-            filtered_modules.extend(
-                [
-                    result
-                    for result in batch_results
-                    if result is not None and not isinstance(result, Exception)
-                ]
-            )
+            # Keep successful results; anything else is reported, not silently
+            # dropped -- is_module_maintained means every module now makes a
+            # live GitHub call, so a rate limit or network error surfacing
+            # here is a real failure a maintainer should see, not noise.
+            for module, result in zip(batch, batch_results, strict=True):
+                if isinstance(result, Exception):
+                    print(
+                        f"Warning: processing {module.get('id', '?')} raised "
+                        f"{type(result).__name__}: {result}"
+                    )
+                elif result is not None:
+                    filtered_modules.append(result)
 
             # Print progress
             print(

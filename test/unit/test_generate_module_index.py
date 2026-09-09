@@ -400,6 +400,58 @@ async def test_generate_module_index_with_exceptions(
     assert watsonx_module["submodules"] == []  # Module details fetch failed
 
 
+@pytest.mark.asyncio
+async def test_generate_module_index_reports_unexpected_exceptions(
+    mock_config, mock_cache, mock_terraform_client, mock_github_client, tmp_path, capsys
+):
+    """
+    process_module runs inside asyncio.gather(..., return_exceptions=True), so
+    an exception it doesn't itself catch becomes a plain result in the batch --
+    it must be reported and the module dropped, not silently absorbed as if it
+    had simply failed a filter. Forces a real exception (not a filtering
+    decision) by making parse_github_url misbehave for one module.
+    """
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    output_path = static_dir / "module_index.json"
+
+    real_parse = mock_github_client.parse_github_url
+
+    def flaky_parse_github_url(source_url):
+        if "terraform-ibm-cos" in source_url:
+            raise RuntimeError("unexpected parsing bug")
+        return real_parse(source_url)
+
+    mock_github_client.parse_github_url = MagicMock(side_effect=flaky_parse_github_url)
+
+    with (
+        patch("scripts.generate_module_index.load_config", return_value=mock_config),
+        patch(
+            "scripts.generate_module_index.TerraformClient",
+            _as_async_context_manager(mock_terraform_client),
+        ),
+        patch(
+            "scripts.generate_module_index.GitHubClient",
+            _as_async_context_manager(mock_github_client),
+        ),
+    ):
+        await generate_module_index(output_path=output_path)
+
+    with open(output_path) as f:
+        output_data = json.load(f)
+
+    ids = {m["id"] for m in output_data["modules"]}
+    assert "terraform-ibm-modules/cos/ibm" not in ids
+    # The other modules in the batch are unaffected by cos's failure.
+    assert "terraform-ibm-modules/vpc/ibm" in ids
+
+    # The failure is visible, not silently dropped.
+    captured = capsys.readouterr()
+    assert "terraform-ibm-modules/cos/ibm" in captured.out
+    assert "RuntimeError" in captured.out
+    assert "unexpected parsing bug" in captured.out
+
+
 class TestSubmoduleDescription:
     """Tests for the fetch_submodule_description function."""
 
@@ -827,6 +879,10 @@ class TestIsModuleMaintained:
 
     @pytest.mark.asyncio
     async def test_archived_repo_is_excluded(self):
+        """
+        Archived excludes even when the required topic is present -- the
+        topic alone isn't enough to keep a repo the org has retired.
+        """
         gh = MagicMock()
         gh.parse_github_url = MagicMock(
             return_value=("terraform-ibm-modules", "terraform-ibm-x")
