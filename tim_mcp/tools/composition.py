@@ -400,18 +400,36 @@ def _detect_services(prompt: str) -> list[_Service]:
 
 
 def _match_known(term: str) -> _Service | None:
-    """Map a caller-supplied service term to a known _Service, or None."""
+    """
+    Map a caller-supplied service term to a known _Service, or None.
+
+    Three tiers, in order:
+      1. Exact identity — the term names a _SERVICES entry by its own key or
+         instance. This is what keeps curated overrides (kms -> kms-all-
+         inclusive, vpc -> landing-zone-vpc) winning over the index's own
+         same-named module, so it has to run before the index is consulted.
+      2. Index exact/family-name match — precise, so "watsonx orchestrate"
+         resolves to watsonx-orchestrate rather than falling into tier 3 and
+         matching the broader "watsonx" keyword meant for watsonx-ai.
+      3. Loose keyword substring — the fallback for genuinely fuzzy phrasing
+         ("encryption" -> kms) that names no module and isn't in the index
+         under any recognisable form.
+    """
     t = f" {term.lower().strip()} "
     slug_key = re.sub(r"[^a-z0-9]+", "_", term.lower().strip()).strip("_")
     for svc in _SERVICES:
         if svc.key == slug_key or svc.instance == slug_key:
             return svc
-        if any(kw in t for kw in svc.keywords):
-            return svc
-    # Fall back to the index before treating the term as an unknown workload.
+
     phrases, entries = _index_phrases()
     name = phrases.get(_phrase(term))
-    return _service_from_index(entries[name]) if name else None
+    if name:
+        return _service_from_index(entries[name])
+
+    for svc in _SERVICES:
+        if any(kw in t for kw in svc.keywords):
+            return svc
+    return None
 
 
 def _adhoc_service(term: str) -> _Service:

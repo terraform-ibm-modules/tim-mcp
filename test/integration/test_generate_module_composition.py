@@ -670,6 +670,30 @@ def test_index_service_priority_comes_from_its_category():
     assert comp._role_for(picked["event_notifications"].priority) == "support"
 
 
+def test_match_known_prefers_the_more_specific_module():
+    """
+    services=["watsonx orchestrate"] used to resolve to watsonx-ai: the
+    keyword loop's "watsonx" in "watsonx orchestrate" substring check fired
+    before the index was ever consulted. The index check now runs before
+    that loose fallback, so the exact, more specific module wins.
+    """
+    assert comp._match_known("watsonx orchestrate").instance == "watsonx_orchestrate"
+    # the bare term still falls through to the loose keyword match
+    assert comp._match_known("watsonx").instance == "watsonx_ai"
+
+
+def test_match_known_curated_override_beats_the_index():
+    """
+    vpc and kms must keep resolving to the curated modules (landing-zone-vpc,
+    kms-all-inclusive) rather than the index's own same-named modules
+    (plain "vpc", and nothing named bare "kms" at all) -- the exact-identity
+    check has to run before the index lookup, not after it.
+    """
+    assert comp._match_known("vpc").instance == "vpc"  # landing-zone-vpc's instance key
+    assert comp._match_known("vpc").name_match[0] == "landing-zone-vpc"
+    assert comp._match_known("kms").name_match[0] == "kms-all-inclusive"
+
+
 @pytest.mark.asyncio
 async def test_services_input_resolves_via_the_index(config):
     """An explicit service the keyword map doesn't know still resolves."""
