@@ -13,6 +13,7 @@ TIM-MCP provides multiple tools designed for **efficient context gathering**. Ea
 
 | Tool | Context Weight | Primary Use |
 |------|----------------|-------------|
+| `generate_module_composition` | Heavy | Assemble a composition JSON from a prompt (calls the other tools live) |
 | `search_modules` | Lightweight | Find module IDs (essential first step) |
 | `get_latest_module_version` | Lightweight | Get the newest published module version and release info |
 | `list_content` | Lightweight | Discover what examples/content exist |
@@ -47,6 +48,51 @@ limit (optional): Number of results, default 5
 ```
 search_modules(query="vpc", limit=5)
 ```
+
+---
+
+## generate_module_composition
+
+Assemble a composition for a request by calling the *other* TIM-MCP tools live. Given services to combine (e.g. openshift + kms + cos), it returns a **composition JSON** — the modules, deployment order, inferred wiring, provisioning conflicts, and prerequisites — built entirely from live registry data. This is the entry point for AI-assisted, multi-module composition.
+
+It holds **no static module data**. Module IDs and versions come from `search_modules` (both the curated keyword map and, for anything it doesn't know, the bundled module index — so any TIM module can be named, not just a fixed list); connections are derived from the real interfaces read via `get_module_details`; deployment order is a topological sort of the inferred connection graph (falling back to a fixed priority only to break ties or resolve a cycle); and when a DA is requested, a `reference_solution` pointer to the deployable architecture is added (fetch it with `get_content` for the authoritative wiring). The result always reflects the current registry.
+
+**When to use:**
+- User asks "how do I build X on IBM Cloud" or "give me an X composition with Y and Z"
+- Starting a new multi-module Terraform solution around a service
+
+**Note:** this tool makes live registry/GitHub calls per request (search + details for every module, resolved and read in parallel), so it is **slower** than the lightweight tools — expect a few seconds per module; a `GITHUB_TOKEN` keeps it from hitting rate limits.
+
+**Parameters:**
+```
+services (preferred): The services to compose, as plain terms you extracted from
+  the user's request, e.g. ["openshift", "kms", "cos"]. Each is resolved to a real
+  module — more reliable than having the tool re-parse free text. Known terms keep
+  curated handling (e.g. "kms" -> kms-all-inclusive, not a generic KMS match);
+  anything else resolves via the module index if it's a real TIM module.
+prompt (fallback): Natural-language request, used when `services` is not given, e.g.
+  "gimme an openshift composition with kms and cos". Mention "DA" for DA grounding.
+include_da (optional): true to add a deployable-architecture reference_solution pointer.
+```
+Provide `services` or `prompt` (at least one).
+
+**Returns:** JSON with:
+- `composition_name`, `description` (one-line summary), `prompt`, `da_grounded`
+- `reference_solution`: the anchor DA (`module_id`, `solution_path`, `source_url`) — only present when `da_grounded`
+- `recommended_modules`: each with `id`, `instance_name`, `role` (foundation/support/workload), `purpose` (the module's live registry description), resolved `version`, `source`, `registry_url`, and `provisions` — whole modules this one instantiates internally (e.g. a cluster module that creates its own COS instance) — deploying that service separately too may create a duplicate; see `notes`
+- `deployment_order`: instance names in dependency order (from the connection graph, not a fixed list)
+- `connections`: `source_module.source_output` → `target_module.target_input`, tagged by confidence in `origin` — `inferred` (exact output-name match), `inferred-kind` (matched by resource kind + value type, e.g. `existing_cos_id` → the COS module's id output), or `inferred-alias` (matched via a naming convention, e.g. `kms_key_crn`). The latter two are name-derived — confirm with `get_module_details` before relying on them.
+- `prerequisites`: derived from the resolved modules' actual inputs — the API key (always), values required by more than one module (region, resource group, etc.), any input left unwired that's required, and "use existing" (`existing_*`) inputs offered as optional reuse points, matching how DAs present that choice
+- `notes`: everything the tool declined to guess at — connectable inputs left unwired (with why), nested inputs (e.g. `worker_pools`) that carry references but can't be expressed as a module-level connection, and provisioning conflicts (a module in the composition would create its own instance of a service the composition also deploys separately)
+
+**DA grounding is opt-in:** when the prompt mentions "DA" (or "deployable architecture"), the response includes a `reference_solution` pointer to the module's deployable-architecture `solutions/` directory. Connections are always inferred from interfaces — real DAs route their wiring through locals/interpolation that can't be extracted reliably, so `reference_solution` points you at the authoritative wiring (fetch it with `get_content`) rather than the tool guessing it.
+
+**Example:**
+```
+generate_module_composition(services=["openshift", "kms", "cos"])
+```
+
+**How to use the result:** emit one `module` block per `recommended_modules` entry (registry `source` + `version`), wire each `connections` entry as `target_input = module.<source_module>.<source_output>`, and surface `prerequisites` as root variables. Treat `inferred-kind`/`inferred-alias` connections as suggestions — confirm exact input/output names with `get_module_details` before finalizing. Check `provisions` against the rest of the composition before assuming a service needs deploying twice.
 
 ---
 
@@ -330,3 +376,11 @@ For production use cases, recommend pinned versions for consistency.
    - **If no examples**: `get_module_details` → help user build from scratch
 
 **Why examples first?** Working code is better context than interface documentation.
+
+### "Build a full architecture for X" (multi-module composition)
+**Goal**: Wire several modules together into a working solution
+1. `generate_module_composition` - returns a composition JSON assembled live (modules + versions from `search_modules`, wiring derived from interfaces, or from the DA when the prompt says "DA"); heavier, a few seconds per module
+2. Review the `connections` — `origin: "da"` are authoritative; `origin: "inferred"` are approximate, so confirm those with `get_module_details` (medium)
+3. Generate the Terraform: one `module` block per `recommended_modules` entry (registry `source` + `version`), wiring each `connections` entry as `target_input = module.<source_module>.<source_output>`, and surfacing `prerequisites` as root variables. Address anything in `notes` (e.g. an unwired encryption input).
+
+**Why start here?** Everything — module IDs, versions, and wiring — comes from live discovery, so nothing is hardcoded to go stale.

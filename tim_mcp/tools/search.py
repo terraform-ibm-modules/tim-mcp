@@ -485,6 +485,24 @@ async def _is_repository_valid(
         return False
 
 
+def load_module_index() -> dict[str, Any] | None:
+    """
+    Read the bundled module index, or None when it isn't present.
+
+    Deliberately uncached: this is a local file read, and the caching layer
+    this package carries is for calls that cost a network round-trip. Callers
+    that read it repeatedly should cache on their own side.
+    """
+    for candidate in [
+        Path(__file__).parent.parent / "static" / "module_index.json",
+        Path(__file__).parent.parent.parent / "static" / "module_index.json",
+    ]:
+        if candidate.exists():
+            with open(candidate) as f:
+                return json.load(f)
+    return None
+
+
 def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
     """
     Search the local module index without making any API calls.
@@ -506,19 +524,9 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
     Returns:
         ModuleSearchResponse if any modules matched, None otherwise
     """
-    # Locate module_index.json — check both packaged and dev layouts.
-    for candidate in [
-        Path(__file__).parent.parent / "static" / "module_index.json",
-        Path(__file__).parent.parent.parent / "static" / "module_index.json",
-    ]:
-        if candidate.exists():
-            index_path = candidate
-            break
-    else:
+    data = load_module_index()
+    if data is None:
         return None
-
-    with open(index_path) as f:
-        data = json.load(f)
 
     words = re.findall(r"[a-z0-9]+", query.lower())
     if not words:

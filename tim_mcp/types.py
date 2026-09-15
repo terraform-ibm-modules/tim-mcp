@@ -8,7 +8,7 @@ the TIM-MCP server for request/response validation and schema generation.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
 class ModuleSearchRequest(BaseModel):
@@ -226,3 +226,143 @@ class ErrorDetail(BaseModel):
     code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
     details: dict[str, Any] | None = Field(None, description="Additional details")
+
+
+class GenerateModuleCompositionRequest(BaseModel):
+    """Request model for the module composition tool."""
+
+    services: list[str] | None = Field(
+        None,
+        description=(
+            "Preferred: the services to compose, as plain terms the caller "
+            "identified from the user's request (e.g. ['openshift', 'kms', "
+            "'cos']). Each is resolved to a real module via search_modules. Use "
+            "this instead of relying on the tool's keyword parsing of 'prompt'."
+        ),
+    )
+    prompt: str | None = Field(
+        None,
+        description=(
+            "Fallback: a natural-language request (e.g. 'gimme an openshift "
+            "composition with kms and cos'). Used when 'services' is not given; "
+            "the tool then parses services from it. Mention 'DA' to ground the "
+            "wiring in the deployable architecture."
+        ),
+    )
+    include_da: bool = Field(
+        False,
+        description=(
+            "Set true to add a deployable-architecture reference_solution "
+            "pointer (equivalent to mentioning 'DA' in the prompt)."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _require_input(self) -> "GenerateModuleCompositionRequest":
+        if not self.services and not (self.prompt and self.prompt.strip()):
+            raise ValueError("Provide 'services' or a non-empty 'prompt'.")
+        return self
+
+
+class RecommendedModule(BaseModel):
+    """A module in the composition, resolved live from the registry."""
+
+    id: str = Field(..., description="Base module identifier (namespace/name/provider)")
+    instance_name: str = Field(
+        ..., description="Suggested Terraform module block name for this instance"
+    )
+    role: str = Field(
+        ...,
+        description="Role in the stack: 'foundation', 'support', or 'workload' (from deployment priority)",
+    )
+    purpose: str = Field(
+        ..., description="What the module does (its live registry description)"
+    )
+    version: str = Field(..., description="Latest version resolved via search_modules")
+    source: str = Field(
+        ..., description="Terraform Registry source to use in the module block"
+    )
+    registry_url: str = Field(..., description="Terraform Registry URL for the module")
+    provisions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Whole modules this one instantiates internally (declared registry "
+            "dependencies, excluding utility submodules). Deploying one of these "
+            "separately as well may create a duplicate resource — see notes."
+        ),
+    )
+
+
+class ModuleConnection(BaseModel):
+    """A wiring between two modules (an output feeding an input)."""
+
+    source_module: str = Field(
+        ..., description="Instance name of the module producing the value"
+    )
+    source_output: str = Field(..., description="Output name on the source module")
+    target_module: str = Field(
+        ..., description="Instance name of the module consuming the value"
+    )
+    target_input: str = Field(
+        ..., description="Input variable name on the target module"
+    )
+    origin: str = Field(
+        "inferred",
+        description=(
+            "How the connection was derived from module interface names: "
+            "'inferred' (exact output-name match, high confidence), "
+            "'inferred-kind' (matched on resource kind + value type), or "
+            "'inferred-alias' (matched via a naming convention such as "
+            "kms_key_crn). The latter two are name-derived — confirm them with "
+            "get_module_details before relying on them."
+        ),
+    )
+
+
+class CompositionPrerequisite(BaseModel):
+    """An input the consumer must supply for the whole composition."""
+
+    name: str = Field(..., description="Prerequisite name")
+    type: str = Field(..., description="Prerequisite type (e.g. secret, string)")
+    required: bool = Field(..., description="Whether the prerequisite is required")
+    description: str | None = Field(None, description="What the prerequisite is for")
+
+
+class ReferenceSolution(BaseModel):
+    """Pointer to the Deployable Architecture solution used to ground the wiring."""
+
+    module_id: str = Field(..., description="Module whose repo holds the DA solution")
+    solution_path: str = Field(
+        ..., description="Path to the solution (e.g. solutions/fully-configurable)"
+    )
+    source_url: str = Field(..., description="GitHub URL of the DA solution directory")
+
+
+class ModuleComposition(BaseModel):
+    """A composition assembled live from the registry via the existing tools."""
+
+    composition_name: str = Field(..., description="Name derived from the request")
+    description: str = Field(..., description="One-line summary of the composition")
+    prompt: str = Field(..., description="The original request")
+    da_grounded: bool = Field(
+        ..., description="Whether wiring was grounded in a deployable architecture"
+    )
+    reference_solution: ReferenceSolution | None = Field(
+        None,
+        description="The DA solution the wiring was grounded in (only when da_grounded)",
+    )
+    recommended_modules: list[RecommendedModule] = Field(
+        ..., description="Modules resolved live via search_modules"
+    )
+    deployment_order: list[str] = Field(
+        ..., description="Instance names in recommended deployment order"
+    )
+    connections: list[ModuleConnection] = Field(
+        ..., description="How module outputs wire into other module inputs"
+    )
+    prerequisites: list[CompositionPrerequisite] = Field(
+        ..., description="Inputs the consumer must supply"
+    )
+    notes: list[str] = Field(
+        default_factory=list, description="Caveats and unresolved items"
+    )
