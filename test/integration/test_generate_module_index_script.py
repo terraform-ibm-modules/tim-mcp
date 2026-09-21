@@ -59,6 +59,13 @@ async def test_generate_module_index_script_execution(tmp_path, monkeypatch):
     mock_gh_client = MagicMock()
     mock_gh_client.__aenter__ = AsyncMock(return_value=mock_gh_client)
     mock_gh_client.__aexit__ = AsyncMock(return_value=None)
+    mock_gh_client.parse_github_url = MagicMock(
+        return_value=("terraform-ibm-modules", "terraform-ibm-test-module")
+    )
+    mock_gh_client.get_repository_info = AsyncMock(
+        return_value={"archived": False, "topics": ["core-team", "terraform-module"]}
+    )
+    mock_gh_client.get_file_content = AsyncMock(return_value={"decoded_content": ""})
 
     # Patch the dependencies
     with patch("generate_module_index.load_config", return_value=mock_config):
@@ -82,3 +89,64 @@ async def test_generate_module_index_script_execution(tmp_path, monkeypatch):
     assert "total_modules" in data
     assert "modules" in data
     assert isinstance(data["modules"], list)
+
+    # The one module the mocks describe must actually survive filtering --
+    # asyncio.gather(..., return_exceptions=True) in generate_module_index
+    # will otherwise swallow a mock/wiring mismatch as a silently-dropped
+    # module rather than a failed test (this caught exactly that once).
+    assert data["total_modules"] == 1
+    assert data["modules"][0]["id"] == "terraform-ibm-modules/test-module/ibm/1.0.0"
+
+
+@pytest.mark.asyncio
+async def test_generate_module_index_excludes_repo_missing_required_topic(
+    tmp_path, monkeypatch
+):
+    """A module whose repo lacks the required topic is filtered out."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token-for-testing")
+    output_file = tmp_path / "module_index.json"
+
+    mock_config = MagicMock()
+    mock_config.allowed_namespaces = ["terraform-ibm-modules"]
+
+    mock_tf_client = MagicMock()
+    mock_tf_client.__aenter__ = AsyncMock(return_value=mock_tf_client)
+    mock_tf_client.__aexit__ = AsyncMock(return_value=None)
+    mock_tf_client.list_all_modules = AsyncMock(
+        return_value=[
+            {
+                "id": "terraform-ibm-modules/community-module/ibm/1.0.0",
+                "namespace": "terraform-ibm-modules",
+                "name": "community-module",
+                "provider": "ibm",
+                "description": "Not a core-team module",
+                "source": "https://github.com/terraform-ibm-modules/terraform-ibm-community-module",
+                "published_at": "2026-01-01T00:00:00Z",
+                "downloads": 100,
+            }
+        ]
+    )
+
+    mock_gh_client = MagicMock()
+    mock_gh_client.__aenter__ = AsyncMock(return_value=mock_gh_client)
+    mock_gh_client.__aexit__ = AsyncMock(return_value=None)
+    mock_gh_client.parse_github_url = MagicMock(
+        return_value=("terraform-ibm-modules", "terraform-ibm-community-module")
+    )
+    mock_gh_client.get_repository_info = AsyncMock(
+        return_value={"archived": False, "topics": ["terraform-module"]}
+    )
+
+    with patch("generate_module_index.load_config", return_value=mock_config):
+        with patch(
+            "generate_module_index.TerraformClient", return_value=mock_tf_client
+        ):
+            with patch(
+                "generate_module_index.GitHubClient", return_value=mock_gh_client
+            ):
+                await generate_module_index(output_path=output_file)
+
+    with open(output_file) as f:
+        data = json.load(f)
+
+    assert data["total_modules"] == 0
