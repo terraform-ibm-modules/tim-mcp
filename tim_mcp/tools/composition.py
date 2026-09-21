@@ -363,16 +363,25 @@ def _mentions_da(prompt: str) -> bool:
 _SVC_BY_KEY = {s.key: s for s in _SERVICES}
 
 
-def _finalize(picked: dict[str, _Service]) -> list[_Service]:
-    """Add the RG foundation + a VPC for clusters, then sort by deployment order."""
+def _finalize(picked: dict[str, _Service]) -> tuple[list[_Service], set[str]]:
+    """
+    Add the RG foundation + a VPC for clusters, sort by deployment order.
+
+    Returns (services, auto_added_keys). auto_added_keys are the services the
+    tool injected itself (never requested), so the caller can tell an unresolved
+    *requested* service apart from a missing convenience add-on.
+    """
+    auto: set[str] = set()
     if "resource_group" not in picked:
         picked["resource_group"] = _SVC_BY_KEY["resource_group"]
+        auto.add("resource_group")
     if _NEEDS_VPC & set(picked) and "vpc" not in picked:
         picked["vpc"] = _SVC_BY_KEY["vpc"]
-    return sorted(picked.values(), key=lambda s: (s.priority, s.key))
+        auto.add("vpc")
+    return sorted(picked.values(), key=lambda s: (s.priority, s.key)), auto
 
 
-def _detect_services(prompt: str) -> list[_Service]:
+def _detect_services(prompt: str) -> tuple[list[_Service], set[str]]:
     """Classify which services the prompt asks for (deduped, deployment-ordered)."""
     p = f" {prompt.lower()} "
     picked: dict[str, _Service] = {}
@@ -447,7 +456,7 @@ def _adhoc_service(term: str) -> _Service:
     )
 
 
-def _services_from_terms(terms: list[str]) -> list[_Service]:
+def _services_from_terms(terms: list[str]) -> tuple[list[_Service], set[str]]:
     """Resolve caller-supplied service terms into _Service entries (ordered)."""
     picked: dict[str, _Service] = {}
     for term in terms:
@@ -595,10 +604,40 @@ def _pick_output(
 # --- Live tool calls (isolated so tests can mock them) ---------------------
 
 
+def _index_module(name_prefs: list[str]):
+    """
+    Resolve a service straight from the bundled index by exact module name.
+
+    ``name_match`` names the real module(s) a service maps to (e.g. openshift ->
+    "base-ocp-vpc", vpc -> "landing-zone-vpc"), so a curated service resolves
+    from the local index with zero API calls — no GitHub token or rate-limit
+    exposure. Index modules are already the curated core-team set, so no live
+    validation is needed. Returns a ModuleInfo, or None on an index miss.
+    """
+    from .search import module_info_from_index_entry
+
+    _, entries = _index_phrases()
+    for pref in name_prefs:
+        entry = entries.get(pref)
+        if entry is not None:
+            info = module_info_from_index_entry(entry)
+            if info is not None:
+                return info
+    return None
+
+
 async def _search_best(svc: _Service, config: Config):
-    """Resolve a service to its best-matching module via search_modules."""
+    """Resolve a service to its best-matching module.
+
+    Curated services resolve from the bundled index first (instant, token-free);
+    only ad-hoc terms and index misses fall through to the live registry search.
+    """
     from ..types import ModuleSearchRequest
     from .search import search_modules_impl
+
+    hit = _index_module(svc.name_match)
+    if hit is not None:
+        return hit
 
     resp = await search_modules_impl(
         ModuleSearchRequest(query=svc.query, limit=5), config
@@ -708,9 +747,11 @@ async def _resolve_da_solution(module, config: Config) -> str | None:
         owner, repo = repo_info
         try:
             items = await gh.get_directory_contents(owner, repo, "solutions")
-        except Exception as e:  # noqa: BLE001 - DA grounding is best-effort
+        except Exception:  # noqa: BLE001 - DA grounding is best-effort
             logger.warning(
-                "Could not list DA solutions", repo=f"{owner}/{repo}", error=str(e)
+                "Could not list DA solutions",
+                repo=f"{owner}/{repo}",
+                exc_info=True,
             )
             return None
 
@@ -1298,9 +1339,11 @@ async def generate_module_composition_impl(
     prompt_text = (request.prompt or "").strip()
     # Prefer the caller-supplied service list; fall back to parsing the prompt.
     if request.services:
-        services = _services_from_terms(request.services)
+        services, auto_added = _services_from_terms(request.services)
     else:
-        services = _detect_services(prompt_text)
+        services, auto_added = _detect_services(prompt_text)
+    # Services the user actually asked for (not the RG/VPC add-ons we inject).
+    requested = [s for s in services if s.key not in auto_added]
     da = request.include_da or (bool(prompt_text) and _mentions_da(prompt_text))
     notes: list[str] = []
 
@@ -1407,8 +1450,31 @@ async def generate_module_composition_impl(
                 "manually.",
             )
 
-    primary = next((e for e in resolved if e["svc"].priority == 5), resolved[-1])
-    composition_name = f"{primary['svc'].key}-composition"
+    # Flag loudly when a service the user *requested* couldn't be resolved, so a
+    # partial result isn't mistaken for a complete one (and isn't silently named
+    # after a surviving add-on like the auto-added VPC).
+    resolved_keys = {e["svc"].key for e in resolved}
+    unresolved_requested = [s for s in requested if s.key not in resolved_keys]
+    if unresolved_requested:
+        names = ", ".join(s.display for s in unresolved_requested)
+        notes.insert(
+            0,
+            f"Requested service(s) not resolved: {names}. This composition is "
+            "incomplete — no matching module was found. Check the server's "
+            "GITHUB_TOKEN / network, or name the module explicitly.",
+        )
+
+    # Name the composition after the primary service the user *requested* (highest
+    # deployment priority = the workload), even if it failed to resolve — the
+    # name should reflect intent, not whichever add-on happened to survive.
+    primary_requested = next(
+        iter(sorted(requested, key=lambda s: (-s.priority, s.key))), None
+    )
+    if primary_requested is not None:
+        composition_name = f"{primary_requested.key}-composition"
+    else:
+        primary = next((e for e in resolved if e["svc"].priority == 5), resolved[-1])
+        composition_name = f"{primary['svc'].key}-composition"
     effective_prompt = prompt_text or "services: " + ", ".join(request.services or [])
 
     logger.info(

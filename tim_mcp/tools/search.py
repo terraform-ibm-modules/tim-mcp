@@ -310,11 +310,22 @@ async def search_modules_impl(
                 modules=final_modules,
             )
 
-        except TIMError:
-            # Re-raise TIM errors as-is to preserve error context
-            raise
         except Exception as e:
-            # Wrap unexpected errors with context
+            # The live registry/GitHub path failed (rate limit, network, auth).
+            # If the local index already matched something, degrade to that
+            # rather than discarding a good answer — the index is the curated
+            # core-team set, so it's a safe fallback. Log with the traceback so
+            # the cause (e.g. 403 rate limit vs no results) isn't lost.
+            if index_result is not None:
+                logger.warning(
+                    "Live search failed; returning local index results",
+                    query=request.query,
+                    index_count=len(index_result.modules),
+                    exc_info=True,
+                )
+                return index_result
+            if isinstance(e, TIMError):
+                raise
             raise TIMValidationError(
                 f"Unexpected error processing search results: {e}"
             ) from e
@@ -503,6 +514,36 @@ def load_module_index() -> dict[str, Any] | None:
     return None
 
 
+def module_info_from_index_entry(entry: dict[str, Any]) -> ModuleInfo | None:
+    """
+    Build a ModuleInfo from one ``module_index.json`` entry, or None if invalid.
+
+    Index IDs are stored as ``namespace/name/provider/version``; the version is
+    split off so the ``id`` works directly with the other tools. Index modules
+    are already the curated/core-team set, so they need no live validation.
+    """
+    parts = entry.get("id", "").split("/")
+    module_id = "/".join(parts[:3]) if len(parts) == 4 else entry.get("id", "")
+    version = parts[3] if len(parts) == 4 else ""
+    try:
+        return ModuleInfo(
+            id=module_id,
+            namespace=parts[0] if parts else "",
+            name=entry["name"],
+            provider=parts[2] if len(parts) >= 3 else "",
+            version=version,
+            description=entry.get("description", ""),
+            source_url=entry["source_url"],
+            downloads=entry.get("downloads", 0),
+            verified=False,
+            published_at=datetime.fromisoformat(
+                entry["published_at"].replace("Z", "+00:00")
+            ),
+        )
+    except Exception:
+        return None
+
+
 def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
     """
     Search the local module index without making any API calls.
@@ -577,33 +618,10 @@ def _search_index(query: str, limit: int) -> ModuleSearchResponse | None:
 
     modules: list[ModuleInfo] = []
     for _, _, m in scored:
-        # Index IDs are stored as "namespace/name/provider/version".
-        # Strip the version so the id works directly with other tools.
-        raw_id = m["id"]
-        parts = raw_id.split("/")
-        module_id = "/".join(parts[:3]) if len(parts) == 4 else raw_id
-        version = parts[3] if len(parts) == 4 else ""
-
-        try:
-            modules.append(
-                ModuleInfo(
-                    id=module_id,
-                    namespace=parts[0] if parts else "",
-                    name=m["name"],
-                    provider=parts[2] if len(parts) >= 3 else "",
-                    version=version,
-                    description=m.get("description", ""),
-                    source_url=m["source_url"],
-                    downloads=m.get("downloads", 0),
-                    verified=False,
-                    published_at=datetime.fromisoformat(
-                        m["published_at"].replace("Z", "+00:00")
-                    ),
-                )
-            )
-        except Exception:
+        info = module_info_from_index_entry(m)
+        if info is None:
             continue
-
+        modules.append(info)
         if len(modules) >= limit:
             break
 

@@ -621,10 +621,10 @@ async def test_unmapped_workload_is_flagged(config):
 def test_index_recognises_a_service_the_keyword_map_lacks():
     """Db2 and Elasticsearch are in no keyword entry — the index supplies them."""
     assert "db2_cloud" in [
-        s.instance for s in comp._detect_services("set up a Db2 database")
+        s.instance for s in comp._detect_services("set up a Db2 database")[0]
     ]
     assert "icd_elasticsearch" in [
-        s.instance for s in comp._detect_services("elasticsearch with cos backups")
+        s.instance for s in comp._detect_services("elasticsearch with cos backups")[0]
     ]
 
 
@@ -635,7 +635,8 @@ def test_index_ignores_words_that_merely_appear_in_module_names():
     terraform-enterprise, app-configuration and security-group.
     """
     picked = [
-        s.instance for s in comp._detect_services("terraform modules for a secure app")
+        s.instance
+        for s in comp._detect_services("terraform modules for a secure app")[0]
     ]
     assert picked == ["resource_group"]
 
@@ -643,20 +644,21 @@ def test_index_ignores_words_that_merely_appear_in_module_names():
 def test_index_prefers_the_more_specific_module():
     """ "watsonx orchestrate" beats the broader "watsonx" keyword..."""
     picked = [
-        s.instance for s in comp._detect_services("watsonx orchestrate for my team")
+        s.instance for s in comp._detect_services("watsonx orchestrate for my team")[0]
     ]
     assert "watsonx_orchestrate" in picked
     assert "watsonx_ai" not in picked
     # ...unless watsonx.ai is asked for by name too
     both = [
-        s.instance for s in comp._detect_services("watsonx ai and watsonx orchestrate")
+        s.instance
+        for s in comp._detect_services("watsonx ai and watsonx orchestrate")[0]
     ]
     assert {"watsonx_ai", "watsonx_orchestrate"} <= set(both)
 
 
 def test_curated_keyword_wins_over_the_index():
     """ "object storage" is COS, not the module literally named *-file-storage."""
-    picked = [s.instance for s in comp._detect_services("i need object storage")]
+    picked = [s.instance for s in comp._detect_services("i need object storage")[0]]
     assert "cos" in picked
     assert "vpc_file_storage" not in picked
 
@@ -664,7 +666,7 @@ def test_curated_keyword_wins_over_the_index():
 def test_index_service_priority_comes_from_its_category():
     """An index-derived service is placed by category, not lumped in as a workload."""
     picked = {
-        s.instance: s for s in comp._detect_services("event notifications please")
+        s.instance: s for s in comp._detect_services("event notifications please")[0]
     }
     assert picked["event_notifications"].priority == 4  # observability -> support
     assert comp._role_for(picked["event_notifications"].priority) == "support"
@@ -751,3 +753,25 @@ async def test_unresolvable_request_raises(config, monkeypatch):
     monkeypatch.setattr(comp, "_search_best", none_search)
     with pytest.raises(TIMError):
         await _run(config, prompt="openshift with kms")
+
+
+def test_index_module_resolves_curated_service_offline():
+    """Curated services resolve straight from the bundled index — no live call,
+    so OpenShift (module 'base-ocp-vpc') works with no GitHub token."""
+    info = comp._index_module(["base-ocp-vpc", "ocp"])
+    assert info is not None
+    assert info.id == "terraform-ibm-modules/base-ocp-vpc/ibm"
+    assert info.name == "base-ocp-vpc"
+    assert comp._index_module(["definitely-not-a-real-module"]) is None
+
+
+@pytest.mark.asyncio
+async def test_unresolved_requested_service_is_flagged(config):
+    """A requested service that can't be resolved is flagged loudly and the
+    composition is named after intent — not silently dropped for a survivor."""
+    c = await _run(config, services=["postgresql", "zzz_unknown_service"])
+    instances = {m.instance_name for m in c.recommended_modules}
+    assert "postgresql" in instances
+    assert "zzz_unknown_service" not in instances
+    assert c.notes and c.notes[0].startswith("Requested service(s) not resolved")
+    assert "zzz_unknown_service" in c.notes[0]
