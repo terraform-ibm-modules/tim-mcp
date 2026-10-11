@@ -18,7 +18,7 @@ dependencies = [
     "httpx==0.28.1",
     "limits==5.8.0",
     "packaging==26.3",
-    "pydantic==2.14.0",
+    "pydantic==2.14.1",
     "pyyaml==6.0.3",
     "structlog==26.1.0",
     "tenacity==9.2.1",
