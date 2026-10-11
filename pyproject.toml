@@ -39,7 +39,7 @@ dev = [
     "pytest-mock==3.16.0",
     "vcrpy==8.3.0",
     "ruff==0.17.0",
-    "hypothesis==6.168.5",
+    "hypothesis==6.169.0",
 ]
 
 [tool.uv]
