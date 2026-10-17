@@ -11,7 +11,7 @@ description = "Terraform IBM Modules MCP"
 readme = "README.md"
 requires-python = ">= 3.11.0"
 dependencies = [
-    "cachetools==7.2.2",
+    "cachetools==7.2.3",
     "click==8.5.0",
     "fastmcp==4.1.0",
     "freezegun==1.5.5",
@@ -36,7 +36,7 @@ dev = [
     "freezegun==1.5.5",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
-    "pytest-mock==3.16.0",
+    "pytest-mock==3.17.0",
     "vcrpy==8.3.0",
     "ruff==0.17.1",
     "hypothesis==6.170.1",
