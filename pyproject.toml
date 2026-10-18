@@ -13,7 +13,7 @@ requires-python = ">= 3.11.0"
 dependencies = [
     "cachetools==7.2.3",
     "click==8.5.0",
-    "fastmcp==4.1.0",
+    "fastmcp==4.1.1",
     "freezegun==1.5.5",
     "httpx==0.28.1",
     "limits==5.8.0",
