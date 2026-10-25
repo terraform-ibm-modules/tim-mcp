@@ -37,7 +37,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pytest-mock==3.17.0",
-    "vcrpy==8.3.0",
+    "vcrpy==8.4.0",
     "ruff==0.17.2",
     "hypothesis==6.170.9",
 ]
