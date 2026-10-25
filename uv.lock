@@ -1273,15 +1273,15 @@ wheels = [
 
 [[package]]
 name = "pytest-asyncio"
-version = "1.4.0"
+version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/7c/d36d04db312ecf4298932ef77e6e4a9e8ad017906e24e34f0b0c361a2473/pytest_asyncio-1.4.0.tar.gz", hash = "sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42", size = 58514, upload-time = "2026-05-26T09:56:04.083Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/9a/887535e477847f5159377ab35303923644840b13c0ca03c0a467f84d4680/pytest_asyncio-1.4.1.tar.gz", hash = "sha256:e8266eb094e5ee9ffdb2068c9836f33e209ea77a970eb846933d416b5602669b", size = 145237, upload-time = "2026-10-25T21:05:37.135Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/e2/08a497ef684b88559c9cc5f4ad53a37e7b99e727094a86d6ea32536d5d3c/pytest_asyncio-1.4.0-py3-none-any.whl", hash = "sha256:933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1", size = 16930, upload-time = "2026-05-26T09:56:02.576Z" },
+    { url = "https://files.pythonhosted.org/packages/46/d7/cd9e2708afdbf059658adaf08bdb0792ca52489871051d6ce7d498b51277/pytest_asyncio-1.4.1-py3-none-any.whl", hash = "sha256:507afa78ec77c6661164ef1a2368bc7820383fd1a14b2a7f813de8b5a92949cc", size = 17061, upload-time = "2026-10-25T21:05:35.473Z" },
 ]
 
 [[package]]
@@ -1729,20 +1729,20 @@ requires-dist = [
     { name = "packaging", specifier = "==26.3" },
     { name = "pydantic", specifier = "==2.14.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==9.1.1" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==1.4.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==1.4.1" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = "==3.17.0" },
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.17.2" },
     { name = "structlog", specifier = "==26.1.0" },
     { name = "tenacity", specifier = "==9.2.1" },
-    { name = "vcrpy", marker = "extra == 'dev'", specifier = "==8.4.0" },
+    { name = "vcrpy", marker = "extra == 'dev'", specifier = "==9.0.0" },
 ]
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pytest-asyncio", specifier = "==1.4.0" },
+    { name = "pytest-asyncio", specifier = "==1.4.1" },
     { name = "ruff", specifier = "==0.17.2" },
 ]
 
@@ -1800,15 +1800,15 @@ wheels = [
 
 [[package]]
 name = "vcrpy"
-version = "8.4.0"
+version = "9.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1b/0e/f4c7c08a75e4bd941490e3f4073d83886af357978cd388f38834ad9b6e55/vcrpy-8.4.0.tar.gz", hash = "sha256:e212fcea9c190a3dfa7c2d4fa3e4980aa208a9fd9d97cb739a1f00c7f6e9655c", size = 99177, upload-time = "2026-10-25T15:38:46.948Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/df/cd28e912771c5bba9bb998829a6c929ac418ad0e852dd67b5a769c5bd411/vcrpy-9.0.0.tar.gz", hash = "sha256:d8d639f96e7a20b9a02a830f316225a68373224eed1fb9db13f4e9022a88ae9b", size = 108545, upload-time = "2026-10-25T21:05:44.848Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/15/702c0380b570cd0ccfeb13a8b3f0fe58f47efb6ad42678eb83ac39b40161/vcrpy-8.4.0-py3-none-any.whl", hash = "sha256:3f9ce2568519901289645387b26287d0f989995258c6cca716798c1cd439a733", size = 47511, upload-time = "2026-10-25T15:38:45.403Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/28/2783fe4e3a64ad2b6af0b77575744aa3e8ecbb27771dfc3813b23904a3b2/vcrpy-9.0.0-py3-none-any.whl", hash = "sha256:9e074e3d0577dd9701b4960afc0c08fdb755eaf58bfaf9acc1ed2bbb389103ce", size = 52347, upload-time = "2026-10-25T21:05:43.135Z" },
 ]
 
 [[package]]
