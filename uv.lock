@@ -1736,7 +1736,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.17.2" },
     { name = "structlog", specifier = "==26.1.0" },
     { name = "tenacity", specifier = "==9.2.1" },
-    { name = "vcrpy", marker = "extra == 'dev'", specifier = "==8.3.0" },
+    { name = "vcrpy", marker = "extra == 'dev'", specifier = "==8.4.0" },
 ]
 provides-extras = ["dev"]
 
@@ -1800,15 +1800,15 @@ wheels = [
 
 [[package]]
 name = "vcrpy"
-version = "8.3.0"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/39/d5/8a1f8eb603e2d35fbb0ecd1e309d0c5c18a0ecfc8c0a8f04088bbc8f833b/vcrpy-8.3.0.tar.gz", hash = "sha256:46d64e77e8d95e5c76c7d9a94ff05d8b38b2ae4e1d4869eb0235024b6fcb5212", size = 96117, upload-time = "2026-07-04T14:27:01.608Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1b/0e/f4c7c08a75e4bd941490e3f4073d83886af357978cd388f38834ad9b6e55/vcrpy-8.4.0.tar.gz", hash = "sha256:e212fcea9c190a3dfa7c2d4fa3e4980aa208a9fd9d97cb739a1f00c7f6e9655c", size = 99177, upload-time = "2026-10-25T15:38:46.948Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/77/cb4219be91508399cbcb6143bad89462cfb16f6c638458f454a5d46ac95a/vcrpy-8.3.0-py3-none-any.whl", hash = "sha256:bd66e6143746778157f00e2a922527a8d96b2fdc350be8988a45a29c843815b9", size = 46530, upload-time = "2026-07-04T14:27:00.546Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/15/702c0380b570cd0ccfeb13a8b3f0fe58f47efb6ad42678eb83ac39b40161/vcrpy-8.4.0-py3-none-any.whl", hash = "sha256:3f9ce2568519901289645387b26287d0f989995258c6cca716798c1cd439a733", size = 47511, upload-time = "2026-10-25T15:38:45.403Z" },
 ]
 
 [[package]]
