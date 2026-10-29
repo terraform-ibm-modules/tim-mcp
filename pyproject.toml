@@ -11,7 +11,7 @@ description = "Terraform IBM Modules MCP"
 readme = "README.md"
 requires-python = ">= 3.11.0"
 dependencies = [
-    "cachetools==7.2.5",
+    "cachetools==7.2.7",
     "click==8.5.0",
     "fastmcp==4.1.4",
     "freezegun==1.5.5",
@@ -34,12 +34,12 @@ tim-mcp = "tim_mcp.main:cli"
 [project.optional-dependencies]
 dev = [
     "freezegun==1.5.5",
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-asyncio==1.4.1",
     "pytest-mock==3.17.0",
     "vcrpy==9.2.0",
-    "ruff==0.17.2",
-    "hypothesis==6.170.11",
+    "ruff==0.17.3",
+    "hypothesis==6.170.13",
 ]
 
 [tool.uv]
@@ -79,7 +79,7 @@ python_functions = "test_*"
 [dependency-groups]
 dev = [
     "pytest-asyncio==1.4.1",
-    "ruff==0.17.2",
+    "ruff==0.17.3",
 ]
 
 [tool.hatch.build]
