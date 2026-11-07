@@ -11,14 +11,14 @@ description = "Terraform IBM Modules MCP"
 readme = "README.md"
 requires-python = ">= 3.11.0"
 dependencies = [
-    "cachetools==7.2.8",
-    "click==8.5.0",
-    "fastmcp==4.1.5",
+    "cachetools==8.0.0",
+    "click==8.5.1",
+    "fastmcp==4.1.6",
     "freezegun==1.5.5",
     "httpx==0.28.1",
     "limits==5.8.0",
     "packaging==26.3",
-    "pydantic==2.14.2",
+    "pydantic==2.14.3",
     "pyyaml==6.0.3",
     "structlog==26.1.0",
     "tenacity==9.2.1",
@@ -37,9 +37,9 @@ dev = [
     "pytest==9.2.0",
     "pytest-asyncio==1.4.1.post1",
     "pytest-mock==3.17.0",
-    "vcrpy==9.4.0",
-    "ruff==0.17.3",
-    "hypothesis==6.170.14",
+    "vcrpy==9.4.2",
+    "ruff==0.17.4",
+    "hypothesis==6.170.15",
 ]
 
 [tool.uv]
@@ -79,7 +79,7 @@ python_functions = "test_*"
 [dependency-groups]
 dev = [
     "pytest-asyncio==1.4.1.post1",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
 ]
 
 [tool.hatch.build]
